@@ -387,3 +387,7 @@ KUBESAGE_SNAPSHOT_DIR=/tmp/snap go test ./internal/ui -run Snapshot  # dumps ANS
 
 Metrics-server CPU/memory per pod, CRD browsing via discovery, Helm releases,
 multi-cluster pulse, log search and highlighting, AI-generated patches applied after a diff preview, and plugins.
+
+## License
+
+[MIT](LICENSE) © 2026 Gaurav Thakur
