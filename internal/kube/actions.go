@@ -230,16 +230,23 @@ func Containers(p *corev1.Pod) []string {
 
 // LogOptions controls a log request.
 type LogOptions struct {
-	Container string
-	Tail      int64
-	Previous  bool
-	Follow    bool
+	Container  string
+	Tail       int64
+	Previous   bool
+	Follow     bool
+	Since      time.Duration // only lines newer than this (0 = use Tail)
+	Timestamps bool          // prefix each line with its RFC3339 timestamp
 }
 
 // Logs opens a log stream for a pod container.
 func (c *Client) Logs(ctx context.Context, ns, pod string, o LogOptions) (io.ReadCloser, error) {
-	opts := &corev1.PodLogOptions{Container: o.Container, Previous: o.Previous, Follow: o.Follow, Timestamps: false}
-	if o.Tail > 0 {
+	opts := &corev1.PodLogOptions{Container: o.Container, Previous: o.Previous, Follow: o.Follow, Timestamps: o.Timestamps}
+	if o.Since > 0 {
+		secs := int64(o.Since.Seconds())
+		opts.SinceSeconds = &secs
+		limit := int64(20000) // keep memory bounded even for a busy pod
+		opts.TailLines = &limit
+	} else if o.Tail > 0 {
 		opts.TailLines = &o.Tail
 	}
 	return c.Clientset.CoreV1().Pods(ns).GetLogs(pod, opts).Stream(ctx)

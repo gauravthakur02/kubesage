@@ -31,12 +31,14 @@ type Row struct {
 	Name      string
 	Cells     []string
 	Health    Health
+	Usage     *Usage // live CPU/memory (pods, when metrics-server is available)
 }
 
 // Table is a list result ready to render.
 type Table struct {
 	Columns []string
 	Rows    []Row
+	Note    string // short live status shown in the title (UI-provided tables)
 }
 
 // Resource describes a browsable resource type.
@@ -70,6 +72,9 @@ func (r Resource) HasSelector() bool {
 
 // List fetches the table for this resource in the client's namespace.
 func (r Resource) List(ctx context.Context, c *Client) (Table, error) {
+	if r.keepOrder { // UI-provided tables: no namespace fan-out, keep rows and note as given
+		return r.list(ctx, c, c.Namespace)
+	}
 	ns := c.Namespace
 	if !r.Namespaced {
 		ns = ""
@@ -327,7 +332,16 @@ func listPods(ctx context.Context, c *Client, ns string) (Table, error) {
 			cells = append(cells, cpu, mem)
 		}
 		cells = append(cells, p.Status.PodIP, p.Spec.NodeName, Age(p.CreationTimestamp))
-		t.Rows = append(t.Rows, Row{Namespace: p.Namespace, Name: p.Name, Health: health, Cells: cells})
+		row := Row{Namespace: p.Namespace, Name: p.Name, Health: health, Cells: cells}
+		if m, ok := metrics[p.Namespace+"/"+p.Name]; ok && merr == nil {
+			var u Usage
+			for _, cu := range m {
+				u.CPUMilli += cu.CPUMilli
+				u.MemBytes += cu.MemBytes
+			}
+			row.Usage = &u
+		}
+		t.Rows = append(t.Rows, row)
 	}
 	sortRows(t.Rows)
 	return t, nil

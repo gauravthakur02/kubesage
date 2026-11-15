@@ -174,3 +174,39 @@ func TestSecretRevealOnProdNeedsTypedName(t *testing.T) {
 		t.Fatal("typing the secret name should unmask")
 	}
 }
+
+func TestUsageHistoryAndSparklines(t *testing.T) {
+	if got := sparkline([]int64{1, 2, 3, 4, 5, 6, 7, 8}, 8); got != "▁▂▃▄▅▆▇█" {
+		t.Fatalf("sparkline = %q", got)
+	}
+	if got := sparkline([]int64{5, 5, 5}, 8); got != "▁▁▁" {
+		t.Fatalf("flat sparkline = %q", got)
+	}
+	h := newHistory()
+	base := time.Now()
+	for i := 0; i < 200; i++ {
+		h.record("k", kube.Usage{CPUMilli: int64(i), MemBytes: int64(i) << 20}, base.Add(time.Duration(i)*5*time.Second))
+	}
+	s := h.get("k")
+	if len(s) != histKeep || s[1].at.Sub(s[0].at) < histInterval {
+		t.Fatalf("history must be throttled to one sample per %s and capped at %d: n=%d", histInterval, histKeep, len(s))
+	}
+
+	a := newHealthApp(t, healthyPod())
+	a.hist = newHistory() // start empty; samples arrive in time order
+	key := histKey(a.client.Context, "shop", "api-1")
+	for i, mem := range []int64{100, 150, 240} {
+		a.hist.record(key, kube.Usage{CPUMilli: 50 + int64(i)*50, MemBytes: mem << 20}, time.Now().Add(time.Duration(i-3)*time.Minute))
+	}
+	a.Update(tea.WindowSizeMsg{Width: 170, Height: 40})
+	run(a, a.refresh(), 0)
+	view := ansi.Strip(a.View())
+	if !strings.Contains(view, "MEM 15m") || !strings.Contains(view, "▁") {
+		t.Fatalf("pods table should show the memory trend:\n%s", view)
+	}
+	press(a, "h")
+	health := ansi.Strip(strings.Join(a.textLines, "\n"))
+	if !strings.Contains(health, "Mem trend") || !strings.Contains(health, "100Mi → 240Mi") {
+		t.Fatalf("health report should show trends:\n%s", health)
+	}
+}

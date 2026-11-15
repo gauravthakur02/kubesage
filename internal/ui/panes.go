@@ -48,6 +48,21 @@ type pane struct {
 	secret     *corev1.Secret // decoded secret being viewed (dropped when leaving the view)
 	nowrap     bool           // long lines are wrapped by default; w toggles
 
+	// search in the text/log view
+	search      string
+	matches     []int // logical line indices that match
+	matchIdx    int
+	visualStart []int // first visual (wrapped) line of each logical line
+
+	// what the log view is streaming (so it can be restarted with another window)
+	logSpec logSpec
+
+	// backTo is where esc returns from a drill-down table (e.g. rollout history → deployments)
+	backTo *kube.Resource
+
+	// edit is an open safe-edit session (editor → diff + dry-run → apply)
+	edit *editState
+
 	// pulse / issues (per pane, so two clusters can be compared)
 	pulse       *kube.Pulse
 	issues      []kube.Issue

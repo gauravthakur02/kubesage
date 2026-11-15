@@ -62,6 +62,18 @@ func (a *App) handleHealth(m healthMsg) {
 		return
 	}
 	a.textTitle = "health pod/" + m.report.Name + " · refreshes every " + fmt.Sprint(a.cfg.RefreshSeconds) + "s"
+	var u kube.Usage
+	have := false
+	for _, c := range m.report.Containers {
+		if c.Usage != nil {
+			u.CPUMilli += c.Usage.CPUMilli
+			u.MemBytes += c.Usage.MemBytes
+			have = true
+		}
+	}
+	if have {
+		a.hist.record(histKey(a.client.Context, m.report.Namespace, m.report.Name), u, time.Now())
+	}
 	a.textLines = a.healthLines(m.report)
 	a.renderText(!m.refresh)
 }
@@ -116,6 +128,14 @@ func (a *App) healthLines(h *kube.PodHealth) []string {
 	}
 	if h.MetricsErr != nil {
 		out = append(out, "  "+label("Usage")+s.Muted.Render("live CPU/memory unavailable (metrics-server missing or not allowed)"))
+	} else if hs := a.hist.get(histKey(a.client.Context, h.Namespace, h.Name)); len(hs) >= 2 {
+		span := time.Since(hs[0].at).Round(time.Minute)
+		milli := func(v int64) string { return fmt.Sprintf("%dm", v) }
+		out = append(out,
+			"  "+label("CPU trend")+s.Title.Render(sparkline(series(hs, false), 30))+"  "+s.Muted.Render(trendSummary(series(hs, false), milli)+" · last "+span.String()),
+			"  "+label("Mem trend")+s.Title.Render(sparkline(series(hs, true), 30))+"  "+s.Muted.Render(trendSummary(series(hs, true), kube.FormatBytes)+" · last "+span.String()))
+	} else {
+		out = append(out, "  "+label("Trend")+s.Muted.Render("collecting… (one sample every 10s, up to 15 minutes; also from the pods table)"))
 	}
 
 	for _, c := range h.Containers {

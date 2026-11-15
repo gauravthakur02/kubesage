@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -298,5 +299,52 @@ func TestRBACTables(t *testing.T) {
 	tbl, _ = roles.List(context.Background(), c)
 	if tbl.Rows[0].Health != HealthWarn {
 		t.Fatal("wildcard rules should be flagged")
+	}
+}
+
+func TestPolicyScan(t *testing.T) {
+	no, yes, uid := false, true, int64(1000)
+	good := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "good", Namespace: "shop"}, Spec: appsv1.DeploymentSpec{
+		Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{AutomountServiceAccountToken: &no,
+			SecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: &yes, RunAsUser: &uid},
+			Containers: []corev1.Container{{Name: "api", Image: "myacr.azurecr.io/shop/api:1.4",
+				SecurityContext: &corev1.SecurityContext{AllowPrivilegeEscalation: &no, ReadOnlyRootFilesystem: &yes,
+					Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}},
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m"), corev1.ResourceMemory: resource.MustParse("128Mi")},
+					Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("200m"), corev1.ResourceMemory: resource.MustParse("256Mi")}},
+				ReadinessProbe: &corev1.Probe{}, LivenessProbe: &corev1.Probe{}}}}}}}
+	bad := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "bad", Namespace: "shop"}, Spec: appsv1.DeploymentSpec{
+		Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{HostNetwork: true,
+			Containers: []corev1.Container{{Name: "app", Image: "busybox", SecurityContext: &corev1.SecurityContext{Privileged: &yes}}}}}}}
+	sys := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "kube-system"}, Spec: appsv1.DaemonSetSpec{
+		Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{HostNetwork: true, Containers: []corev1.Container{{Name: "a", Image: "x"}}}}}}
+	c := &Client{Clientset: fake.NewSimpleClientset(good, bad, sys), Namespace: AllNamespaces}
+	fs, err := c.PolicyScan(context.Background(), PolicyOptions{AllowedRegistries: []string{`^[a-z0-9-]+\.azurecr\.io/`}, SkipNamespaces: []string{"kube-system"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := map[string]Health{}
+	for _, f := range fs {
+		if f.Workload == "good" {
+			t.Errorf("a hardened deployment should have no findings, got %s: %s", f.Check, f.Message)
+		}
+		if f.Namespace == "kube-system" {
+			t.Error("skipped namespaces must not be checked")
+		}
+		checks[f.Check] = f.Severity
+	}
+	for check, sev := range map[string]Health{"host namespaces": HealthErr, "privileged": HealthErr, "image registry": HealthErr,
+		"image tag": HealthWarn, "runs as root": HealthWarn, "capabilities": HealthWarn, "resource limits": HealthWarn,
+		"writable root filesystem": HealthWarn, "service account token": HealthNeutral} {
+		if checks[check] != sev {
+			t.Errorf("check %q: severity %v, want %v", check, checks[check], sev)
+		}
+	}
+	if fs[0].Severity != HealthErr {
+		t.Fatal("errors first")
+	}
+	if _, err := c.PolicyScan(context.Background(), PolicyOptions{AllowedRegistries: []string{"("}}); err == nil {
+		t.Fatal("invalid registry regex must be reported")
 	}
 }

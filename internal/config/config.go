@@ -146,8 +146,18 @@ type Config struct {
 	DangerContexts string   `yaml:"danger_contexts"`
 	Favorites      []string `yaml:"favorites"`
 	AI             AIConfig `yaml:"ai"`
+	Policy         Policy   `yaml:"policy"`
 
 	path string
+}
+
+// Policy configures the workload policy/security checks (V, :policy, kubesage scan --policy).
+type Policy struct {
+	// AllowedRegistries are regular expressions images must match, e.g. '^[a-z0-9-]+\.azurecr\.io/'.
+	// Empty turns the registry check off.
+	AllowedRegistries []string `yaml:"allowed_registries"`
+	// SkipNamespaces are not checked (system components that legitimately need privileges).
+	SkipNamespaces []string `yaml:"skip_namespaces"`
 }
 
 // Default returns a config with sensible defaults (local Ollama first).
@@ -160,6 +170,8 @@ func Default() *Config {
 		Animations:     true,
 		DangerContexts: `(?i)(prod|prd|-p$|live)`,
 		Favorites:      []string{"pods", "deployments", "services", "events", "nodes"},
+		Policy: Policy{SkipNamespaces: []string{"kube-system", "kube-public", "kube-node-lease", "gatekeeper-system",
+			"calico-system", "tigera-operator", "azure-workload-identity-system"}},
 		AI: AIConfig{
 			Active:          "local",
 			Redact:          true,

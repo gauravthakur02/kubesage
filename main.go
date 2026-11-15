@@ -29,7 +29,8 @@ const usage = `kubesage — a Kubernetes IDE for your terminal, with an AI copil
 
 Usage:
   kubesage [flags]                 launch the interactive UI
-  kubesage scan [flags]            print detected issues (exit code 2 if errors found)
+  kubesage scan [--policy] [flags] print detected issues (exit code 2 if errors found);
+                                   --policy adds security/config checks of every workload
   kubesage ask [flags] "question"  ask the AI about the cluster, answer streams to stdout
   kubesage ai                      list AI profiles and whether their API key is found
   kubesage ai test [profile]       send a tiny prompt to check a profile works
@@ -145,7 +146,15 @@ func main() {
 		_, err := tea.NewProgram(app, tea.WithAltScreen()).Run()
 		exitIf(err)
 	case "scan":
-		os.Exit(runScan(client))
+		code := runScan(client)
+		for _, a := range subArgs {
+			if a == "--policy" || a == "-policy" {
+				if pc := runPolicyScan(cfg, client); pc > code {
+					code = pc
+				}
+			}
+		}
+		os.Exit(code)
 	case "ask":
 		runAsk(cfg, client, strings.Join(subArgs, " "), *readOnly || cfg.ReadOnly)
 	default:
@@ -506,4 +515,35 @@ func splitGlobalFlags(fs *flag.FlagSet, args []string) (globals, rest []string) 
 		}
 	}
 	return globals, rest
+}
+
+func runPolicyScan(cfg *config.Config, c *kube.Client) int {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	fs, err := c.PolicyScan(ctx, kube.PolicyOptions{AllowedRegistries: cfg.Policy.AllowedRegistries, SkipNamespaces: cfg.Policy.SkipNamespaces})
+	exitIf(err)
+	red := lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e")).Bold(true)
+	yellow := lipgloss.NewStyle().Foreground(lipgloss.Color("#e0af68")).Bold(true)
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("#737aa2"))
+	fmt.Printf("\npolicy & security checks · %s · namespace %s\n\n", c.Context, c.NamespaceLabel())
+	code, errs, warns := 0, 0, 0
+	for _, f := range fs {
+		label := dim.Render("  info ")
+		switch f.Severity {
+		case kube.HealthErr:
+			label, code = red.Render("✗ ERROR"), 2
+			errs++
+		case kube.HealthWarn:
+			label = yellow.Render("▲ WARN ")
+			warns++
+		}
+		ctr := ""
+		if f.Container != "" {
+			ctr = " [" + f.Container + "]"
+		}
+		fmt.Printf("%s %-24s %s/%s/%s%s\n        %s\n", label, f.Check, f.Namespace, strings.TrimSuffix(f.Kind, "s"), f.Workload, ctr, f.Message)
+		fmt.Println(dim.Render("        → " + f.Hint))
+	}
+	fmt.Printf("\n%d errors · %d warnings · %d findings in total\n", errs, warns, len(fs))
+	return code
 }

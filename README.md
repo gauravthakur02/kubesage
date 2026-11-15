@@ -58,6 +58,7 @@ Describe, YAML, edit, delete and AI analysis work on every type. The header's ta
 |---|---|
 | `1`-`9`, `tab` | resource tabs (favorites) |
 | `:pods`, `:deploy`, `:sts`, `:ds`, `:rs`, `:jobs`, `:cj`, `:svc`, `:ing`, `:cm`, `:secret`, `:pvc`, `:hpa`, `:ev`, `:nodes`, `:ns` | jump to a resource (`:pods kube-system` or `:pods all`) |
+| `V` / `:policy` | **policy & security checks** for every workload, with AI fixes |
 | `H` / `:pulse` | **Pulse**: node/pod/deployment health bars, CPU/memory requests vs capacity, detected issues |
 | `A` / `:ai <question>` | **AI chat** about the cluster |
 | `?` | help |
@@ -91,7 +92,8 @@ There is one AI conversation, shown in whichever pane is in AI mode. Pressing `a
 | `l` / `p` | live logs / previous (crashed) container logs, with container and pod pickers |
 | `s` | **shell into a container**: full TTY with resize, bash → ash → sh, no kubectl needed, debug-container fallback for distroless images |
 | `a` | **AI analyze**: sends the manifest, events, detected issues and recent and previous logs to the model |
-| `e` | `kubectl edit` |
+| `e` | **safe edit**: your editor → diff → server dry-run → apply on request |
+| `o` | **rollout history** of a deployment: diff revisions, `U` to roll back |
 | `S` / `R` / `D` | scale, rollout restart, delete |
 | `f` | list port-forwards: open, go to, stop |
 | `F` | **port-forward** a pod, service, deployment, statefulset or daemonset (services resolve named target ports to a ready pod) |
@@ -137,6 +139,53 @@ With more than one container you pick one; init containers are left out because 
 - **Images without a shell** (distroless or scratch): kubesage offers to attach an ephemeral `busybox` debug container that shares the container's processes
   (`kubectl debug --target`). It asks first, because this permanently adds an ephemeral container to the pod, and it is unavailable in `--readonly` mode.
 - For a single command without an interactive shell, use `!exec <pod> -- <cmd>`. It goes through the same approval as other changes.
+
+### Logs
+
+- **Search:** `/` searches any log, YAML or describe view (case-insensitive) and highlights every match. `n` / `N` jump to the next or previous match, keeping wrapped lines in view, and `esc` clears the search.
+- **Time window:** `t` picks *last 500 lines, 5m, 15m, 1h, 6h or 24h*, and `T` toggles timestamps. Both restart the stream.
+- **All pods at once:** on a deployment, statefulset, daemonset or job, `l` offers **★ all N pods, merged**. It follows one container in up to 20 pods in a single stream,
+  with each line prefixed by a colour-coded `[pod]` tag (the pod name's suffix). Search works across the merged stream.
+
+### Resource trends
+
+kubesage keeps about 15 minutes of CPU and memory samples per pod in memory (one every 10 s, from the pods table and health reports).
+The pods table gains a **`MEM 15m`** sparkline column once it has data and there is room. The **health report** (`h`) shows CPU and memory trend lines with start → now, minimum and maximum, so a pod creeping toward its memory limit stands out.
+
+### Rollout history and rollback
+
+`o` on a deployment opens its **revision history**: every ReplicaSet revision with its images, ready replicas, age and change-cause, plus the live rollout status
+(`✓ rolled out`, `rolling out: 2 of 3 new replicas updated` or `✗ rollout stuck`).
+- `enter` / `d` diffs a revision's pod template against the current one (the ReplicaSet hash label is ignored).
+- `U` rolls back to that revision, like `kubectl rollout undo --to-revision`. It asks first, needs the name typed on production-like contexts, and is blocked in read-only mode.
+- `esc` returns to the deployments list.
+
+### Safe edit
+
+`e` opens any object in your editor (`$KUBE_EDITOR`, `$EDITOR`, `$VISUAL`, or `vi` / `notepad`), with `managedFields` and `status` stripped. When you save and close:
+1. kubesage shows a coloured **diff** against the live object.
+2. It runs a **server-side dry-run**: the API server validates the change, including admission webhooks and policies, **without persisting it**.
+   Rejections are shown with the reason, and policy **warnings** are listed (they are captured instead of being printed over the screen).
+3. `A` applies the change after confirmation, `e` reopens the editor with your changes, and `esc` discards them.
+If someone changed the object in the meantime, apply fails safely and your edits are kept. Renames and namespace moves are refused, and `--readonly` blocks editing. kubectl is not needed.
+
+### Policy & security checks
+
+`V` (or `:policy`) checks the pod template of every Deployment, StatefulSet, DaemonSet and CronJob, plus bare pods, in the focused namespace (or all namespaces):
+
+| Severity | Checks |
+|---|---|
+| ✗ error | privileged containers · host network/PID/IPC (a warning for DaemonSets, where node agents need it) · images outside `allowed_registries` |
+| ▲ warn | may run as root · privilege escalation allowed · writable root filesystem · capabilities not dropped · missing CPU/memory limits · no requests · `:latest`/untagged images · hostPath volumes |
+| info | service-account token mounted · missing readiness/liveness probes |
+
+`enter` opens the workload YAML, `e` safe-edits it, and **`a` asks the AI for the smallest patch** that fixes all findings of that workload. The AI is told not to apply anything and to explain findings that should stay.
+Filter with `/` (e.g. `root`, `limits`). From the command line, `kubesage scan --policy` exits with code 2 when there are errors, which suits CI.
+```yaml
+policy:
+  allowed_registries: ['^[a-z0-9-]+\.azurecr\.io/']   # optional; empty = registry check off
+  skip_namespaces: [kube-system, kube-public, kube-node-lease, gatekeeper-system, calico-system, tigera-operator, azure-workload-identity-system]
+```
 
 ### Port-forwarding
 

@@ -23,6 +23,7 @@ type Client struct {
 	Namespace  string // "" means all namespaces
 	Kubeconfig string
 	Rest       *rest.Config
+	warns      *warnCollector
 	raw        clientcmdapi.Config
 	nsc        nsCache
 }
@@ -58,6 +59,8 @@ func New(kubeconfig, context, namespace string) (*Client, error) {
 		return nil, err
 	}
 	rc.QPS, rc.Burst = 50, 100
+	warns := &warnCollector{}
+	rc.WarningHandler = warns
 	cs, err := kubernetes.NewForConfig(rc)
 	if err != nil {
 		return nil, err
@@ -71,7 +74,7 @@ func New(kubeconfig, context, namespace string) (*Client, error) {
 			namespace = ns
 		}
 	}
-	return &Client{Clientset: cs, Dynamic: dyn, Rest: rc, Context: context, Namespace: namespace, Kubeconfig: kubeconfig, raw: raw}, nil
+	return &Client{Clientset: cs, Dynamic: dyn, Rest: rc, warns: warns, Context: context, Namespace: namespace, Kubeconfig: kubeconfig, raw: raw}, nil
 }
 
 // Contexts lists kubeconfig context names, sorted.
@@ -111,7 +114,7 @@ func (c *Client) NamespaceLabel() string {
 
 // WithNamespace returns a client sharing this connection but scoped to ns.
 func (c *Client) WithNamespace(ns string) *Client {
-	return &Client{Clientset: c.Clientset, Dynamic: c.Dynamic, Rest: c.Rest, Context: c.Context,
+	return &Client{Clientset: c.Clientset, Dynamic: c.Dynamic, Rest: c.Rest, warns: c.warns, Context: c.Context,
 		Namespace: ns, Kubeconfig: c.Kubeconfig, raw: c.raw}
 }
 

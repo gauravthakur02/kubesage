@@ -195,9 +195,17 @@ func (a *App) hints() string {
 	var list []kv
 	switch a.mode {
 	case modeText:
+		if a.textKind == "editdiff" {
+			list = []kv{{"A", "apply"}, {"e", "edit again"}, {"esc", "discard"}, {"/", "search"}, {"↑↓", "scroll"}}
+			break
+		}
 		list = []kv{{"esc", "back"}, {"↑↓/pgup", "scroll"}, {"g/G", "top/bottom"}, {"a", "ask AI"}, {"y", "yaml"}, {"d", "describe"}}
 		if a.textKind == "logs" {
-			list = append(list, kv{"f", "follow"})
+			list = append(list, kv{"f", "follow"}, kv{"t", "time window"}, kv{"T", "timestamps"})
+		}
+		list = append(list, kv{"/", "search"})
+		if a.search != "" {
+			list = append(list, kv{"n/N", "next/prev match"})
 		}
 		wrap := "wrap: on"
 		if a.nowrap {
@@ -227,6 +235,19 @@ func (a *App) hints() string {
 				{"p", "health check"}, {"/", "filter"}, {"q", "quit"}}
 			break
 		}
+		if a.res.Name == policyRes {
+			list = []kv{{"enter", "workload YAML"}, {"a", "AI fix"}, {"e", "safe edit"}, {"/", "filter"}, {"esc", "back"}}
+			break
+		}
+		if _, _, ok := isRollout(a.res); ok {
+			list = []kv{{"enter/d", "diff vs current"}, {"U", "roll back to this revision"}, {"esc", "back to deployments"}, {"r", "refresh"}}
+			break
+		}
+		if a.res.Name == "deployments" {
+			list = []kv{{"o", "rollout history"}, {"enter", "describe"}, {"a", "AI analyze"}, {"l", "logs"}, {"S", "scale"},
+				{"R", "restart"}, {"y", "yaml"}, {"/", "filter"}, {":", "cmd"}, {"?", "help"}}
+			break
+		}
 		if a.res.Name == "secrets" {
 			list = []kv{{"enter", "view (masked)"}, {"y", "yaml"}, {"d", "describe"}, {"/", "filter"}, {":", "cmd"}, {"?", "help"}}
 			break
@@ -252,6 +273,16 @@ func (a *App) tableTitle() string {
 		if a.launcher {
 			t = fmt.Sprintf("Choose cluster(s) (%d) · space select · enter open", len(a.visible))
 		}
+		if a.filter != "" {
+			t += " · /" + a.filter
+		}
+		return t
+	}
+	if ns, name, ok := isRollout(a.res); ok {
+		return fmt.Sprintf("Rollout history deployment %s/%s · %s", ns, name, a.table.Note)
+	}
+	if a.res.Name == policyRes {
+		t := fmt.Sprintf("Policy & security · %s · %s", a.client.NamespaceLabel(), a.table.Note)
 		if a.filter != "" {
 			t += " · /" + a.filter
 		}
@@ -327,6 +358,33 @@ func (a *App) viewTableBody(w, h int) string {
 				return c
 			}
 			return a.table.Rows[idx].Cells
+		}
+	}
+	// Memory trend (last ~15 min) as an extra column right after MEM.
+	memCol := -1
+	for i, c := range cols {
+		if c == "MEM" {
+			memCol = i
+		}
+	}
+	hasTrend := false
+	if memCol >= 0 && a.res.Name == "pods" && w >= 110 {
+		for _, idx := range a.visible {
+			r := a.table.Rows[idx]
+			if len(a.hist.get(histKey(a.client.Context, r.Namespace, r.Name))) >= 2 {
+				hasTrend = true
+				break
+			}
+		}
+	}
+	if hasTrend {
+		cols = append(append(append([]string{}, cols[:memCol+1]...), "MEM 15m"), cols[memCol+1:]...)
+		base := cellsOf
+		cellsOf = func(idx int) []string {
+			row := a.table.Rows[idx]
+			c := base(idx)
+			trend := sparkline(series(a.hist.get(histKey(a.client.Context, row.Namespace, row.Name)), true), 10)
+			return append(append(append([]string{}, c[:memCol+1]...), trend), c[memCol+1:]...)
 		}
 	}
 	markOf := func(idx int) string {
@@ -437,8 +495,23 @@ func (a *App) renderText(gotoBottom bool) {
 		return
 	}
 	out := make([]string, 0, len(a.textLines))
-	for _, l := range a.textLines {
+	a.matches = a.matches[:0]
+	lowerQ := strings.ToLower(a.search)
+	for i, l := range a.textLines {
 		l = strings.ReplaceAll(l, "\t", "    ")
+		// Merged logs: colour the [pod] prefix and keep it out of the content styling.
+		prefix := ""
+		if a.textKind == "logs" && len(a.logSpec.pods) > 1 && strings.HasPrefix(l, "[") {
+			if j := strings.Index(l, "] "); j > 0 {
+				prefix, l = a.podTagStyle(l[1:j]).Render(l[:j+1])+" ", l[j+2:]
+			}
+		}
+		if a.search != "" && a.textKind != "health" && a.textKind != "secret" && strings.Contains(strings.ToLower(ansi.Strip(l)), lowerQ) {
+			current := a.matchIdx >= 0 && a.matchIdx < len(a.matches)+1 && len(a.matches) == a.matchIdx
+			a.matches = append(a.matches, i)
+			out = append(out, prefix+a.highlightSearch(ansi.Strip(l), current))
+			continue
+		}
 		switch a.textKind {
 		case "yaml":
 			if m := yamlKeyRe.FindStringSubmatchIndex(l); m != nil {
@@ -462,14 +535,16 @@ func (a *App) renderText(gotoBottom bool) {
 				l = s.WarnText.Render(l)
 			}
 		}
-		out = append(out, l)
+		out = append(out, prefix+l)
 	}
-	if !a.nowrap && a.vp.Width > 0 {
-		for i, l := range out {
-			if ansi.StringWidth(l) > a.vp.Width {
-				out[i] = ansi.Hardwrap(l, a.vp.Width, true)
-			}
+	a.visualStart = a.visualStart[:0]
+	visual := 0
+	for i, l := range out {
+		if !a.nowrap && a.vp.Width > 0 && ansi.StringWidth(l) > a.vp.Width {
+			out[i] = ansi.Hardwrap(l, a.vp.Width, true)
 		}
+		a.visualStart = append(a.visualStart, visual)
+		visual += strings.Count(out[i], "\n") + 1
 	}
 	a.vp.SetContent(strings.Join(out, "\n"))
 	if gotoBottom && a.textKind == "logs" {
@@ -806,12 +881,12 @@ func (a *App) viewHelp(w, h int) string {
 			{":pods kube-system", "resource in namespace"}, {"/", "filter rows"}, {"n  :ns", "namespace"}, {"c  :ctx", "kube context"}, {"r", "refresh"}}},
 		{"Resource actions", [][2]string{{"enter d", "describe"}, {"h", "pod health report"}, {"y", "YAML"},
 			{"enter (secret)", "secret viewer · x unmask"}, {"l / p", "logs / previous logs"}, {"s", "shell into container (bash/ash/sh)"},
-			{"e", "edit (kubectl)"}, {"S", "scale"}, {"R", "rollout restart"}, {"D ctrl+d", "delete"},
+			{"e", "safe edit: $EDITOR → diff + dry-run → apply"}, {"S", "scale"}, {"R", "rollout restart"}, {"o", "rollout history · diff · rollback (U)"}, {"D ctrl+d", "delete"},
 			{"F", "port-forward"}, {":pf", "manage port-forwards"}, {"!  :!<cmd>", "run kubectl"}}},
 		{"Panes", [][2]string{{"|  :vsplit [res]", "split side by side"}, {"-  :split [res]", "split stacked"}, {"L", "logs in a new pane"},
 			{"ctrl+w  alt+1-6", "focus next / pane N"}, {"z", "zoom pane"}, {"[ ]", "resize pane"}, {"ctrl+x  :close", "close pane"},
 			{":only", "keep only this pane"}, {"ctrl+t  :tabnew [ns|res]", "new tab"}, {">  <  :tab N", "next / prev / go to tab"},
-			{"C  :clusters", "all clusters: health, open"}, {":tabnew @ctx [ns]", "tab on another cluster"},
+			{"C  :clusters", "all clusters: health, open"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
 			{":vsplit @ctx [ns]", "compare clusters side by side"}, {"c  :ctx <name>", "switch this tab's cluster"},
 			{":tabname <name>", "rename tab"}, {":tabclose", "close tab (ctrl+x on last pane)"}, {":ns! <ns>", "namespace for all panes"}, {":layout <name>", "triage, ops, dash, ai, single"}}},
 		{"AI & health", [][2]string{{"a", "AI analyze selected"}, {"A  :ai <q>", "AI chat"}, {"H  :pulse", "cluster pulse & issues"}, {"t (pulse)", "AI triage of all issues"},

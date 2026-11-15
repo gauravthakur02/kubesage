@@ -129,6 +129,7 @@ type App struct {
 	pfReported map[int]bool
 
 	logoTicks int // drives the logo animation (advanced by the spinner tick)
+	hist      *metricHistory
 
 	status    string
 	statusErr bool
@@ -146,6 +147,7 @@ func New(cfg *config.Config, client *kube.Client, opts Options) *App {
 	a.nextID = 1
 	a.cl = newClusterStore()
 	a.discovered = map[string][]kube.Resource{}
+	a.hist = newHistory()
 	a.cl.add(client)
 	a.pane = newPane(1, client.WithNamespace(client.Namespace), r)
 	a.root = &layoutNode{p: a.pane}
@@ -375,6 +377,9 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.listErr = msg.err
 		if msg.err == nil {
 			a.table = msg.table
+			if a.res.Name == "pods" {
+				a.recordTable(a.client.Context, msg.table)
+			}
 			a.applyFilter()
 			a.applyPendingSelect()
 			if a.launchCursor && a.res.Name == clustersRes { // start on the kubeconfig current-context
@@ -506,6 +511,19 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case shellDoneMsg:
 		return a, a.handleShellDone(msg)
+
+	case editLoadedMsg:
+		return a, a.handleEditLoaded(msg)
+
+	case editDoneMsg:
+		return a, a.handleEditDone(msg)
+
+	case dryRunMsg:
+		a.handleDryRun(msg)
+		return a, nil
+
+	case applyDoneMsg:
+		return a, a.handleApplyDone(msg)
 
 	case shellAllowedMsg:
 		return a, a.handleShellAllowed(msg)
@@ -670,6 +688,25 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 			}
 		}
 	}
+	if _, _, ok := isRollout(a.res); ok {
+		if row, ok := a.selected(); ok {
+			if cmd, handled := a.rolloutRowAction(k.String(), row); handled {
+				return cmd
+			}
+		}
+	}
+	if a.res.Name == policyRes {
+		if row, ok := a.selected(); ok {
+			if cmd, handled := a.policyRowAction(k.String(), row); handled {
+				return cmd
+			}
+		}
+	}
+	if k.String() == "esc" && a.filter == "" && a.backTo != nil {
+		back := *a.backTo
+		a.backTo = nil
+		return a.switchResource(back)
+	}
 	switch k.String() {
 	case "q":
 		a.quitCleanup()
@@ -740,6 +777,8 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 		return a.openPulse()
 	case "C":
 		return a.openClusters()
+	case "V":
+		return a.openPolicy()
 	case "A":
 		a.openAI()
 	case "T":
@@ -758,8 +797,8 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 	if !ok {
 		return nil
 	}
-	if a.res.Name == clustersRes {
-		return nil // resource actions don't apply to the cluster list
+	if _, _, ok := isRollout(a.res); ok || a.res.Name == clustersRes || a.res.Name == policyRes {
+		return nil // resource actions don't apply to these lists
 	}
 	return a.rowAction(k.String(), row)
 }
@@ -818,9 +857,7 @@ func (a *App) rowAction(key string, row kube.Row) tea.Cmd {
 			return fetchPods(a.client, r, ns, name, "shell")
 		}
 	case "e":
-		if a.guardWrite() {
-			return kubectlExec(a.client, "edit", r.Name, name, "-n", nsOrDefault(ns))
-		}
+		return a.openEdit(r, ns, name)
 	case "ctrl+d", "D":
 		if a.guardWrite() {
 			a.askConfirm(fmt.Sprintf("Delete %s %s?", strings.ToLower(r.Kind), objName(ns, name)), name, func() tea.Cmd {
@@ -846,6 +883,11 @@ func (a *App) rowAction(key string, row kube.Row) tea.Cmd {
 			return fetchPortTargets(a.client, r, ns, name)
 		}
 		a.setStatus("port-forward works on pods, services and deployments/statefulsets/daemonsets", true)
+	case "o":
+		if r.Name == "deployments" {
+			return a.openRollout(ns, name)
+		}
+		a.setStatus("rollout history is available for deployments", true)
 	case "R":
 		if r.CanRestart() && a.guardWrite() {
 			a.askConfirm(fmt.Sprintf("Rollout restart %s %s?", strings.ToLower(r.Kind), objName(ns, name)), "", func() tea.Cmd {
@@ -919,10 +961,17 @@ func (a *App) handlePods(msg podsMsg) tea.Cmd {
 		return pickContainer(0)
 	}
 	var names []string
+	merged := fmt.Sprintf("★ all %d pods, merged", len(msg.pods))
+	if msg.purpose == "logs" || msg.purpose == "prevlogs" {
+		names = append(names, merged)
+	}
 	for i := range msg.pods {
 		names = append(names, msg.pods[i].Name+"  "+kube.PodStatus(&msg.pods[i]))
 	}
 	a.openPicker("Pod", names, func(s string) tea.Cmd {
+		if s == merged {
+			return a.openMergedLogs(msg.pods)
+		}
 		for i, n := range names {
 			if n == s {
 				return pickContainer(i)
@@ -980,6 +1029,8 @@ func (a *App) runCommand(line string) tea.Cmd {
 			return nil
 		})
 		return nil
+	case "policy", "policies", "security":
+		return a.openPolicy()
 	case "resources", "res", "api-resources", "all":
 		return a.openNavigator()
 	case "clusters", "cluster", "contexts":
@@ -1128,20 +1179,7 @@ func (a *App) openLogs(ns, pod, container string, previous bool) tea.Cmd {
 	if a.mode != modeText {
 		a.prevMode = a.mode
 	}
-	a.mode = modeText
-	podRes, _ := kube.Lookup("pods")
-	a.target = targetRef{podRes, ns, pod}
-	a.textKind = "logs"
-	a.textTitle = fmt.Sprintf("logs %s/%s [%s]", ns, pod, container)
-	if previous {
-		a.textTitle += " (previous)"
-	}
-	a.textLines = nil
-	a.follow = true
-	a.logGen++
-	a.logCh, a.logCancel = startLogStream(a.client, ns, pod, kube.LogOptions{Container: container, Tail: 500, Follow: !previous, Previous: previous})
-	a.renderText(true)
-	return tagPane(a.pane, waitLines(a.logCh, a.logGen))
+	return a.startLogs(logSpec{ns: ns, pods: []string{pod}, container: container, previous: previous})
 }
 
 func (a *App) stopLogs() {
@@ -1153,8 +1191,39 @@ func (a *App) stopLogs() {
 }
 
 func (a *App) updateText(k tea.KeyMsg) tea.Cmd {
+	if cmd, handled := a.updateEdit(k.String()); handled {
+		return cmd
+	}
 	switch k.String() {
+	case "/":
+		a.openInput(ovInput, "search › ", func(q string) tea.Cmd { a.setSearch(q); return nil })
+		a.input.SetValue(a.search)
+		a.input.CursorEnd()
+		return nil
+	case "n":
+		a.nextMatch(1)
+		return nil
+	case "N":
+		a.nextMatch(-1)
+		return nil
+	case "t":
+		if a.textKind == "logs" && len(a.logSpec.pods) > 0 {
+			return a.pickLogWindow()
+		}
+	case "T":
+		if a.textKind == "logs" && len(a.logSpec.pods) > 0 {
+			spec := a.logSpec
+			spec.timestamps = !spec.timestamps
+			return a.startLogs(spec)
+		}
 	case "esc", "q":
+		if k.String() == "esc" && a.search != "" {
+			a.search, a.matches = "", nil
+			a.renderText(false)
+			a.setStatus("search cleared", false)
+			return nil
+		}
+		a.search, a.matches = "", nil
 		a.stopLogs()
 		a.reveal, a.secret = false, nil // never leave decoded secret values behind
 		a.mode = a.prevMode
