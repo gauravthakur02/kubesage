@@ -91,6 +91,18 @@ func main() {
 		return
 	}
 	// Global flags may appear anywhere, e.g. `kubesage ai add x --provider anthropic --config c.yaml`.
+	for _, a := range args {
+		if a == "-h" || a == "--help" || a == "-help" || a == "help" {
+			if sub == "" || sub == "help" {
+				fs.Usage()
+				return
+			}
+		}
+	}
+	if sub == "help" {
+		fs.Usage()
+		return
+	}
 	globals, rest := splitGlobalFlags(fs, args)
 	_ = fs.Parse(globals)
 	subArgs := rest

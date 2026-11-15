@@ -48,6 +48,7 @@ type Resource struct {
 	Namespaced bool
 	GVR        schema.GroupVersionResource
 	Group      string // navigator section: Workloads, Network, Config & Storage, Access control (RBAC), Cluster, Custom resources
+	keepOrder  bool   // rows are already in a meaningful order (UI-provided lists)
 	list       func(ctx context.Context, c *Client, ns string) (Table, error)
 }
 
@@ -91,7 +92,7 @@ func (r Resource) List(ctx context.Context, c *Client) (Table, error) {
 		return Table{}, err
 	}
 	t := Table{Columns: cols, Rows: rows}
-	if r.Name != "events" {
+	if r.Name != "events" && !r.keepOrder {
 		sortRows(t.Rows)
 	}
 	if r.Namespaced && ns == AllNamespaces {
@@ -751,7 +752,7 @@ func listNamespaces(ctx context.Context, c *Client, _ string) (Table, error) {
 
 // VirtualResource is a UI-provided table (e.g. the Clusters overview) that is not a Kubernetes API resource.
 func VirtualResource(name, kind, short string, rows func() Table) Resource {
-	return Resource{Name: name, Kind: kind, Short: short, list: func(context.Context, *Client, string) (Table, error) {
+	return Resource{Name: name, Kind: kind, Short: short, keepOrder: true, list: func(context.Context, *Client, string) (Table, error) {
 		return rows(), nil
 	}}
 }
