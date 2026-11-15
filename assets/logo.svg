@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 256" width="1000" height="256" role="img" aria-label="kubesage logo">
+  <title>kubesage — a Kubernetes IDE for the terminal with an AI copilot</title>
+  <defs>
+    <linearGradient id="wheel" gradientUnits="userSpaceOnUse" x1="20" y1="20" x2="236" y2="236">
+      <stop offset="0" stop-color="#7aa2f7"/>
+      <stop offset="1" stop-color="#bb9af7"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c3e88d"/>
+      <stop offset="1" stop-color="#73daca"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f2335"/>
+      <stop offset="1" stop-color="#16161e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1000" height="256" rx="40" fill="url(#bg)"/>
+  <g transform="translate(12 12) scale(0.906)">
+  <!-- helm wheel (Kubernetes) -->
+  <g stroke="url(#wheel)" stroke-width="10" stroke-linecap="round" fill="none">
+    <line x1="128.0" y1="88.0" x2="128.0" y2="31.0"/><line x1="156.3" y1="99.7" x2="196.6" y2="59.4"/><line x1="168.0" y1="128.0" x2="225.0" y2="128.0"/><line x1="156.3" y1="156.3" x2="196.6" y2="196.6"/><line x1="128.0" y1="168.0" x2="128.0" y2="225.0"/><line x1="99.7" y1="156.3" x2="59.4" y2="196.6"/><line x1="88.0" y1="128.0" x2="31.0" y2="128.0"/><line x1="99.7" y1="99.7" x2="59.4" y2="59.4"/>
+    <circle cx="128" cy="128" r="78" stroke-width="13"/>
+  </g>
+  <g fill="url(#wheel)"><circle cx="128.0" cy="22.0" r="9"/><circle cx="203.0" cy="53.0" r="9"/><circle cx="234.0" cy="128.0" r="9"/><circle cx="203.0" cy="203.0" r="9"/><circle cx="128.0" cy="234.0" r="9"/><circle cx="53.0" cy="203.0" r="9"/><circle cx="22.0" cy="128.0" r="9"/><circle cx="53.0" cy="53.0" r="9"/></g>
+  <!-- hub with a sage leaf (the copilot) -->
+  <circle cx="128" cy="128" r="38" fill="#1a1b26" stroke="url(#wheel)" stroke-width="8"/>
+  <path d="M128 100 C150 110 154 136 128 158 C102 136 106 110 128 100 Z" fill="url(#leaf)"/>
+  <path d="M128 106 L128 152 M128 124 L139 116 M128 136 L118 128" stroke="#1a1b26" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+  <!-- AI spark -->
+  <path d="M226 14 L230.5 27.5 L244 32 L230.5 36.5 L226 50 L221.5 36.5 L208 32 L221.5 27.5 Z" fill="#bb9af7"/>
+  <path d="M244 58 L246 63 L251 65 L246 67 L244 72 L242 67 L237 65 L242 63 Z" fill="#7dcfff"/>
+  </g>
+  <text x="272" y="148" font-family="'JetBrains Mono','SF Mono',Menlo,Consolas,monospace" font-size="96" font-weight="700" letter-spacing="-2">
+    <tspan fill="#c0caf5">kube</tspan><tspan fill="url(#leaf)">sage</tspan>
+  </text>
+  <text x="276" y="196" font-family="'JetBrains Mono','SF Mono',Menlo,Consolas,monospace" font-size="24" fill="#7a88b8">
+    Kubernetes IDE for your terminal · AI copilot
+  </text>
+</svg>
