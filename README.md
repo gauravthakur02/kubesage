@@ -60,7 +60,7 @@ Describe, YAML, edit, delete and AI analysis work on every type. The header's ta
 | `:pods`, `:deploy`, `:sts`, `:ds`, `:rs`, `:jobs`, `:cj`, `:svc`, `:ing`, `:cm`, `:secret`, `:pvc`, `:hpa`, `:ev`, `:nodes`, `:ns` | jump to a resource (`:pods kube-system` or `:pods all`) |
 | `V` / `:policy` | **policy & security checks** for every workload, with AI fixes |
 | `H` / `:pulse` | **Pulse**: node/pod/deployment health bars, CPU/memory requests vs capacity, detected issues |
-| `:helm` | **Helm releases**: values, manifests, history, revision diff, rollback |
+| `M` / `:helm` / `:charts` | **Helm releases** (values, manifests, history, revision diff, rollback) and the **charts** they use (default values, README, templates) |
 | `b` / `:view <name>` | open a **saved view** (`:view save <name>` stores the current tab) |
 | `A` / `:ai <question>` | **AI chat** about the cluster |
 | `?` | help |
@@ -198,6 +198,19 @@ policy:
 | `enter` / `v` | user-supplied values; keys that look secret (password, token, key…) are masked, `x` unmasks after confirmation and masks again after 60 s |
 | `m` | rendered manifest |
 | `h` | revision history; `enter`/`d` diffs a revision's values and manifest against the current one, `U` runs `helm rollback` after a typed confirmation (needs the `helm` CLI, blocked in `--readonly`) |
+
+`:charts` (or `:helm charts`, or `M` twice) groups the releases by chart: versions and app versions in use, how many releases, in which namespaces, and whether any failed.
+The chart files come from the chart packaged with the newest release, so no repository access is needed.
+
+| Key | Does |
+|-----|------|
+| `enter` | the releases that use this chart |
+| `v` | the chart's default values (secret-looking keys masked, `x` to unmask) |
+| `r` | README |
+| `t` | all templates, one after another (`/` to search) |
+| `i` | metadata: home, sources, keywords, dependencies, packaged files |
+
+Both screens are also at the top of the resource list (`0`), in a **Helm** section.
 
 ### Nodes
 

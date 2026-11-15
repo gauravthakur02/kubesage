@@ -69,7 +69,8 @@ type pane struct {
 	drain *kube.DrainPlan
 
 	// helmRel is the Helm release shown in the values/manifest view
-	helmRel *kube.HelmRelease
+	helmRel  *kube.HelmRelease
+	helmShow string // chart part shown: defaults, readme, templates, info ("" = release)
 
 	// pulse / issues (per pane, so two clusters can be compared)
 	pulse       *kube.Pulse

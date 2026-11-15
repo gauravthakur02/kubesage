@@ -102,7 +102,7 @@ func (a *App) openHelm() tea.Cmd {
 	if back.Name != helmRes {
 		a.backTo = &back
 	}
-	a.setStatus("enter: values · m: manifest · h: history (diff, rollback) · esc: back", false)
+	a.setStatus("enter: values · m: manifest · h: history (diff, rollback) · M: charts · esc: back", false)
 	return cmd
 }
 
@@ -153,7 +153,7 @@ func (a *App) openHelmText(ns, name string, rev int, kind string) tea.Cmd {
 		a.prevMode = a.mode
 	}
 	a.mode, a.textKind, a.textTitle, a.textLines = modeText, kind, "loading…", nil
-	a.reveal, a.helmRel = false, nil
+	a.reveal, a.helmRel, a.helmShow = false, nil, ""
 	a.renderText(true)
 	return tagPane(a.pane, a.fetchHelmText(ns, name, rev, kind))
 }
@@ -174,6 +174,9 @@ func (a *App) handleHelmText(m helmTextMsg) {
 func (a *App) renderHelmText() {
 	r := a.helmRel
 	if r == nil {
+		return
+	}
+	if a.renderChartText(r) {
 		return
 	}
 	switch a.textKind {

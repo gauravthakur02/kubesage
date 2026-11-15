@@ -160,7 +160,11 @@ func (a *App) viewHeader() string {
 	if a.mode == modeAI {
 		aiTab = s.TabActive.Render("A AI")
 	}
-	tabs = append(tabs, s.Muted.Render("│"), pulse, aiTab)
+	helmTab := s.Tab.Render("M ⎈ Helm")
+	if a.mode == modeTable && (a.res.Name == helmRes || a.res.Name == chartsRes) {
+		helmTab = s.TabActive.Render("M ⎈ Helm")
+	}
+	tabs = append(tabs, s.Muted.Render("│"), helmTab, pulse, aiTab)
 	line2 := ansi.Truncate(strings.Join(tabs, ""), a.w, "…")
 	return line1 + "\n" + line2
 }
@@ -235,6 +239,10 @@ func (a *App) hints() string {
 				{"p", "health check"}, {"/", "filter"}, {"q", "quit"}}
 			break
 		}
+		if a.res.Name == chartsRes {
+			list = []kv{{"enter", "releases"}, {"v", "default values"}, {"r", "README"}, {"t", "templates"}, {"i", "info"}, {"esc", "back"}}
+			break
+		}
 		if a.res.Name == helmRes {
 			list = []kv{{"enter", "values"}, {"m", "manifest"}, {"h", "history · diff · rollback"}, {"/", "filter"}, {"esc", "back"}}
 			break
@@ -294,8 +302,15 @@ func (a *App) tableTitle() string {
 	if ns, name, ok := isRollout(a.res); ok {
 		return fmt.Sprintf("Rollout history deployment %s/%s · %s", ns, name, a.table.Note)
 	}
-	if a.res.Name == helmRes {
-		return fmt.Sprintf("Helm releases · %s · %s", a.client.NamespaceLabel(), a.table.Note)
+	if a.res.Name == helmRes || a.res.Name == chartsRes {
+		t := fmt.Sprintf("Helm releases · %s · %s", a.client.NamespaceLabel(), a.table.Note)
+		if a.res.Name == chartsRes {
+			t = fmt.Sprintf("Helm charts in use · %s · %s", a.client.NamespaceLabel(), a.table.Note)
+		}
+		if a.filter != "" {
+			t += " · /" + a.filter
+		}
+		return t
 	}
 	if ns, name, ok := isHelmHistory(a.res); ok {
 		return fmt.Sprintf("Helm history %s/%s · %s", ns, name, a.table.Note)
@@ -907,7 +922,7 @@ func (a *App) viewHelp(w, h int) string {
 		{"Panes", [][2]string{{"|  :vsplit [res]", "split side by side"}, {"-  :split [res]", "split stacked"}, {"L", "logs in a new pane"},
 			{"ctrl+w  alt+1-6", "focus next / pane N"}, {"z", "zoom pane"}, {"[ ]", "resize pane"}, {"ctrl+x  :close", "close pane"},
 			{":only", "keep only this pane"}, {"ctrl+t  :tabnew [ns|res]", "new tab"}, {">  <  :tab N", "next / prev / go to tab"},
-			{"C  :clusters", "all clusters: health, open"}, {":helm", "Helm releases · values · history"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
+			{"C  :clusters", "all clusters: health, open"}, {"M  :helm", "Helm releases (M again: charts) · values · history"}, {":charts", "Helm charts in use · defaults · README · templates"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
 			{":vsplit @ctx [ns]", "compare clusters side by side"}, {"c  :ctx <name>", "switch this tab's cluster"},
 			{":tabname <name>", "rename tab"}, {":tabclose", "close tab (ctrl+x on last pane)"}, {":ns! <ns>", "namespace for all panes"}, {":layout <name>", "triage, ops, dash, ai, single"},
 			{":view save <name>", "save this tab's layout"}, {"b  :view [name]", "open a saved view"}}},

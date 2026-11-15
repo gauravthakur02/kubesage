@@ -103,6 +103,10 @@ func (a *App) showNavigator() {
 		}
 		return all[i].Kind < all[j].Kind
 	})
+	rel, charts := a.helmResource(), a.chartsResource()
+	rel.Group, charts.Group = "Helm", "Helm"
+	rel.Aliases = []string{"helm"}
+	all = append([]kube.Resource{rel, charts}, all...)
 	labels := make([]string, len(all))
 	for i, r := range all {
 		alias := ""
@@ -110,7 +114,7 @@ func (a *App) showNavigator() {
 			alias = ":" + r.Aliases[0]
 		}
 		scope := ""
-		if !r.Namespaced {
+		if !r.Namespaced && r.Group != "Helm" {
 			scope = " (cluster)"
 		}
 		name := r.Kind + scope

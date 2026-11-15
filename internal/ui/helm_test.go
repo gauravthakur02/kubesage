@@ -22,8 +22,13 @@ func helmSecret(t *testing.T, ns, name string, rev int, status, chartVer string,
 	t.Helper()
 	rec := map[string]any{
 		"name": name, "namespace": ns, "version": rev,
-		"info":     map[string]any{"status": status, "last_deployed": "2026-11-01T10:00:00Z", "description": fmt.Sprintf("Upgrade %d", rev)},
-		"chart":    map[string]any{"metadata": map[string]any{"name": name, "version": chartVer, "appVersion": "1." + chartVer}},
+		"info": map[string]any{"status": status, "last_deployed": "2026-11-01T10:00:00Z", "description": fmt.Sprintf("Upgrade %d", rev)},
+		"chart": map[string]any{
+			"metadata":  map[string]any{"name": name, "version": chartVer, "appVersion": "1." + chartVer, "description": "The " + name + " chart", "home": "https://example.com/" + name},
+			"values":    map[string]any{"image": map[string]any{"tag": "latest"}, "apiToken": "default-token"},
+			"templates": []map[string]any{{"name": "templates/deployment.yaml", "data": []byte("kind: Deployment\nname: {{ .Release.Name }}\n")}},
+			"files":     []map[string]any{{"name": "README.md", "data": []byte("# " + name + "\nInstall me.\n")}},
+		},
 		"config":   values,
 		"manifest": manifest,
 	}
@@ -105,5 +110,78 @@ func TestHelmRollbackBlockedReadOnly(t *testing.T) {
 func TestDecodeHelmReleaseRejectsGarbage(t *testing.T) {
 	if _, err := kube.DecodeHelmRelease([]byte("not-base64!!")); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestHelmChartsView(t *testing.T) {
+	a := newHelmApp(t, false)
+	run(a, a.runCommand("charts"), 0)
+	view := ansi.Strip(a.View())
+	for _, want := range []string{"Helm charts in use", "2 charts · 2 releases", "web", "0.2.0", "The web chart", "cache", "1 failed"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("charts view missing %q:\n%s", want, view)
+		}
+	}
+	pick := func() {
+		for i, idx := range a.visible {
+			if a.table.Rows[idx].Cells[0] == "web" {
+				a.cursor = i
+			}
+		}
+	}
+	pick()
+	press(a, "v")
+	view = ansi.Strip(a.View())
+	if !strings.Contains(view, "default values") || !strings.Contains(view, "tag: latest") || strings.Contains(view, "default-token") {
+		t.Fatalf("defaults view wrong:\n%s", view)
+	}
+	press(a, "esc")
+	press(a, "r")
+	if view = ansi.Strip(a.View()); !strings.Contains(view, "Install me.") {
+		t.Fatalf("README missing:\n%s", view)
+	}
+	press(a, "esc")
+	press(a, "t")
+	if view = ansi.Strip(a.View()); !strings.Contains(view, "templates/deployment.yaml") || !strings.Contains(view, "{{ .Release.Name }}") {
+		t.Fatalf("templates missing:\n%s", view)
+	}
+	press(a, "esc")
+	press(a, "i")
+	if view = ansi.Strip(a.View()); !strings.Contains(view, "https://example.com/web") {
+		t.Fatalf("info missing:\n%s", view)
+	}
+	press(a, "esc")
+	pick()
+	press(a, "enter")
+	view = ansi.Strip(a.View())
+	if !strings.Contains(view, "Helm releases") || !strings.Contains(view, "/web") || strings.Contains(view, "cache") {
+		t.Fatalf("enter should list releases of the chart:\n%s", view)
+	}
+}
+
+func TestNavigatorListsHelm(t *testing.T) {
+	a := newHelmApp(t, false)
+	a.discovered[a.client.Context] = nil
+	run(a, a.openNavigator(), 0)
+	view := ansi.Strip(a.View())
+	if !strings.Contains(view, "Helm release") || !strings.Contains(view, "Helm chart") {
+		t.Fatalf("navigator should list Helm:\n%s", view)
+	}
+}
+
+func TestHelmTabKey(t *testing.T) {
+	a := newHelmApp(t, false)
+	press(a, "esc")
+	if !strings.Contains(ansi.Strip(a.View()), "M ⎈ Helm") {
+		t.Fatal("tab bar should show the Helm tab")
+	}
+	press(a, "1")
+	press(a, "M")
+	if a.res.Name != helmRes {
+		t.Fatalf("M should open Helm releases, got %s", a.res.Name)
+	}
+	press(a, "M")
+	if a.res.Name != chartsRes {
+		t.Fatalf("M on releases should open charts, got %s", a.res.Name)
 	}
 }

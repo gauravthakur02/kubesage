@@ -10,6 +10,7 @@ import (
 	"io"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +31,34 @@ type HelmRelease struct {
 	Values          map[string]any // user-supplied values (helm get values)
 	Manifest        string
 	Notes           string
+	ChartInfo       HelmChart // the chart as packaged in the release
+}
+
+// HelmChart is the chart stored with a release: metadata, default values, templates and files.
+type HelmChart struct {
+	Name, Version, AppVersion string
+	Description, Home         string
+	Sources, Keywords         []string
+	Dependencies              []string // "name version (repository)"
+	Defaults                  map[string]any
+	Templates                 []HelmFile
+	Files                     []HelmFile // README.md, values.schema.json, …
+}
+
+// HelmFile is one file of a chart.
+type HelmFile struct {
+	Name string
+	Data []byte
+}
+
+// Readme returns the chart's README, if packaged.
+func (c HelmChart) Readme() string {
+	for _, f := range c.Files {
+		if strings.EqualFold(f.Name, "README.md") || strings.EqualFold(f.Name, "README") {
+			return string(f.Data)
+		}
+	}
+	return ""
 }
 
 type helmRecord struct {
@@ -44,10 +73,28 @@ type helmRecord struct {
 	} `json:"info"`
 	Chart struct {
 		Metadata struct {
-			Name       string `json:"name"`
-			Version    string `json:"version"`
-			AppVersion string `json:"appVersion"`
+			Name         string   `json:"name"`
+			Version      string   `json:"version"`
+			AppVersion   string   `json:"appVersion"`
+			Description  string   `json:"description"`
+			Home         string   `json:"home"`
+			Sources      []string `json:"sources"`
+			Keywords     []string `json:"keywords"`
+			Dependencies []struct {
+				Name       string `json:"name"`
+				Version    string `json:"version"`
+				Repository string `json:"repository"`
+			} `json:"dependencies"`
 		} `json:"metadata"`
+		Values    map[string]any `json:"values"`
+		Templates []struct {
+			Name string `json:"name"`
+			Data []byte `json:"data"`
+		} `json:"templates"`
+		Files []struct {
+			Name string `json:"name"`
+			Data []byte `json:"data"`
+		} `json:"files"`
 	} `json:"chart"`
 	Config   map[string]any `json:"config"`
 	Manifest string         `json:"manifest"`
@@ -73,7 +120,19 @@ func DecodeHelmRelease(data []byte) (*HelmRelease, error) {
 		return nil, err
 	}
 	t, _ := time.Parse(time.RFC3339Nano, r.Info.LastDeployed)
-	return &HelmRelease{Name: r.Name, Namespace: r.Namespace, Revision: r.Version, Status: r.Info.Status,
+	md := r.Chart.Metadata
+	ch := HelmChart{Name: md.Name, Version: md.Version, AppVersion: md.AppVersion, Description: md.Description, Home: md.Home,
+		Sources: md.Sources, Keywords: md.Keywords, Defaults: r.Chart.Values}
+	for _, d := range md.Dependencies {
+		ch.Dependencies = append(ch.Dependencies, strings.TrimSpace(fmt.Sprintf("%s %s (%s)", d.Name, d.Version, d.Repository)))
+	}
+	for _, f := range r.Chart.Templates {
+		ch.Templates = append(ch.Templates, HelmFile{f.Name, f.Data})
+	}
+	for _, f := range r.Chart.Files {
+		ch.Files = append(ch.Files, HelmFile{f.Name, f.Data})
+	}
+	return &HelmRelease{ChartInfo: ch, Name: r.Name, Namespace: r.Namespace, Revision: r.Version, Status: r.Info.Status,
 		Chart: r.Chart.Metadata.Name, ChartVersion: r.Chart.Metadata.Version, AppVersion: r.Chart.Metadata.AppVersion,
 		Updated: t, Description: r.Info.Description, Values: r.Config, Manifest: r.Manifest, Notes: r.Info.Notes}, nil
 }

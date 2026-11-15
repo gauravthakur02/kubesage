@@ -184,6 +184,10 @@ func (a *App) resourceByName(name string) kube.Resource {
 		return a.clustersResource()
 	case name == policyRes:
 		return a.policyResource()
+	case name == helmRes:
+		return a.helmResource()
+	case name == chartsRes:
+		return a.chartsResource()
 	case strings.HasPrefix(name, rolloutPrefix):
 		ns, n, _ := strings.Cut(strings.TrimPrefix(name, rolloutPrefix), "/")
 		return a.rolloutResource(ns, n)

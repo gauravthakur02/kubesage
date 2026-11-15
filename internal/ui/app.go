@@ -733,6 +733,13 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 			}
 		}
 	}
+	if a.res.Name == chartsRes {
+		if row, ok := a.selected(); ok {
+			if cmd, handled := a.chartRowAction(k.String(), row); handled {
+				return cmd
+			}
+		}
+	}
 	if a.res.Name == helmRes {
 		if row, ok := a.selected(); ok {
 			if cmd, handled := a.helmRowAction(k.String(), row); handled {
@@ -820,6 +827,11 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 		return fetchNamespaces(a.client)
 	case "H":
 		return a.openPulse()
+	case "M":
+		if a.mode == modeTable && a.res.Name == helmRes {
+			return a.openCharts() // M again: releases ⇄ charts
+		}
+		return a.openHelm()
 	case "C":
 		return a.openClusters()
 	case "b":
@@ -844,7 +856,7 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 	if !ok {
 		return nil
 	}
-	if _, _, hh := isHelmHistory(a.res); hh || a.res.Name == helmRes {
+	if _, _, hh := isHelmHistory(a.res); hh || a.res.Name == helmRes || a.res.Name == chartsRes {
 		return nil
 	}
 	if _, _, ok := isRollout(a.res); ok || a.res.Name == clustersRes || a.res.Name == policyRes {
@@ -1121,8 +1133,13 @@ func (a *App) runCommand(line string) tea.Cmd {
 		_ = a.cfg.Save()
 		a.setStatus("live updates: "+a.cfg.LiveUpdates, false)
 		return tea.Batch(a.ensureWatches()...)
-	case "helm", "releases", "charts":
+	case "helm", "releases":
+		if arg == "charts" || arg == "chart" {
+			return a.openCharts()
+		}
 		return a.openHelm()
+	case "charts", "chart":
+		return a.openCharts()
 	case "policy", "policies", "security":
 		return a.openPolicy()
 	case "resources", "res", "api-resources", "all":
@@ -1348,12 +1365,16 @@ func (a *App) updateText(k tea.KeyMsg) tea.Cmd {
 			return a.toggleReveal()
 		}
 		if a.textKind == "helmvalues" && a.helmRel != nil {
+			what := "Helm values"
+			if a.helmShow == "defaults" {
+				what = "chart default values"
+			}
 			if a.reveal {
 				a.reveal = false
 				a.renderHelmText()
 				return nil
 			}
-			a.askConfirm(fmt.Sprintf("Show unmasked Helm values of %s/%s on %s?", a.helmRel.Namespace, a.helmRel.Name, a.client.Context), a.helmRel.Name, func() tea.Cmd {
+			a.askConfirm(fmt.Sprintf("Show unmasked %s of %s/%s on %s?", what, a.helmRel.Namespace, a.helmRel.Name, a.client.Context), a.helmRel.Name, func() tea.Cmd {
 				a.reveal, a.revealedAt = true, time.Now()
 				a.renderHelmText()
 				return nil
