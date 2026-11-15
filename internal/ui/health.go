@@ -319,6 +319,8 @@ func (a *App) toggleReveal() tea.Cmd {
 func (a *App) maskSecret(why string) {
 	a.reveal = false
 	switch a.textKind {
+	case "helmvalues":
+		a.renderHelmText()
 	case "secret":
 		a.renderSecret(false)
 	case "yaml":

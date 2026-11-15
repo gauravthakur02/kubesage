@@ -333,3 +333,11 @@ func condOrder(t string) int {
 func (c *Client) SecretValues(ctx context.Context, ns, name string) (*corev1.Secret, error) {
 	return c.Clientset.CoreV1().Secrets(ns).Get(ctx, name, metav1.GetOptions{})
 }
+
+func parseQty(v any) (resource.Quantity, error) {
+	s, ok := v.(string)
+	if !ok {
+		return resource.Quantity{}, fmt.Errorf("not a quantity")
+	}
+	return resource.ParseQuantity(s)
+}

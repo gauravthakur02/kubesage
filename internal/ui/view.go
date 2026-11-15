@@ -235,12 +235,25 @@ func (a *App) hints() string {
 				{"p", "health check"}, {"/", "filter"}, {"q", "quit"}}
 			break
 		}
+		if a.res.Name == helmRes {
+			list = []kv{{"enter", "values"}, {"m", "manifest"}, {"h", "history · diff · rollback"}, {"/", "filter"}, {"esc", "back"}}
+			break
+		}
+		if _, _, ok := isHelmHistory(a.res); ok {
+			list = []kv{{"enter/d", "diff vs current"}, {"v", "values"}, {"U", "helm rollback"}, {"esc", "back"}}
+			break
+		}
 		if a.res.Name == policyRes {
 			list = []kv{{"enter", "workload YAML"}, {"a", "AI fix"}, {"e", "safe edit"}, {"/", "filter"}, {"esc", "back"}}
 			break
 		}
 		if _, _, ok := isRollout(a.res); ok {
 			list = []kv{{"enter/d", "diff vs current"}, {"U", "roll back to this revision"}, {"esc", "back to deployments"}, {"r", "refresh"}}
+			break
+		}
+		if a.res.Name == "nodes" {
+			list = []kv{{"h", "node health"}, {"u", "cordon/uncordon"}, {"X", "drain preview"}, {":taint", "taints"}, {"enter", "describe"},
+				{"a", "AI analyze"}, {"/", "filter"}, {"?", "help"}}
 			break
 		}
 		if a.res.Name == "deployments" {
@@ -281,6 +294,12 @@ func (a *App) tableTitle() string {
 	if ns, name, ok := isRollout(a.res); ok {
 		return fmt.Sprintf("Rollout history deployment %s/%s · %s", ns, name, a.table.Note)
 	}
+	if a.res.Name == helmRes {
+		return fmt.Sprintf("Helm releases · %s · %s", a.client.NamespaceLabel(), a.table.Note)
+	}
+	if ns, name, ok := isHelmHistory(a.res); ok {
+		return fmt.Sprintf("Helm history %s/%s · %s", ns, name, a.table.Note)
+	}
 	if a.res.Name == policyRes {
 		t := fmt.Sprintf("Policy & security · %s · %s", a.client.NamespaceLabel(), a.table.Note)
 		if a.filter != "" {
@@ -292,6 +311,7 @@ func (a *App) tableTitle() string {
 	if a.res.Namespaced {
 		t += " · " + a.client.NamespaceLabel()
 	}
+	t += a.liveBadge()
 	if a.filter != "" {
 		t += " · /" + a.filter
 	}
@@ -513,7 +533,7 @@ func (a *App) renderText(gotoBottom bool) {
 			continue
 		}
 		switch a.textKind {
-		case "yaml":
+		case "yaml", "helmvalues", "manifest":
 			if m := yamlKeyRe.FindStringSubmatchIndex(l); m != nil {
 				l = l[:m[4]] + s.YAMLKey.Render(l[m[4]:m[5]]) + s.Muted.Render(":") + s.Base.Render(l[m[5]+1:])
 			} else if strings.HasPrefix(strings.TrimSpace(l), "#") {
@@ -881,14 +901,16 @@ func (a *App) viewHelp(w, h int) string {
 			{":pods kube-system", "resource in namespace"}, {"/", "filter rows"}, {"n  :ns", "namespace"}, {"c  :ctx", "kube context"}, {"r", "refresh"}}},
 		{"Resource actions", [][2]string{{"enter d", "describe"}, {"h", "pod health report"}, {"y", "YAML"},
 			{"enter (secret)", "secret viewer · x unmask"}, {"l / p", "logs / previous logs"}, {"s", "shell into container (bash/ash/sh)"},
-			{"e", "safe edit: $EDITOR → diff + dry-run → apply"}, {"S", "scale"}, {"R", "rollout restart"}, {"o", "rollout history · diff · rollback (U)"}, {"D ctrl+d", "delete"},
+			{"e", "safe edit: $EDITOR → diff + dry-run → apply"}, {"S", "scale"}, {"R", "rollout restart"}, {"o", "rollout history · diff · rollback (U)"},
+			{"h u X (nodes)", "node health · cordon · drain preview"}, {":taint k=v:Effect", "add taint (k- removes)"}, {"D ctrl+d", "delete"},
 			{"F", "port-forward"}, {":pf", "manage port-forwards"}, {"!  :!<cmd>", "run kubectl"}}},
 		{"Panes", [][2]string{{"|  :vsplit [res]", "split side by side"}, {"-  :split [res]", "split stacked"}, {"L", "logs in a new pane"},
 			{"ctrl+w  alt+1-6", "focus next / pane N"}, {"z", "zoom pane"}, {"[ ]", "resize pane"}, {"ctrl+x  :close", "close pane"},
 			{":only", "keep only this pane"}, {"ctrl+t  :tabnew [ns|res]", "new tab"}, {">  <  :tab N", "next / prev / go to tab"},
-			{"C  :clusters", "all clusters: health, open"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
+			{"C  :clusters", "all clusters: health, open"}, {":helm", "Helm releases · values · history"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
 			{":vsplit @ctx [ns]", "compare clusters side by side"}, {"c  :ctx <name>", "switch this tab's cluster"},
-			{":tabname <name>", "rename tab"}, {":tabclose", "close tab (ctrl+x on last pane)"}, {":ns! <ns>", "namespace for all panes"}, {":layout <name>", "triage, ops, dash, ai, single"}}},
+			{":tabname <name>", "rename tab"}, {":tabclose", "close tab (ctrl+x on last pane)"}, {":ns! <ns>", "namespace for all panes"}, {":layout <name>", "triage, ops, dash, ai, single"},
+			{":view save <name>", "save this tab's layout"}, {"b  :view [name]", "open a saved view"}}},
 		{"AI & health", [][2]string{{"a", "AI analyze selected"}, {"A  :ai <q>", "AI chat"}, {"H  :pulse", "cluster pulse & issues"}, {"t (pulse)", "AI triage of all issues"},
 			{"ctrl+r (AI)", "run cmd from reply"}, {"ctrl+o", "switch AI profile"},
 			{":ai-key [profile]", "set API key (hidden)"}, {":ai-add", "add AI provider/model"}, {":theme", "switch theme (T cycles)"}, {":save", "persist theme/profile"}, {"q ctrl+c", "quit"}}},

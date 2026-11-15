@@ -60,6 +60,8 @@ Describe, YAML, edit, delete and AI analysis work on every type. The header's ta
 | `:pods`, `:deploy`, `:sts`, `:ds`, `:rs`, `:jobs`, `:cj`, `:svc`, `:ing`, `:cm`, `:secret`, `:pvc`, `:hpa`, `:ev`, `:nodes`, `:ns` | jump to a resource (`:pods kube-system` or `:pods all`) |
 | `V` / `:policy` | **policy & security checks** for every workload, with AI fixes |
 | `H` / `:pulse` | **Pulse**: node/pod/deployment health bars, CPU/memory requests vs capacity, detected issues |
+| `:helm` | **Helm releases**: values, manifests, history, revision diff, rollback |
+| `b` / `:view <name>` | open a **saved view** (`:view save <name>` stores the current tab) |
 | `A` / `:ai <question>` | **AI chat** about the cluster |
 | `?` | help |
 
@@ -137,7 +139,7 @@ With more than one container you pick one; init containers are left out because 
   It uses the WebSocket protocol (Kubernetes 1.30+) and falls back to SPDY. Some RBAC setups allow `pods/exec` only over WebSocket (GET).
 - On production-like contexts it asks before opening the shell.
 - **Images without a shell** (distroless or scratch): kubesage offers to attach an ephemeral `busybox` debug container that shares the container's processes
-  (`kubectl debug --target`). It asks first, because this permanently adds an ephemeral container to the pod, and it is unavailable in `--readonly` mode.
+  (`kubectl debug --target`). The image is `busybox:1.36` by default; set `debug_image` in the config (or `:debug` on a pod) to use one from your own registry, e.g. `myacr.azurecr.io/tools/netshoot:1.0`. It asks first, because this permanently adds an ephemeral container to the pod, and it is unavailable in `--readonly` mode.
 - For a single command without an interactive shell, use `!exec <pod> -- <cmd>`. It goes through the same approval as other changes.
 
 ### Logs
@@ -186,6 +188,40 @@ policy:
   allowed_registries: ['^[a-z0-9-]+\.azurecr\.io/']   # optional; empty = registry check off
   skip_namespaces: [kube-system, kube-public, kube-node-lease, gatekeeper-system, calico-system, tigera-operator, azure-workload-identity-system]
 ```
+
+### Helm releases
+
+`:helm` lists the Helm releases in the namespace (or `:ns all` for every namespace), read directly from Helm's release Secrets and ConfigMaps, so no `helm` CLI is needed to browse.
+
+| Key | Does |
+|-----|------|
+| `enter` / `v` | user-supplied values; keys that look secret (password, token, key…) are masked, `x` unmasks after confirmation and masks again after 60 s |
+| `m` | rendered manifest |
+| `h` | revision history; `enter`/`d` diffs a revision's values and manifest against the current one, `U` runs `helm rollback` after a typed confirmation (needs the `helm` CLI, blocked in `--readonly`) |
+
+### Nodes
+
+On `:nodes`:
+
+| Key | Does |
+|-----|------|
+| `h` | **node health**: conditions, taints, allocatable vs requests/limits vs live usage, and every pod on the node; refreshes live |
+| `u` | cordon / uncordon |
+| `X` | **drain preview**: which pods would be evicted, which are skipped (DaemonSet, mirror pods) and which would block the drain (no controller, a PodDisruptionBudget allowing 0 disruptions); `A` in the preview drains after you type the node name |
+| `:taint key=value:NoSchedule` / `:taint key-` | add or remove a taint on the selected node |
+
+All of these are blocked in `--readonly` mode and ask for confirmation.
+
+### Saved views
+
+A view remembers a tab's cluster, namespace, resource and pane layout.
+`:view save triage-shop` stores the current tab in the config, `b` (or `:view`) lists views and opens the chosen one in a new tab (connecting to its cluster when needed), `:view rm <name>` deletes one.
+
+### Live updates
+
+Tables follow the cluster with Kubernetes **watches**, so a pod that crashes or a deployment that scales shows up within about a second; the title shows `● live`.
+When a watch is not allowed (for example `:pods all` with namespace-scoped RBAC) the pane falls back to polling every `refresh_seconds` and shows `↻ 3s`, and retries the watch every 30 s.
+`:live poll` / `:live watch` switches the mode and saves it as `live_updates` in the config.
 
 ### Port-forwarding
 
@@ -288,6 +324,8 @@ Run `kubesage config init`. The file goes to `~/.config/kubesage/config.yaml` on
 ```yaml
 theme: tokyonight            # tokyonight, dracula, nord, catppuccin, gruvbox, solarized-light
 refresh_seconds: 3
+live_updates: watch         # watch (live, falls back to polling) or poll
+debug_image: busybox:1.36   # ephemeral debug container image for shell-less pods
 read_only: false
 choose_context_on_start: true   # show the cluster chooser when --context is not given
 animations: true                # animated logo in the terminal
@@ -434,8 +472,7 @@ KUBESAGE_SNAPSHOT_DIR=/tmp/snap go test ./internal/ui -run Snapshot  # dumps ANS
 
 ## Roadmap ideas
 
-Metrics-server CPU/memory per pod, CRD browsing via discovery, Helm releases,
-multi-cluster pulse, log search and highlighting, AI-generated patches applied after a diff preview, and plugins.
+Multi-cluster pulse, log search and highlighting, AI-generated patches applied after a diff preview, and plugins.
 
 ## License
 

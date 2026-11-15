@@ -263,3 +263,6 @@ func (c *Client) LogsText(ctx context.Context, ns, pod string, o LogOptions) (st
 	b, err := io.ReadAll(io.LimitReader(rc, 512*1024))
 	return string(b), err
 }
+
+// IsSensitiveKey reports whether a key name looks like it holds a secret (password, token, key…).
+func IsSensitiveKey(name string) bool { return sensitiveName.MatchString(name) }

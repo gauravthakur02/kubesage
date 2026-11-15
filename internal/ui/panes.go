@@ -23,15 +23,17 @@ type pane struct {
 	prevMode mode
 
 	// resource table
-	res     kube.Resource
-	table   kube.Table
-	visible []int
-	cursor  int
-	offset  int
-	filter  string
-	loading bool
-	listErr error
-	listGen int
+	res          kube.Resource
+	table        kube.Table
+	visible      []int
+	cursor       int
+	offset       int
+	filter       string
+	loading      bool
+	listErr      error
+	listGen      int
+	lastList     time.Time // when the last list was requested
+	watchPending bool      // a debounced watch refresh is scheduled
 
 	// text / logs view
 	vp         viewport.Model
@@ -62,6 +64,12 @@ type pane struct {
 
 	// edit is an open safe-edit session (editor → diff + dry-run → apply)
 	edit *editState
+
+	// drain is the previewed drain plan shown in this pane
+	drain *kube.DrainPlan
+
+	// helmRel is the Helm release shown in the values/manifest view
+	helmRel *kube.HelmRelease
 
 	// pulse / issues (per pane, so two clusters can be compared)
 	pulse       *kube.Pulse
@@ -404,6 +412,18 @@ func tagPane(p *pane, cmd tea.Cmd) tea.Cmd {
 			m.pane = p
 			return m
 		case secretMsg:
+			m.pane = p
+			return m
+		case nodeHealthMsg:
+			m.pane = p
+			return m
+		case drainPlanMsg:
+			m.pane = p
+			return m
+		case drainDoneMsg:
+			m.pane = p
+			return m
+		case helmTextMsg:
 			m.pane = p
 			return m
 		default:

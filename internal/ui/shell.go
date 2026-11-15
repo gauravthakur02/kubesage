@@ -156,8 +156,8 @@ func (a *App) handleShellDone(m shellDoneMsg) tea.Cmd {
 			return nil
 		}
 		target := m
-		a.askConfirm(fmt.Sprintf("%s has no shell. Start an ephemeral debug container (busybox) sharing its process namespace? This permanently adds an ephemeral container to pod %s.",
-			m.container, m.pod), "", func() tea.Cmd { return a.debugShell(target.ns, target.pod, target.container) })
+		a.askConfirm(fmt.Sprintf("%s has no shell. Start an ephemeral debug container (%s) sharing its process namespace? This permanently adds an ephemeral container to pod %s.",
+			m.container, a.debugImage(), m.pod), "", func() tea.Cmd { return a.debugShell(target.ns, target.pod, target.container) })
 	case strings.Contains(m.err.Error(), "exit code"):
 		// The shell itself exited non-zero (e.g. the last command failed before `exit`): a normal close.
 		a.setStatus(fmt.Sprintf("shell in %s/%s [%s] closed (%s)", m.ns, m.pod, m.container, m.err.Error()), false)
@@ -171,5 +171,13 @@ func (a *App) handleShellDone(m shellDoneMsg) tea.Cmd {
 
 // debugShell attaches an ephemeral busybox container that targets the container's processes.
 func (a *App) debugShell(ns, pod, container string) tea.Cmd {
-	return kubectlExec(a.client, "debug", "-it", pod, "-n", ns, "--image=busybox:1.36", "--target="+container, "--profile=general", "--", "sh")
+	return kubectlExec(a.client, "debug", "-it", pod, "-n", ns, "--image="+a.debugImage(), "--target="+container, "--profile=general", "--", "sh")
+}
+
+// debugImage is the configured debug container image (busybox by default).
+func (a *App) debugImage() string {
+	if a.cfg.DebugImage != "" {
+		return a.cfg.DebugImage
+	}
+	return "busybox:1.36"
 }

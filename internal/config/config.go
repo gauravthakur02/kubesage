@@ -147,8 +147,26 @@ type Config struct {
 	Favorites      []string `yaml:"favorites"`
 	AI             AIConfig `yaml:"ai"`
 	Policy         Policy   `yaml:"policy"`
+	// DebugImage is used for ephemeral debug containers in images without a shell.
+	// Point it at your own registry if admission policies only allow approved images.
+	DebugImage string `yaml:"debug_image"`
+	// Views are saved pane layouts (:view save <name>, b to open).
+	Views map[string]View `yaml:"views,omitempty"`
+	// LiveUpdates is "watch" (instant updates via the Kubernetes watch API, default) or "poll".
+	LiveUpdates string `yaml:"live_updates"`
 
 	path string
+}
+
+// View is a saved layout: a split tree of panes (leaf = one pane).
+type View struct {
+	Context   string  `yaml:"context,omitempty"`
+	Namespace string  `yaml:"namespace,omitempty"`
+	Resource  string  `yaml:"resource,omitempty"` // resource name, or "ai" / "pulse"
+	Stacked   bool    `yaml:"stacked,omitempty"`
+	Ratio     float64 `yaml:"ratio,omitempty"`
+	A         *View   `yaml:"a,omitempty"`
+	B         *View   `yaml:"b,omitempty"`
 }
 
 // Policy configures the workload policy/security checks (V, :policy, kubesage scan --policy).
@@ -170,6 +188,8 @@ func Default() *Config {
 		Animations:     true,
 		DangerContexts: `(?i)(prod|prd|-p$|live)`,
 		Favorites:      []string{"pods", "deployments", "services", "events", "nodes"},
+		DebugImage:     "busybox:1.36",
+		LiveUpdates:    "watch",
 		Policy: Policy{SkipNamespaces: []string{"kube-system", "kube-public", "kube-node-lease", "gatekeeper-system",
 			"calico-system", "tigera-operator", "azure-workload-identity-system"}},
 		AI: AIConfig{

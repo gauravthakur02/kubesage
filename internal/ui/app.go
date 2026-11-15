@@ -78,6 +78,7 @@ type App struct {
 	ov       overlay
 	version  string
 	dangerRe *regexp.Regexp
+	watches  map[*pane]*paneWatch
 
 	// launcher: the startup cluster chooser is showing (no cluster contacted yet)
 	launcher     bool
@@ -291,6 +292,7 @@ func (a *App) switchResource(r kube.Resource) tea.Cmd {
 func (a *App) refresh() tea.Cmd {
 	a.listGen++
 	a.loading = true
+	a.lastList = time.Now()
 	return tagPane(a.pane, fetchList(a.client, a.res, a.listGen))
 }
 
@@ -344,10 +346,13 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		a.checkForwards()
 		cmds := append([]tea.Cmd{tick(a.refreshEvery())}, a.autoMask()...)
+		cmds = append(cmds, a.ensureWatches()...)
 		for _, p := range a.panes() {
 			switch {
 			case p.mode == modeText && p.textKind == "health" && (!a.zoomed || p == a.pane):
 				cmds = append(cmds, tagPane(p, fetchHealth(p.client, p.target.ns, p.target.name, true)))
+			case p.mode == modeText && p.textKind == "nodehealth" && (!a.zoomed || p == a.pane):
+				cmds = append(cmds, tagPane(p, fetchNodeHealth(p.client, p.target.name, true)))
 			case p.mode == modeText && p.textKind == "secret" && p.reveal:
 				a.withPane(p, func() { a.renderSecret(false) }) // countdown
 			}
@@ -360,6 +365,8 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				continue
 			}
 			switch {
+			case p.mode == modeTable && !p.loading && a.watching(p) && time.Since(p.lastList) < watchResync:
+				// live watch keeps this pane current
 			case p.mode == modeTable && !p.loading:
 				cmds = append(cmds, a.refreshPane(p))
 			case p.mode == modePulse && !p.pulseBusy && time.Now().Second()%15 < a.cfg.RefreshSeconds:
@@ -512,6 +519,27 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case shellDoneMsg:
 		return a, a.handleShellDone(msg)
 
+	case watchEventMsg:
+		return a, a.handleWatchEvent(msg)
+
+	case watchEndMsg:
+		return a, a.handleWatchEnd(msg)
+
+	case helmTextMsg:
+		a.handleHelmText(msg)
+		return a, nil
+
+	case nodeHealthMsg:
+		a.handleNodeHealth(msg)
+		return a, nil
+
+	case drainPlanMsg:
+		a.handleDrainPlan(msg)
+		return a, nil
+
+	case drainDoneMsg:
+		return a, tea.Batch(a.handleDrainDone(msg), a.openDrainPreview(a.target.name))
+
 	case editLoadedMsg:
 		return a, a.handleEditLoaded(msg)
 
@@ -527,6 +555,9 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case shellAllowedMsg:
 		return a, a.handleShellAllowed(msg)
+
+	case viewReadyMsg:
+		return a, a.handleViewReady(msg)
 
 	case discoverMsg:
 		return a, a.handleDiscover(msg)
@@ -702,6 +733,20 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 			}
 		}
 	}
+	if a.res.Name == helmRes {
+		if row, ok := a.selected(); ok {
+			if cmd, handled := a.helmRowAction(k.String(), row); handled {
+				return cmd
+			}
+		}
+	}
+	if _, _, ok := isHelmHistory(a.res); ok {
+		if row, ok := a.selected(); ok {
+			if cmd, handled := a.helmHistoryRowAction(k.String(), row); handled {
+				return cmd
+			}
+		}
+	}
 	if k.String() == "esc" && a.filter == "" && a.backTo != nil {
 		back := *a.backTo
 		a.backTo = nil
@@ -777,6 +822,8 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 		return a.openPulse()
 	case "C":
 		return a.openClusters()
+	case "b":
+		return a.openViewPicker()
 	case "V":
 		return a.openPolicy()
 	case "A":
@@ -795,6 +842,9 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 	}
 	row, ok := a.selected()
 	if !ok {
+		return nil
+	}
+	if _, _, hh := isHelmHistory(a.res); hh || a.res.Name == helmRes {
 		return nil
 	}
 	if _, _, ok := isRollout(a.res); ok || a.res.Name == clustersRes || a.res.Name == policyRes {
@@ -828,6 +878,8 @@ func (a *App) rowAction(key string, row kube.Row) tea.Cmd {
 		return a.openText(r, ns, name, "yaml")
 	case "h":
 		switch {
+		case r.Name == "nodes":
+			return a.openNodeHealth(name)
 		case r.Name == "pods":
 			return a.openHealth(ns, name)
 		case r.HasSelector():
@@ -883,6 +935,14 @@ func (a *App) rowAction(key string, row kube.Row) tea.Cmd {
 			return fetchPortTargets(a.client, r, ns, name)
 		}
 		a.setStatus("port-forward works on pods, services and deployments/statefulsets/daemonsets", true)
+	case "u":
+		if r.Name == "nodes" {
+			return a.toggleCordon(name, strings.Contains(row.Cells[1], "SchedulingDisabled"))
+		}
+	case "X":
+		if r.Name == "nodes" {
+			return a.openDrainPreview(name)
+		}
 	case "o":
 		if r.Name == "deployments" {
 			return a.openRollout(ns, name)
@@ -937,7 +997,7 @@ func (a *App) handlePods(msg podsMsg) tea.Cmd {
 			return a.openHealth(p.Namespace, p.Name)
 		}
 		ctrs := kube.Containers(&p)
-		if msg.purpose == "shell" { // init containers have exited; only running containers take a shell
+		if msg.purpose == "shell" || msg.purpose == "debug" { // init containers have exited; only running containers
 			ctrs = nil
 			for _, c := range p.Spec.Containers {
 				ctrs = append(ctrs, c.Name)
@@ -947,6 +1007,11 @@ func (a *App) handlePods(msg podsMsg) tea.Cmd {
 			switch msg.purpose {
 			case "shell":
 				return a.openShell(p.Namespace, p.Name, c)
+			case "debug":
+				target := p
+				a.askConfirm(fmt.Sprintf("Attach an ephemeral debug container (%s) to %s [%s]? This permanently adds it to the pod spec.",
+					a.debugImage(), target.Name, c), "", func() tea.Cmd { return a.debugShell(target.Namespace, target.Name, c) })
+				return nil
 			default:
 				return a.openLogs(p.Namespace, p.Name, c, msg.purpose == "prevlogs")
 			}
@@ -1029,6 +1094,35 @@ func (a *App) runCommand(line string) tea.Cmd {
 			return nil
 		})
 		return nil
+	case "taint":
+		return a.taintCommand(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+	case "view", "views":
+		return a.viewCommand(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+	case "debug":
+		if row, ok := a.selected(); ok && a.res.Name == "pods" {
+			if !a.guardWrite() {
+				return nil
+			}
+			return fetchPods(a.client, a.res, row.Namespace, row.Name, "debug")
+		}
+		a.setStatus("select a pod first (:debug starts an ephemeral debug container)", true)
+		return nil
+	case "live":
+		switch arg {
+		case "watch", "poll":
+			a.cfg.LiveUpdates = arg
+		default:
+			if a.liveWatch() {
+				a.cfg.LiveUpdates = "poll"
+			} else {
+				a.cfg.LiveUpdates = "watch"
+			}
+		}
+		_ = a.cfg.Save()
+		a.setStatus("live updates: "+a.cfg.LiveUpdates, false)
+		return tea.Batch(a.ensureWatches()...)
+	case "helm", "releases", "charts":
+		return a.openHelm()
 	case "policy", "policies", "security":
 		return a.openPolicy()
 	case "resources", "res", "api-resources", "all":
@@ -1194,6 +1288,16 @@ func (a *App) updateText(k tea.KeyMsg) tea.Cmd {
 	if cmd, handled := a.updateEdit(k.String()); handled {
 		return cmd
 	}
+	switch {
+	case a.textKind == "drain" && k.String() == "A":
+		return a.startDrain()
+	case a.textKind == "nodehealth" && k.String() == "u":
+		if n := a.target.name; n != "" {
+			return a.toggleCordon(n, strings.Contains(strings.Join(a.textLines, " "), "cordoned"))
+		}
+	case a.textKind == "nodehealth" && k.String() == "X":
+		return a.openDrainPreview(a.target.name)
+	}
 	switch k.String() {
 	case "/":
 		a.openInput(ovInput, "search › ", func(q string) tea.Cmd { a.setSearch(q); return nil })
@@ -1242,6 +1346,19 @@ func (a *App) updateText(k tea.KeyMsg) tea.Cmd {
 	case "x":
 		if a.textKind == "secret" || (a.textKind == "yaml" && a.target.res.Name == "secrets") {
 			return a.toggleReveal()
+		}
+		if a.textKind == "helmvalues" && a.helmRel != nil {
+			if a.reveal {
+				a.reveal = false
+				a.renderHelmText()
+				return nil
+			}
+			a.askConfirm(fmt.Sprintf("Show unmasked Helm values of %s/%s on %s?", a.helmRel.Namespace, a.helmRel.Name, a.client.Context), a.helmRel.Name, func() tea.Cmd {
+				a.reveal, a.revealedAt = true, time.Now()
+				a.renderHelmText()
+				return nil
+			})
+			return nil
 		}
 	case "h":
 		if a.target.res.Name == "pods" && a.textKind != "health" {
