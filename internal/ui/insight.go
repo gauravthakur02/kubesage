@@ -29,10 +29,10 @@ func (a *App) openReport(kind, loading string, fetch func(ctx context.Context) (
 	})
 }
 
-var graphKinds = map[string]bool{"Ingress": true, "Service": true, "Deployment": true, "StatefulSet": true, "DaemonSet": true, "ReplicaSet": true, "Pod": true}
+var graphKinds = map[string]bool{"Gateway": true, "HTTPRoute": true, "Ingress": true, "Service": true, "Deployment": true, "StatefulSet": true, "DaemonSet": true, "ReplicaSet": true, "Pod": true}
 
 var kindIcon = map[string]string{"Ingress": "🌐", "Service": "⇄", "Deployment": "▣", "StatefulSet": "▤", "DaemonSet": "▦", "ReplicaSet": "▢",
-	"Pod": "●", "ConfigMap": "⚙", "Secret": "🔑", "PersistentVolumeClaim": "⛁", "HPA": "↕"}
+	"Pod": "●", "ConfigMap": "⚙", "Secret": "🔑", "PersistentVolumeClaim": "⛁", "HPA": "↕", "HTTPRoute": "↪", "Gateway": "⛩"}
 
 func (a *App) renderGraph(n *kube.GraphNode, prefix string, last, root bool, out *[]string) {
 	s := a.st

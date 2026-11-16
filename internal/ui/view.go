@@ -212,7 +212,7 @@ func (a *App) hints() string {
 		}
 		list = []kv{{"esc", "back"}, {"↑↓/pgup", "scroll"}, {"g/G", "top/bottom"}, {"a", "ask AI"}, {"y", "yaml"}, {"d", "describe"}}
 		if a.textKind == "logs" {
-			list = append(list, kv{"f", "follow"}, kv{"t", "time window"}, kv{"T", "timestamps"})
+			list = append(list, kv{"f", "follow"}, kv{"t", "time window"}, kv{"T", "timestamps"}, kv{"J", "pretty JSON"}, kv{"i/x", "include/exclude"}, kv{"ctrl+s", "save"})
 		}
 		list = append(list, kv{"/", "search"})
 		if a.search != "" {
@@ -295,7 +295,7 @@ func (a *App) hints() string {
 		if a.res.Name == "pods" {
 			extra = append(extra, kv{"P", "netpol"})
 		}
-		extra = append(extra, kv{"I", "incident"})
+		extra = append(extra, kv{"I", "incident"}, kv{"( )", "sort"})
 		list = append(extra, list...)
 	}
 	if len(a.panes()) > 1 {
@@ -303,7 +303,7 @@ func (a *App) hints() string {
 	}
 	var parts []string
 	for _, p := range list {
-		parts = append(parts, a.st.Key.Render(p.k)+" "+a.st.KeyDesc.Render(p.v))
+		parts = append(parts, a.st.Key.Render(a.keyLabel(p.k))+" "+a.st.KeyDesc.Render(p.v))
 	}
 	return strings.Join(parts, a.st.Muted.Render("  "))
 }
@@ -459,8 +459,48 @@ func (a *App) viewTableBody(w, h int) string {
 		}
 		return " "
 	}
+	// Hidden columns (hide_columns / :cols) and the sort arrow.
+	if hidden := a.hiddenColumns(); len(hidden) > 0 {
+		var keep []int
+		for i, c := range cols {
+			if !hidden[strings.ToUpper(c)] {
+				keep = append(keep, i)
+			}
+		}
+		if len(keep) > 0 && len(keep) < len(cols) {
+			nc := make([]string, len(keep))
+			for j, i := range keep {
+				nc[j] = cols[i]
+			}
+			cols = nc
+			base := cellsOf
+			cellsOf = func(idx int) []string {
+				c := base(idx)
+				out := make([]string, len(keep))
+				for j, i := range keep {
+					if i < len(c) {
+						out[j] = c[i]
+					}
+				}
+				return out
+			}
+		}
+	}
+	a.colNames = append(a.colNames[:0], cols...)
+	header := append([]string(nil), cols...)
+	if sp, ok := a.sorts[a.res.Name]; ok && sp.col != "" {
+		for i, c := range header {
+			if c == sp.col {
+				if sp.desc {
+					header[i] = c + " ▼"
+				} else {
+					header[i] = c + " ▲"
+				}
+			}
+		}
+	}
 	widths := make([]int, len(cols))
-	for i, c := range cols {
+	for i, c := range header {
 		widths[i] = lipgloss.Width(c)
 	}
 	for _, idx := range a.visible {
@@ -515,7 +555,8 @@ func (a *App) viewTableBody(w, h int) string {
 	}
 	a.offset = max(0, min(a.offset, max(0, len(a.visible)-bodyH)))
 
-	lines := []string{"    " + s.Header.Render(renderCells(cols))}
+	a.colWidths = append(a.colWidths[:0], widths...)
+	lines := []string{"    " + s.Header.Render(renderCells(header))}
 	for i := a.offset; i < min(len(a.visible), a.offset+bodyH); i++ {
 		idx := a.visible[i]
 		row := a.table.Rows[idx]
@@ -560,8 +601,11 @@ func (a *App) renderText(gotoBottom bool) {
 	out := make([]string, 0, len(a.textLines))
 	a.matches = a.matches[:0]
 	lowerQ := strings.ToLower(a.search)
-	for i, l := range a.textLines {
+	for _, l := range a.textLines {
 		l = strings.ReplaceAll(l, "\t", "    ")
+		if a.textKind == "logs" && (a.logInclude != nil || a.logExclude != nil) && !a.logLineVisible(l) {
+			continue
+		}
 		// Merged logs: colour the [pod] prefix and keep it out of the content styling.
 		prefix := ""
 		if a.textKind == "logs" && len(a.logSpec.pods) > 1 && strings.HasPrefix(l, "[") {
@@ -571,7 +615,7 @@ func (a *App) renderText(gotoBottom bool) {
 		}
 		if a.search != "" && a.textKind != "health" && a.textKind != "secret" && strings.Contains(strings.ToLower(ansi.Strip(l)), lowerQ) {
 			current := a.matchIdx >= 0 && a.matchIdx < len(a.matches)+1 && len(a.matches) == a.matchIdx
-			a.matches = append(a.matches, i)
+			a.matches = append(a.matches, len(out))
 			out = append(out, prefix+a.highlightSearch(ansi.Strip(l), current))
 			continue
 		}
@@ -589,6 +633,12 @@ func (a *App) renderText(gotoBottom bool) {
 				l = s.WarnText.Render(l)
 			}
 		case "logs":
+			if a.logJSON {
+				if pretty, ok := a.prettyJSONLog(l); ok {
+					out = append(out, prefix+pretty)
+					continue
+				}
+			}
 			switch {
 			case strings.HasPrefix(l, "──") || strings.HasPrefix(l, "[kubesage]"):
 				l = s.Muted.Render(l)
@@ -962,7 +1012,13 @@ func (a *App) viewHelp(w, h int) string {
 			{":rbac · :whocan v r · :why", "your permissions · who has access · explain forbidden"},
 			{":pin · :pin ns · :alerts", "watch list with bell/desktop alerts"}, {":find <text|label=v> [--all]", "search all connected clusters"},
 			{":quota", "quotas, limit ranges, node pool capacity"}, {":policyreports · :backups", "Kyverno/Gatekeeper/PSA · Velero"},
-			{":prom <PromQL>", "query Prometheus"}, {":report", "Markdown incident report"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
+			{":prom <PromQL>", "query Prometheus"}, {":report", "Markdown incident report"},
+			{"( / )", "sort by next column / reverse (or click a header with :mouse)"}, {":cols", "show/hide columns"},
+			{"W · B on a pod", "startup breakdown · browse files (:download / :upload)"}, {":restart-needed", "pods with outdated ConfigMaps/Secrets"},
+			{":autoscaling · :mesh · :secrets-health", "HPA/KEDA/VPA · sidecars · secret sync and rotation"},
+			{":kubeconfig", "contexts: rename, delete, add AKS clusters"}, {":runbooks", "team runbooks (used by the AI)"},
+			{":apply <path>", "diff local manifests, then apply"}, {":opencost [workload]", "cost from OpenCost/Kubecost"},
+			{":fwd save/name/stop", "port-forward profiles"}, {"J · i/x · ctrl+s in logs", "pretty JSON · include/exclude · save"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
 			{":vsplit @ctx [ns]", "compare clusters side by side"}, {"c  :ctx <name>", "switch this tab's cluster"},
 			{":tabname <name>", "rename tab"}, {":tabclose", "close tab (ctrl+x on last pane)"}, {":ns! <ns>", "namespace for all panes"}, {":layout <name>", "triage, ops, dash, ai, single"},
 			{":view save <name>", "save this tab's layout"}, {"b  :view [name]", "open a saved view"}}},

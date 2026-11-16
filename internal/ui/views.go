@@ -204,6 +204,14 @@ func (a *App) resourceByName(name string) kube.Resource {
 		return a.policyReportsResource()
 	case name == backupsRes:
 		return a.backupsResource()
+	case name == staleRes:
+		return a.staleResource()
+	case name == scalingRes:
+		return a.scalingResource()
+	case name == secretsHealthRes:
+		return a.secretsHealthResource()
+	case name == meshRes:
+		return a.meshResource()
 	case strings.HasPrefix(name, rolloutPrefix):
 		ns, n, _ := strings.Cut(strings.TrimPrefix(name, rolloutPrefix), "/")
 		return a.rolloutResource(ns, n)

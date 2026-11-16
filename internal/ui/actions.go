@@ -41,7 +41,9 @@ func (a *App) rowActions(row kube.Row) []rowActionItem {
 	}
 	if r.Name == "pods" {
 		add(key("h", "health report"), key("l", "logs"), key("s", "shell"), key("P", "network policies: who may connect"),
-			key("N", "network debug: DNS, TCP and HTTP test from inside this pod"))
+			key("N", "network debug: DNS, TCP and HTTP test from inside this pod"),
+			key("W", "startup breakdown: scheduling, image pull, init, readiness · probe advice"),
+			key("B", "browse files in the container · view · download · upload"))
 	} else if r.CanLogs() {
 		add(key("l", "logs"))
 	}

@@ -448,7 +448,8 @@ func (a *App) openNetPol(ns, pod string) tea.Cmd {
 // generic resource actions (delete, scale, …) do not apply.
 func (a *App) isKubesageTable() bool {
 	switch a.res.Name {
-	case sizingRes, certsRes, imagesRes, storageRes, gitopsRes, alertsRes, policyRepRes, backupsRes:
+	case sizingRes, certsRes, imagesRes, storageRes, gitopsRes, alertsRes, policyRepRes, backupsRes, staleRes, scalingRes, kubeconfigRes, runbooksRes,
+		secretsHealthRes, meshRes, costRes:
 		return true
 	}
 	if strings.HasPrefix(a.res.Name, searchPrefix) {
@@ -465,6 +466,28 @@ func (a *App) extraRowAction(key string, row kube.Row) (tea.Cmd, bool) {
 		return a.sizingRowAction(key, row)
 	case a.res.Name == alertsRes:
 		return a.alertRowAction(key, row)
+	case a.res.Name == staleRes:
+		return a.staleRowAction(key, row)
+	case a.res.Name == runbooksRes && key == "enter":
+		if rbs, err := a.loadRunbooks(); err == nil {
+			for _, rb := range rbs {
+				if rb.Path == row.Name {
+					return a.openRunbook(rb), true
+				}
+			}
+		}
+		return nil, true
+	case a.res.Name == kubeconfigRes:
+		return a.kubeconfigRowAction(key, row)
+	case a.res.Name == scalingRes && key == "enter":
+		if r, name, ok := policyTarget(row); ok {
+			return a.openGraph(r.Kind, row.Namespace, name), true
+		}
+		return nil, true
+	case a.res.Name == "pods" && key == "B":
+		return a.browseFiles(row.Namespace, row.Name, "", "/"), true
+	case a.res.Name == "pods" && key == "W":
+		return a.openStartup(row.Namespace, row.Name), true
 	case strings.HasPrefix(a.res.Name, searchPrefix):
 		return a.searchRowAction(key, row)
 	case a.res.Name == policyRepRes && key == "enter":
@@ -530,6 +553,20 @@ func (a *App) kubesageTitle() string {
 		return "GitOps apps · " + a.client.NamespaceLabel() + " · " + note
 	case alertsRes:
 		return "Alerts · " + note
+	case staleRes:
+		return "Restart needed · " + a.client.NamespaceLabel() + " · " + note
+	case scalingRes:
+		return "Autoscaling · " + a.client.NamespaceLabel() + " · " + note
+	case kubeconfigRes:
+		return "Kubeconfig · " + note
+	case runbooksRes:
+		return "Runbooks · " + note
+	case secretsHealthRes:
+		return "Secrets health · " + a.client.NamespaceLabel() + " · " + note
+	case meshRes:
+		return "Service mesh · " + note
+	case costRes:
+		return "Cost · " + note
 	case policyRepRes:
 		return "Policy reports · " + a.client.NamespaceLabel() + " · " + note
 	case backupsRes:
@@ -559,8 +596,14 @@ func (a *App) kubesageHints() []kv {
 		return []kv{{"enter", "details"}, {"/", "filter"}, {"esc", "back"}}
 	case policyRepRes, backupsRes:
 		return []kv{{"enter", "describe"}, {"/", "filter"}, {"esc", "back"}}
+	case scalingRes:
+		return []kv{{"enter", "target relationships"}, {"/", "filter"}, {"esc", "back"}}
+	case kubeconfigRes:
+		return []kv{{"enter", "open"}, {"p", "check"}, {"r", "rename"}, {"D", "delete"}, {"a", "add AKS cluster"}, {"esc", "back"}}
+	case staleRes:
+		return []kv{{"R", "rollout restart"}, {"enter", "relationships"}, {"/", "filter"}, {"esc", "back"}}
 	case alertsRes:
-		return []kv{{"enter", "open object"}, {"a", "AI explain"}, {":pin/:unpin", "watch list"}, {"esc", "back"}}
+		return []kv{{"enter", "open object"}, {"a", "AI explain"}, {"r", "runbook"}, {":pin/:unpin", "watch list"}, {"esc", "back"}}
 	}
 	if strings.HasPrefix(a.res.Name, searchPrefix) {
 		return []kv{{"enter", "open"}, {"y", "yaml"}, {"/", "filter"}, {"esc", "back"}}

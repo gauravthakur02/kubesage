@@ -10,7 +10,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // GraphNode is one object in a relationship tree.
@@ -34,7 +36,65 @@ type nsObjects struct {
 	svcs     []corev1.Service
 	ings     []networkingv1.Ingress
 	pvcs     map[string]corev1.PersistentVolumeClaim
-	hpaNames map[string]string // "Kind/name" → hpa name
+	hpaNames map[string]string           // "Kind/name" → hpa name
+	routes   []unstructured.Unstructured // Gateway API HTTPRoutes
+	gateways []unstructured.Unstructured
+}
+
+var (
+	httpRouteGVR = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}
+	gatewayGVR   = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "gateways"}
+)
+
+func routeRefs(u *unstructured.Unstructured, field string) []string {
+	var out []string
+	switch field {
+	case "parents":
+		ps, _, _ := unstructured.NestedSlice(u.Object, "spec", "parentRefs")
+		for _, p := range ps {
+			if m, ok := p.(map[string]any); ok {
+				out = append(out, fmt.Sprint(m["name"]))
+			}
+		}
+	case "backends":
+		rules, _, _ := unstructured.NestedSlice(u.Object, "spec", "rules")
+		seen := map[string]bool{}
+		for _, r := range rules {
+			rm, _ := r.(map[string]any)
+			brs, _ := rm["backendRefs"].([]any)
+			for _, b := range brs {
+				bm, _ := b.(map[string]any)
+				if k, _ := bm["kind"].(string); k != "" && k != "Service" {
+					continue
+				}
+				if n := fmt.Sprint(bm["name"]); !seen[n] {
+					seen[n] = true
+					out = append(out, n)
+				}
+			}
+		}
+	}
+	return out
+}
+
+func routeNode(u *unstructured.Unstructured) *GraphNode {
+	hosts, _, _ := unstructured.NestedStringSlice(u.Object, "spec", "hostnames")
+	n := &GraphNode{Kind: "HTTPRoute", Namespace: u.GetNamespace(), Name: u.GetName(), Status: strings.Join(hosts, ","), Health: HealthOK}
+	parents, _, _ := unstructured.NestedSlice(u.Object, "status", "parents")
+	for _, p := range parents {
+		pm, _ := p.(map[string]any)
+		conds, _ := pm["conditions"].([]any)
+		for _, c := range conds {
+			cm, _ := c.(map[string]any)
+			if (cm["type"] == "Accepted" || cm["type"] == "ResolvedRefs") && cm["status"] != "True" {
+				n.Health, n.Note = HealthErr, fmt.Sprintf("%v: %v", cm["type"], cm["reason"])
+			}
+		}
+	}
+	if gw := routeRefs(u, "parents"); len(gw) > 0 && n.Note == "" {
+		n.Note = "via gateway " + strings.Join(gw, ",")
+	}
+	return n
 }
 
 func (c *Client) loadNS(ctx context.Context, ns string) (*nsObjects, error) {
@@ -66,6 +126,14 @@ func (c *Client) loadNS(ctx context.Context, ns string) (*nsObjects, error) {
 	if l, err := cs.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{}); err == nil {
 		for _, p := range l.Items {
 			o.pvcs[p.Name] = p
+		}
+	}
+	if c.Dynamic != nil {
+		if l, err := c.Dynamic.Resource(httpRouteGVR).Namespace(ns).List(ctx, metav1.ListOptions{}); err == nil {
+			o.routes = l.Items
+		}
+		if l, err := c.Dynamic.Resource(gatewayGVR).Namespace(ns).List(ctx, metav1.ListOptions{}); err == nil {
+			o.gateways = l.Items
 		}
 	}
 	if l, err := cs.AutoscalingV2().HorizontalPodAutoscalers(ns).List(ctx, metav1.ListOptions{}); err == nil {
@@ -117,6 +185,16 @@ func podNode(p *corev1.Pod) *GraphNode {
 	n := &GraphNode{Kind: "Pod", Namespace: p.Namespace, Name: p.Name, Status: status, Health: h}
 	if p.Spec.NodeName != "" {
 		n.Note = "on " + p.Spec.NodeName
+	}
+	if mesh, ready := SidecarOf(p); mesh != "" {
+		if ready {
+			n.Note += " · " + mesh + " sidecar"
+		} else {
+			n.Note += " · " + mesh + " sidecar NOT ready"
+			if n.Health == HealthOK {
+				n.Health = HealthWarn
+			}
+		}
 	}
 	return n
 }
@@ -433,6 +511,13 @@ func (o *nsObjects) usedBy(podLabels []labels.Set) []*GraphNode {
 			continue
 		}
 		sn := &GraphNode{Kind: "Service", Namespace: s.Namespace, Name: s.Name, Health: HealthNeutral, Status: string(s.Spec.Type)}
+		for j := range o.routes {
+			for _, b := range routeRefs(&o.routes[j], "backends") {
+				if b == s.Name {
+					sn.add(routeNode(&o.routes[j]))
+				}
+			}
+		}
 		for j := range o.ings {
 			for _, r := range o.ings[j].Spec.Rules {
 				if r.HTTP == nil {
@@ -479,6 +564,13 @@ func (c *Client) Relations(ctx context.Context, kind, ns, name string) (*GraphNo
 			if o.svcs[i].Name == name {
 				n := o.serviceNode(&o.svcs[i])
 				front.Children = o.usedBy(nil)
+				for j := range o.routes {
+					for _, b := range routeRefs(&o.routes[j], "backends") {
+						if b == name {
+							front.add(routeNode(&o.routes[j]))
+						}
+					}
+				}
 				for j := range o.ings {
 					ing := o.ingressNode(&o.ings[j])
 					for _, ch := range ing.Children {
@@ -489,6 +581,58 @@ func (c *Client) Relations(ctx context.Context, kind, ns, name string) (*GraphNo
 				}
 				return n, front, nil
 			}
+		}
+	case "HTTPRoute":
+		for i := range o.routes {
+			if o.routes[i].GetName() != name {
+				continue
+			}
+			n := routeNode(&o.routes[i])
+			for _, b := range routeRefs(&o.routes[i], "backends") {
+				found := false
+				for j := range o.svcs {
+					if o.svcs[j].Name == b {
+						n.add(o.serviceNode(&o.svcs[j]))
+						found = true
+					}
+				}
+				if !found {
+					n.add(&GraphNode{Kind: "Service", Namespace: ns, Name: b, Status: "missing", Health: HealthErr})
+					n.Health = HealthErr
+				}
+			}
+			for _, g := range routeRefs(&o.routes[i], "parents") {
+				front.add(&GraphNode{Kind: "Gateway", Namespace: ns, Name: g, Health: HealthNeutral})
+			}
+			return n, front, nil
+		}
+	case "Gateway":
+		for i := range o.gateways {
+			g := &o.gateways[i]
+			if g.GetName() != name {
+				continue
+			}
+			class, _, _ := unstructured.NestedString(g.Object, "spec", "gatewayClassName")
+			st, reason, _ := readyCondition(g.Object)
+			n := &GraphNode{Kind: "Gateway", Namespace: ns, Name: name, Status: "class " + class, Health: HealthOK}
+			if st == "False" {
+				n.Health, n.Note = HealthErr, reason
+			}
+			for j := range o.routes {
+				for _, p := range routeRefs(&o.routes[j], "parents") {
+					if p == name {
+						rn := n.add(routeNode(&o.routes[j]))
+						for _, b := range routeRefs(&o.routes[j], "backends") {
+							for k := range o.svcs {
+								if o.svcs[k].Name == b {
+									rn.add(o.serviceNode(&o.svcs[k]))
+								}
+							}
+						}
+					}
+				}
+			}
+			return n, nil, nil
 		}
 	case "Deployment", "StatefulSet", "DaemonSet":
 		n := o.workloadNode(kind, name)
@@ -525,7 +669,7 @@ func (c *Client) Relations(ctx context.Context, kind, ns, name string) (*GraphNo
 			return n, front, nil
 		}
 	default:
-		return nil, nil, fmt.Errorf("relationships are available for ingresses, services, deployments, statefulsets, daemonsets, replicasets and pods")
+		return nil, nil, fmt.Errorf("relationships are available for gateways, httproutes, ingresses, services, deployments, statefulsets, daemonsets, replicasets and pods")
 	}
 	return nil, nil, fmt.Errorf("%s %s/%s not found", strings.ToLower(kind), ns, name)
 }

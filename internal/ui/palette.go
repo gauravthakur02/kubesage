@@ -28,7 +28,11 @@ var paletteItems = []struct{ label, cmd string }{
 	{"My permissions here (RBAC)", "rbac"}, {"Why was I forbidden?", "why"}, {"Alerts from the watch list", "alerts"},
 	{"Watch this namespace (alerts)", "pin ns"}, {"Quotas & node pool capacity", "quota"}, {"Policy reports: Kyverno, Gatekeeper, PSA", "policyreports"},
 	{"Velero backups", "backups"}, {"Search all connected clusters", "find "}, {"Incident report of the selected object", "report"},
-	{"PromQL query", "prom "}, {"Help", "help"},
+	{"PromQL query", "prom "}, {"Restart needed: outdated ConfigMaps/Secrets", "restart-needed"},
+	{"Autoscaling: HPA, KEDA, VPA", "autoscaling"}, {"Kubeconfig: contexts, add AKS cluster", "kubeconfig"},
+	{"Team runbooks", "runbooks"}, {"Secrets health & rotation", "secrets-health"}, {"Service mesh sidecars", "mesh"},
+	{"Cost per namespace (OpenCost)", "opencost"}, {"Apply local manifests (dry-run diff)", "apply "},
+	{"Port-forward profiles", "fwd"}, {"Show/hide columns", "cols"}, {"Toggle mouse", "mouse"}, {"Help", "help"},
 }
 
 // openPalette fuzzy-searches resources, kubesage screens, saved views, contexts and plugins (ctrl+p).

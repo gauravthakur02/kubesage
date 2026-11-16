@@ -83,6 +83,13 @@ Describe, YAML, edit, delete and AI analysis work on every type. The header's ta
 | `:find <text\|image\|ip\|label=v> [--all]` | search every connected cluster |
 | `:quota` · `:policyreports` · `:backups` | quotas and node pool capacity · Kyverno/Gatekeeper/PSA results · Velero |
 | `:prom <PromQL>` · `:report` | query Prometheus · save a Markdown incident report |
+| `:restart-needed` | workloads whose ConfigMap or Secret changed after their pods started; `R` restarts them |
+| `:autoscaling` · `:mesh` · `:secrets-health` · `:opencost [workload]` | HPA/KEDA/VPA · Istio/Linkerd sidecars · secret sync and rotation · cost from OpenCost/Kubecost |
+| `:kubeconfig` | contexts: check, rename, delete, **add AKS clusters** from `az` |
+| `:runbooks` | team runbooks; the AI follows matching ones automatically |
+| `:apply <path>` | server-side dry-run diff of local YAML, kustomize or a Helm chart, then `A` applies |
+| `:fwd save <name>` · `:fwd <name>` | port-forward profiles |
+| `( )` · `:cols` · `:mouse` | sort by column / reverse · show or hide columns · mouse support |
 | `A` / `:ai <question>` | **AI chat** about the cluster |
 | `?` | help |
 
@@ -122,6 +129,8 @@ There is one AI conversation, shown in whichever pane is in AI mode. Pressing `a
 | `P` | **network policies** of a pod: who may connect, where it may connect, missing DNS egress |
 | `N` | **network debug** from inside a pod: DNS, TCP and HTTP to a service, host:port or URL (ephemeral debug container, asks first) |
 | `p` on a serviceaccount | its RoleBindings, ClusterRoleBindings and rules |
+| `W` | **startup breakdown** of a pod: scheduling, image pulls, init containers, readiness, with probe advice |
+| `B` | **browse files** in a container, view them, `:download` / `:upload` (no shell needed beyond `ls`/`cat`) |
 | `u` on a Helm release | **upgrade preview**: `helm upgrade --dry-run=server` diffed against what runs now |
 | `h` / `J` / `u` on a cronjob | run history with durations and failures / run now / suspend or resume |
 | `S` / `R` / `D` | scale, rollout restart, delete |
@@ -269,6 +278,60 @@ prometheus:
 **Also:** `:find` searches names, images, IPs, hosts and labels across every connected cluster (`--all` for every kubeconfig context); `:quota` shows ResourceQuota usage,
 LimitRanges and request-based node pool utilisation with nodes that could be removed; `:policyreports` collects Kyverno PolicyReports, Gatekeeper violations
 and namespace Pod Security levels; `:backups` lists Velero schedules and backups; `:report` writes relationships, timeline, open issues and the last AI answer to Markdown.
+
+### Day-2 helpers
+
+**Restart needed (`:restart-needed`).** Environment variables and `subPath` mounts never update in a running pod. kubesage compares when each ConfigMap and Secret
+a pod uses last changed (from managed fields) with when the pod started, and lists the workloads that still run the old values. `R` does a rollout restart.
+Plain volume mounts are listed as "updated in place" because the file changes but the app may not reload it.
+
+**Pod startup (`W`)** breaks a pod's start into scheduling, image pulls (from events), each init container, container start and readiness, and flags
+risky probes: liveness without a startup probe on a slow app, 1-second liveness timeouts, liveness and readiness on the same endpoint, missing readiness.
+
+**Autoscaling (`:autoscaling`)** shows HPAs (current vs target per metric, stuck at max, metrics unavailable), KEDA ScaledObjects (triggers, ready, paused) and
+VPAs (recommendations). VPA recommendations also appear as a column in `:rightsize`.
+
+**Kubeconfig (`:kubeconfig`)** lists contexts with server and auth plugin. `p` checks one, `r` renames, `D` deletes (with unused cluster and user entries), and `a`
+adds an AKS cluster: pick a subscription and a cluster from `az`, and kubesage runs `az aks get-credentials`. Every change writes a backup next to the kubeconfig first.
+
+**Runbooks.** Point `runbooks: {dir: ~/runbooks}` at a folder (or a git clone; `:runbooks pull` updates it). Each Markdown file can declare what it is for:
+
+```markdown
+---
+title: Pod crash loops
+match: [CrashLoopBackOff, OOMKilled]
+---
+# Crash loops
+1. Check the previous container's logs (p) ...
+```
+
+Whenever the AI analyses, triages or answers an incident, matching runbooks are added to the prompt and the AI is told to follow them first. In `:alerts`, `r` opens the matching runbook.
+
+**Logs:** `J` renders JSON lines as `LEVEL time message key=value`, `i`/`x` keep or hide lines by regex, `ctrl+s` saves what is shown.
+
+**Apply local manifests (`:apply ./deploy`)** renders a file, a folder of YAML, a kustomization (`kubectl kustomize`) or a Helm chart (`helm template`), runs a
+server-side dry-run apply of every object and shows new / changed (with a diff) / unchanged / errors. `A` applies with server-side apply; nothing is applied while any object fails.
+
+**Secrets health (`:secrets-health`)** lists Secrets with the time since their last change, how many pods use them, and whether they are managed by an ExternalSecret
+or SealedSecret (with sync status). Secrets older than `secret_rotation_days` (90) are yellow. Values are never read into this view.
+
+**Gateway API and mesh:** the relationships graph follows HTTPRoutes and Gateways (`w` works on them too) and marks Istio/Linkerd sidecars that are not ready;
+`:mesh` shows injection per namespace and pods that are missing their sidecar. **Cost:** `:opencost` reads OpenCost or Kubecost (auto-detected, or `opencost.url`).
+
+### Safety for production
+
+```yaml
+change_windows:                 # changes to matching contexts only inside the window
+  - {contexts: "(?i)prod", days: Mon-Fri, hours: "08:00-18:00", tz: Europe/Amsterdam, mode: block}   # or mode: warn
+freezes:
+  - {contexts: "(?i)prod", from: 2026-12-20, to: 2027-01-03, reason: holiday freeze}
+require_reason: "(?i)prod"      # every change asks for a reason, stored in the audit log
+```
+
+Blocked changes include the AI's commands. **Port-forward profiles:** start the forwards you need, `:fwd save dev-stack`, and next time `:fwd dev-stack` starts them all.
+
+**Table comfort:** `(` sorts by the next column and `)` reverses (ages, sizes and counts sort numerically). `:cols` hides columns per resource (saved as `hide_columns`).
+`:mouse` turns on clicking rows and headers and wheel scrolling (hold Option/Shift to select text). `keys: {w: g}` remaps a key.
 
 ### Insights
 

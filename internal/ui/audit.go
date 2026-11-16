@@ -23,6 +23,7 @@ type auditEntry struct {
 	Action  string    `json:"action"`
 	Target  string    `json:"target,omitempty"`
 	By      string    `json:"by"` // user or ai
+	Reason  string    `json:"reason,omitempty"`
 	Result  string    `json:"result"`
 }
 
@@ -49,7 +50,8 @@ func (a *App) auditBy(by, action, ctx, ns, target string, err error) {
 	if err != nil {
 		res = "error: " + firstLineStr(err.Error(), 200)
 	}
-	e := auditEntry{Time: time.Now().UTC(), Context: ctx, NS: ns, Action: action, Target: target, By: by, Result: res}
+	e := auditEntry{Time: time.Now().UTC(), Context: ctx, NS: ns, Action: action, Target: target, By: by, Result: res, Reason: a.changeReason}
+	a.changeReason = ""
 	b, _ := json.Marshal(e)
 	auditMu.Lock()
 	defer auditMu.Unlock()
@@ -92,8 +94,12 @@ func (a *App) openAudit() tea.Cmd {
 		} else {
 			by = s.Muted.Render("user")
 		}
-		lines = append(lines, fmt.Sprintf("%s  %s  %-26s %s  %s  %s", s.Muted.Render(e.Time.Local().Format("2006-01-02 15:04:05")), by,
-			e.Context, s.YAMLKey.Render(e.Action), strings.TrimSpace(e.NS+" "+e.Target), st.Render(e.Result)))
+		line := fmt.Sprintf("%s  %s  %-26s %s  %s  %s", s.Muted.Render(e.Time.Local().Format("2006-01-02 15:04:05")), by,
+			e.Context, s.YAMLKey.Render(e.Action), strings.TrimSpace(e.NS+" "+e.Target), st.Render(e.Result))
+		if e.Reason != "" {
+			line += s.Muted.Render("  reason: " + e.Reason)
+		}
+		lines = append(lines, line)
 	}
 	if len(lines) == 0 {
 		lines = []string{s.Muted.Render("no changes recorded yet")}

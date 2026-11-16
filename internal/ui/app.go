@@ -73,15 +73,18 @@ type pickerState struct {
 type App struct {
 	*pane // the focused pane; its fields (res, table, cursor, vp, client…) are promoted
 
-	cfg        *config.Config
-	opts       Options
-	st         Styles
-	w, h       int
-	ov         overlay
-	version    string
-	dangerRe   *regexp.Regexp
-	watches    map[*pane]*paneWatch
-	newVersion string // newer release on GitHub, if any
+	cfg          *config.Config
+	opts         Options
+	st           Styles
+	w, h         int
+	ov           overlay
+	version      string
+	dangerRe     *regexp.Regexp
+	watches      map[*pane]*paneWatch
+	newVersion   string              // newer release on GitHub, if any
+	writeIntent  bool                // guardWrite passed; the next askConfirm is a change
+	sorts        map[string]sortSpec // per resource
+	changeReason string              // reason given for the change in progress (audit log)
 
 	// background monitor of the watch list
 	alerts        map[string]*alert
@@ -259,9 +262,9 @@ func (a *App) Init() tea.Cmd {
 	a.loading = true
 	if a.opts.ChooseContext {
 		a.launchCursor = true
-		return tea.Batch(a.openLauncher(), tick(a.refreshEvery()), a.spin.Tick)
+		return tea.Batch(a.openLauncher(), tick(a.refreshEvery()), a.spin.Tick, a.mouseInit())
 	}
-	cmds := []tea.Cmd{tagPane(a.pane, fetchList(a.client, a.res, a.listGen)), fetchVersion(a.client), tick(a.refreshEvery()), a.spin.Tick, a.checkUpdate()}
+	cmds := []tea.Cmd{tagPane(a.pane, fetchList(a.client, a.res, a.listGen)), fetchVersion(a.client), tick(a.refreshEvery()), a.spin.Tick, a.checkUpdate(), a.mouseInit()}
 	for _, ctx := range a.opts.ExtraContexts {
 		cmds = append(cmds, a.connect(ctx, a.opts.Namespace, "bgtab"))
 	}
@@ -282,6 +285,7 @@ func (a *App) applyFilter() {
 			a.visible = append(a.visible, i)
 		}
 	}
+	a.applySort()
 	if a.cursor >= len(a.visible) {
 		a.cursor = max(0, len(a.visible)-1)
 	}
@@ -330,6 +334,12 @@ func (a *App) setNamespace(ns string) tea.Cmd {
 
 // Update handles every message, routing pane-scoped results to their pane.
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if k, ok := msg.(tea.KeyMsg); ok {
+		msg = a.remapKey(k)
+	}
+	if m, ok := msg.(tea.MouseMsg); ok {
+		return a, a.handleMouse(m)
+	}
 	if pm, ok := msg.(paneMsg); ok {
 		if p := pm.targetPane(); p != nil && p != a.pane {
 			if !a.hasPane(p) {
@@ -478,7 +488,12 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.renderChat()
 			return a, nil
 		}
-		return a, a.sendToAI(msg.display, msg.prompt)
+		prompt, n := a.withRunbooks(msg.prompt)
+		display := msg.display
+		if n > 0 {
+			display += fmt.Sprintf(" · with %d team runbook(s)", n)
+		}
+		return a, a.sendToAI(display, prompt)
 
 	case aiChunkMsg:
 		if msg.gen != a.aiGen || len(a.chat) == 0 {
@@ -538,6 +553,21 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case shellDoneMsg:
 		return a, a.handleShellDone(msg)
+
+	case applyPlanMsg:
+		a.handleApplyPlan(msg)
+		return a, nil
+	case dirMsg:
+		return a, a.handleDir(msg)
+	case fileMsg:
+		a.handleFile(msg)
+		return a, nil
+	case aksSubsMsg:
+		return a, a.handleAKSSubs(msg)
+	case aksClustersMsg:
+		return a, a.handleAKSClusters(msg)
+	case kubeconfigChangedMsg:
+		return a, a.handleKubeconfigChanged(msg)
 
 	case alertsMsg:
 		a.handleAlerts(msg)
@@ -872,6 +902,12 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 		return a.openPulse()
 	case "I":
 		return a.openIncident()
+	case "(":
+		a.cycleSort(false)
+		return nil
+	case ")":
+		a.cycleSort(true)
+		return nil
 	case " ", "space":
 		if !a.isKubesageTable() && a.res.Watchable() {
 			return a.openActions()
@@ -1036,6 +1072,14 @@ func (a *App) guardWrite() bool {
 		a.setStatus("read-only mode: mutating actions are disabled", true)
 		return false
 	}
+	if msg, warn := changePolicy(a.cfg, a.client.Context, time.Now()); msg != "" {
+		if !warn {
+			a.setStatus("⛔ "+msg, true)
+			return false
+		}
+		a.setStatus("⚠ "+msg+" (warning only)", true)
+	}
+	a.writeIntent = true // the next confirmation is for a change (may need a reason)
 	return true
 }
 
@@ -1228,6 +1272,51 @@ func (a *App) runCommand(line string) tea.Cmd {
 		return a.openWhoCan(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
 	case "why":
 		return a.openWhy()
+	case "secrets-health", "secretshealth", "rotation", "externalsecrets":
+		return a.openVirtual(a.secretsHealthResource(), "Secrets: sync, rotation age and usage · ExternalSecrets and SealedSecrets")
+	case "mesh", "istio", "linkerd":
+		return a.openVirtual(a.meshResource(), "sidecar injection per namespace")
+	case "opencost", "spend", "kubecost":
+		agg := "namespace"
+		if arg == "workload" || arg == "controller" {
+			agg = "controller"
+		}
+		return a.openVirtual(a.costResource(agg), "cost per "+agg+" from OpenCost/Kubecost · :opencost workload for per-workload")
+	case "cols", "columns":
+		return a.colsCommand(arg)
+	case "mouse":
+		return a.mouseCommand()
+	case "fwd", "fwds":
+		return a.fwdCommand(arg + " " + strings.Join(fields[min(2, len(fields)):], " "))
+	case "apply":
+		return a.openApplyPlan(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+	case "files", "ls", "browse":
+		if row, ok := a.selected(); ok && a.res.Name == "pods" {
+			return a.browseFiles(row.Namespace, row.Name, "", arg)
+		}
+		if a.files != nil {
+			return a.browseFiles(a.files.ns, a.files.pod, a.files.container, nonEmptyStr(arg, a.files.dir))
+		}
+		a.setStatus("select a pod first, then :files [path] (or press B on it)", true)
+		return nil
+	case "download", "dl":
+		return a.downloadCommand(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+	case "upload", "ul":
+		return a.uploadCommand(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+	case "runbooks", "runbook", "rb":
+		return a.runbooksCommand(arg)
+	case "autoscaling", "scaling", "autoscalers", "keda", "vpa":
+		return a.openVirtual(a.scalingResource(), "HPA, KEDA and VPA · enter: the target workload")
+	case "kubeconfig", "kubeconfigs", "kc":
+		return a.openVirtual(a.kubeconfigResource(), "enter: open · p: check · r: rename · D: delete · a: add an AKS cluster (az)")
+	case "restart-needed", "stale", "staleconfig":
+		return a.openVirtual(a.staleResource(), "workloads whose ConfigMap/Secret changed after their pods started · R: rollout restart")
+	case "startup", "slowstart":
+		if row, ok := a.selected(); ok && a.res.Name == "pods" {
+			return a.openStartup(row.Namespace, row.Name)
+		}
+		a.setStatus("select a pod first, then :startup (or press W on it)", true)
+		return nil
 	case "find", "search", "grep":
 		return a.searchCommand(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
 	case "policyreports", "kyverno", "gatekeeper", "psa":
@@ -1437,6 +1526,11 @@ func (a *App) updateText(k tea.KeyMsg) tea.Cmd {
 		}
 	case a.textKind == "nodehealth" && k.String() == "X":
 		return a.openDrainPreview(a.target.name)
+	case a.textKind == "logs" && (k.String() == "J" || k.String() == "i" || k.String() == "x" || k.String() == "ctrl+s"):
+		cmd, _ := a.logsKey(k.String())
+		return cmd
+	case a.textKind == "applyplan" && k.String() == "A":
+		return a.confirmApplyPlan()
 	case a.textKind == "graph" && k.String() == "t":
 		return a.openTimeline(a.target.res.Kind, a.target.ns, a.target.name)
 	case a.textKind == "timeline" && k.String() == "r":
@@ -1764,6 +1858,10 @@ func (a *App) openInput(kind overlay, hint string, onSubmit func(string) tea.Cmd
 }
 
 func (a *App) askConfirm(question, typeToConfirm string, fn func() tea.Cmd) {
+	if a.writeIntent && a.reasonRequired() {
+		fn = a.withReason(fn)
+	}
+	a.writeIntent = false
 	a.ov = ovConfirm
 	a.confirm = question
 	a.onConfirm = fn

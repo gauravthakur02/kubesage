@@ -123,6 +123,10 @@ func (a *App) processQueue() tea.Cmd {
 		case c.Risk == agent.Blocked:
 			a.recordResult(agent.Result{Command: c})
 			continue
+		case c.Risk == agent.Write && func() bool { m, w := changePolicy(a.cfg, a.client.Context, time.Now()); return m != "" && !w }():
+			m, _ := changePolicy(a.cfg, a.client.Context, time.Now())
+			a.recordResult(agent.Result{Command: c, Declined: true, Note: m})
+			continue
 		case c.Risk == agent.Write && a.readOnly():
 			a.recordResult(agent.Result{Command: c, Declined: true, Note: "kubesage is in read-only mode; changes are disabled"})
 			continue

@@ -314,6 +314,8 @@ func (a *App) alertRowAction(key string, row kube.Row) (tea.Cmd, bool) {
 			return nil, true
 		}
 		return a.openText(res, is.Namespace, is.Name, "describe"), true
+	case "r":
+		return a.runbookFor(is.Reason + " " + is.Message + " " + is.Kind), true
 	case "a":
 		if al.ctx == a.client.Context && ok {
 			return a.analyze(res, is.Namespace, is.Name), true

@@ -107,8 +107,10 @@ func (a *App) showNavigator() {
 	rel.Group, charts.Group = "Helm", "Helm"
 	rel.Aliases = []string{"helm"}
 	insights := []kube.Resource{a.sizingResource(), a.certsResource(), a.imagesResource(), a.storageResource(), a.gitopsResource(),
-		a.alertsResource(), a.policyReportsResource(), a.backupsResource()}
-	for i, al := range []string{"rightsize", "certs", "images", "storage", "gitops", "alerts", "policyreports", "backups"} {
+		a.alertsResource(), a.policyReportsResource(), a.backupsResource(), a.staleResource(), a.scalingResource(), a.secretsHealthResource(),
+		a.meshResource(), a.costResource("namespace"), a.runbooksResource(), a.kubeconfigResource()}
+	for i, al := range []string{"rightsize", "certs", "images", "storage", "gitops", "alerts", "policyreports", "backups", "restart-needed",
+		"autoscaling", "secrets-health", "mesh", "opencost", "runbooks", "kubeconfig"} {
 		insights[i].Group, insights[i].Aliases = "Insights", []string{al}
 	}
 	all = append(append([]kube.Resource{rel, charts}, insights...), all...)

@@ -170,6 +170,26 @@ type Config struct {
 	Alerts Alerts `yaml:"alerts,omitempty"`
 	// Prometheus enables long-term metrics (right-sizing over days, metric spikes in the timeline).
 	Prometheus Prometheus `yaml:"prometheus,omitempty"`
+	// Runbooks is a folder (optionally a git clone) of Markdown runbooks the AI and alerts use.
+	Runbooks Runbooks `yaml:"runbooks,omitempty"`
+	// OpenCost points at OpenCost or Kubecost (auto-detected in the opencost/kubecost namespaces when empty).
+	OpenCost OpenCost `yaml:"opencost,omitempty"`
+	// SecretRotationDays flags Secrets not changed for longer than this (default 90).
+	SecretRotationDays int `yaml:"secret_rotation_days,omitempty"`
+	// ChangeWindows restricts when changes may be made to matching contexts.
+	ChangeWindows []ChangeWindow `yaml:"change_windows,omitempty"`
+	// Freezes block changes to matching contexts between two dates.
+	Freezes []Freeze `yaml:"freezes,omitempty"`
+	// RequireReason is a regex of contexts where every change asks for a reason (stored in the audit log).
+	RequireReason string `yaml:"require_reason,omitempty"`
+	// ForwardProfiles are named sets of port-forwards (:fwd save <name>, :fwd <name>).
+	ForwardProfiles map[string][]ForwardSpec `yaml:"forward_profiles,omitempty"`
+	// Mouse enables clicking rows and headers and wheel scrolling (hold Option/Shift to select text).
+	Mouse bool `yaml:"mouse,omitempty"`
+	// Keys remaps keys: {original: new}, e.g. {w: g} makes g open the relationships graph.
+	Keys map[string]string `yaml:"keys,omitempty"`
+	// HideColumns hides table columns per resource, e.g. {pods: [IP, NODE]} (:cols toggles).
+	HideColumns map[string][]string `yaml:"hide_columns,omitempty"`
 
 	path string
 }
@@ -372,4 +392,47 @@ type Prometheus struct {
 	BearerTokenCommand string `yaml:"bearer_token_command,omitempty"`
 	// Window for right-sizing peaks, e.g. 7d (default).
 	Window string `yaml:"window,omitempty"`
+}
+
+// Runbooks configures team runbooks. Each .md file may start with front matter:
+//
+//	---
+//	title: Pod crash loops
+//	match: [CrashLoopBackOff, OOMKilled]
+//	---
+type Runbooks struct {
+	Dir string `yaml:"dir,omitempty"`
+}
+
+// OpenCost configures the cost API.
+type OpenCost struct {
+	URL    string `yaml:"url,omitempty"`    // http://… or service:<ns>/<svc>:<port>
+	Window string `yaml:"window,omitempty"` // default 7d
+}
+
+// ChangeWindow allows changes on matching contexts only on Days during Hours.
+type ChangeWindow struct {
+	Contexts string `yaml:"contexts"`        // regex, e.g. (?i)prod
+	Days     string `yaml:"days,omitempty"`  // Mon-Fri, or Mon,Tue,Thu (default every day)
+	Hours    string `yaml:"hours,omitempty"` // 08:00-18:00 (default all day)
+	TZ       string `yaml:"tz,omitempty"`    // e.g. Europe/Amsterdam (default local)
+	Mode     string `yaml:"mode,omitempty"`  // block (default) or warn
+}
+
+// Freeze blocks changes between From and To (YYYY-MM-DD or RFC 3339).
+type Freeze struct {
+	Contexts string `yaml:"contexts"`
+	From     string `yaml:"from"`
+	To       string `yaml:"to"`
+	Reason   string `yaml:"reason,omitempty"`
+}
+
+// ForwardSpec is one saved port-forward.
+type ForwardSpec struct {
+	Context   string `yaml:"context"`
+	Namespace string `yaml:"namespace"`
+	Resource  string `yaml:"resource"` // pods, services, deployments…
+	Name      string `yaml:"name"`
+	Local     int    `yaml:"local"`
+	Remote    int    `yaml:"remote"`
 }

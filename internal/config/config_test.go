@@ -50,7 +50,8 @@ func TestLoadKeepsDefaultsAndSavesPrivately(t *testing.T) {
 	if err := c.Save(); err != nil {
 		t.Fatal(err)
 	}
-	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o600 {
+	// Windows has no Unix permission bits; the file inherits the user profile's ACL there.
+	if fi, _ := os.Stat(path); runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600 {
 		t.Fatalf("config must be private, got %v", fi.Mode().Perm())
 	}
 }

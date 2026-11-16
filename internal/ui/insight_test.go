@@ -3,6 +3,7 @@ package ui
 import (
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -107,6 +108,9 @@ func newShopApp(t *testing.T, res string, readOnly bool, dynObjs ...runtime.Obje
 		{Group: "networking.k8s.io", Version: "v1", Resource: "ingresses"}: "IngressList", {Group: "autoscaling", Version: "v2", Resource: "horizontalpodautoscalers"}: "HorizontalPodAutoscalerList",
 		{Group: "policy", Version: "v1", Resource: "poddisruptionbudgets"}:        "PodDisruptionBudgetList",
 		{Group: "wgpolicyk8s.io", Version: "v1alpha2", Resource: "policyreports"}: "PolicyReportList", {Group: "wgpolicyk8s.io", Version: "v1alpha2", Resource: "clusterpolicyreports"}: "ClusterPolicyReportList",
+		{Group: "autoscaling.k8s.io", Version: "v1", Resource: "verticalpodautoscalers"}: "VerticalPodAutoscalerList", {Group: "keda.sh", Version: "v1alpha1", Resource: "scaledobjects"}: "ScaledObjectList",
+		{Group: "external-secrets.io", Version: "v1beta1", Resource: "externalsecrets"}: "ExternalSecretList", {Group: "external-secrets.io", Version: "v1", Resource: "externalsecrets"}: "ExternalSecretList", {Group: "bitnami.com", Version: "v1alpha1", Resource: "sealedsecrets"}: "SealedSecretList",
+		{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}: "HTTPRouteList", {Group: "gateway.networking.k8s.io", Version: "v1", Resource: "gateways"}: "GatewayList",
 		{Group: "velero.io", Version: "v1", Resource: "backups"}: "BackupList", {Group: "velero.io", Version: "v1", Resource: "schedules"}: "ScheduleList",
 	}, dynObjs...)
 	for _, p := range []string{"web-7d9-aaaaa", "web-7d9-bbbbb"} {
@@ -277,6 +281,9 @@ func TestFieldPath(t *testing.T) {
 }
 
 func TestPluginRunsInBackground(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("echo is a cmd.exe builtin on Windows, not an executable")
+	}
 	a, _ := newShopApp(t, "pods", false)
 	no := false
 	a.cfg.Plugins = []config.Plugin{{Name: "echo", Key: "K", Scopes: []string{"pods"}, Command: "echo", Args: []string{"$NAME", "in", "$NAMESPACE"}, Background: true, Confirm: &no}}

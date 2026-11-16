@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -69,8 +70,15 @@ type pane struct {
 	drain *kube.DrainPlan
 
 	// helmRel is the Helm release shown in the values/manifest view
-	helmRel  *kube.HelmRelease
-	helmShow string // chart part shown: defaults, readme, templates, info ("" = release)
+	helmRel    *kube.HelmRelease
+	files      *filesState   // pod file browser position
+	logJSON    bool          // pretty-print JSON log lines
+	applyPlan  *applyPlanMsg // local manifests dry-run plan
+	colWidths  []int         // last rendered table column widths (mouse)
+	colNames   []string
+	logInclude *regexp.Regexp // show only matching log lines
+	logExclude *regexp.Regexp // hide matching log lines
+	helmShow   string         // chart part shown: defaults, readme, templates, info ("" = release)
 
 	// pulse / issues (per pane, so two clusters can be compared)
 	pulse       *kube.Pulse
@@ -425,6 +433,12 @@ func tagPane(p *pane, cmd tea.Cmd) tea.Cmd {
 			m.pane = p
 			return m
 		case helmTextMsg:
+			m.pane = p
+			return m
+		case fileMsg:
+			m.pane = p
+			return m
+		case applyPlanMsg:
 			m.pane = p
 			return m
 		default:
