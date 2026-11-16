@@ -40,8 +40,17 @@ scoop bucket add kubesage https://github.com/gauravthakur02/scoop-bucket && scoo
 ```
 
 **Manual download:** every [release](https://github.com/gauravthakur02/kubesage/releases) has `.tar.gz` (macOS, Linux) and `.zip` (Windows)
-archives plus `checksums.txt`. Unpack and put `kubesage` on your PATH. On macOS, a binary downloaded with a browser is quarantined
-because it is not notarized; clear it with `xattr -d com.apple.quarantine kubesage`.
+archives plus `checksums.txt`. Unpack and put `kubesage` on your PATH.
+
+> **macOS: "Apple could not verify kubesage is free of malware".** Builds are not yet notarized by Apple, so macOS Gatekeeper
+> blocks binaries **downloaded with a web browser** (the browser marks them as quarantined). The install script and Homebrew do not
+> have this problem. If you downloaded the archive by hand, check it against `checksums.txt`, then clear the quarantine flag on that
+> one file (this changes nothing else on your Mac):
+> ```bash
+> shasum -a 256 kubesage_*_darwin_*.tar.gz      # compare with checksums.txt
+> xattr -d com.apple.quarantine ./kubesage
+> ```
+> Or: try to open it once, then **System Settings → Privacy & Security → "kubesage" was blocked → Open Anyway**.
 
 **With Go:**
 ```bash
@@ -814,6 +823,19 @@ git tag v0.2.0 && git push origin v0.2.0
 
 A Homebrew cask and a Scoop manifest are published too once `homebrew-tap` / `scoop-bucket` repositories exist and the
 `HOMEBREW_TAP_GITHUB_TOKEN` / `SCOOP_BUCKET_GITHUB_TOKEN` secrets are set. CI runs the tests on Linux, macOS and Windows for every push and pull request.
+
+**Signed and notarized macOS builds.** The release signs and notarizes the macOS binaries as soon as these repository secrets exist
+(it needs an [Apple Developer Program](https://developer.apple.com/programs/) membership; without them the step is skipped):
+
+| Secret | Value |
+|---|---|
+| `MACOS_SIGN_P12` | base64 of your *Developer ID Application* certificate exported from Keychain as `.p12` (`base64 -i cert.p12`) |
+| `MACOS_SIGN_PASSWORD` | the `.p12` export password |
+| `MACOS_NOTARY_ISSUER_ID` | App Store Connect → Users and Access → Integrations → API key issuer ID |
+| `MACOS_NOTARY_KEY_ID` | that API key's ID |
+| `MACOS_NOTARY_KEY` | base64 of the downloaded `AuthKey_<id>.p8` |
+
+Signing runs on the Linux release runner, so no Mac is needed in CI.
 
 ## Roadmap ideas
 

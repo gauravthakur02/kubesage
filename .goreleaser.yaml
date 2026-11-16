@@ -52,6 +52,27 @@ nfpms:
         dst: /usr/share/doc/kubesage/README.md
     recommends: [kubectl]
 
+# macOS Gatekeeper blocks downloaded binaries that Apple has not notarized ("Apple could not verify…").
+# Signing + notarization runs on the Linux release runner and switches on once these repository secrets exist
+# (Apple Developer Program membership needed):
+#   MACOS_SIGN_P12           base64 of the "Developer ID Application" certificate exported as .p12
+#   MACOS_SIGN_PASSWORD      the .p12 password
+#   MACOS_NOTARY_ISSUER_ID   App Store Connect API key: issuer ID
+#   MACOS_NOTARY_KEY_ID      App Store Connect API key: key ID
+#   MACOS_NOTARY_KEY         base64 of the AuthKey_<id>.p8 file
+notarize:
+  macos:
+    - enabled: '{{ if index .Env "MACOS_SIGN_P12" }}true{{ else }}false{{ end }}'
+      sign:
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
+        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
+      notarize:
+        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
+        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
+        key: "{{ .Env.MACOS_NOTARY_KEY }}"
+        wait: true
+        timeout: 20m
+
 checksum:
   name_template: checksums.txt
 
