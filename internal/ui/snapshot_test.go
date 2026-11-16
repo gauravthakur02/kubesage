@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 // KUBESAGE_SNAPSHOT_DIR=/tmp/x go test ./internal/ui -run Snapshot writes ANSI screens for visual review.

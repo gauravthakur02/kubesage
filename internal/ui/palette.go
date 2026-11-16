@@ -11,8 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
-	"kubesage/internal/config"
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 func kubeStrip(s string) string { return ansi.Strip(s) }
@@ -24,7 +24,11 @@ var paletteItems = []struct{ label, cmd string }{
 	{"Right-sizing & cost", "rightsize"}, {"TLS certificates & expiry", "certs"}, {"Images in use (Trivy scan)", "images"},
 	{"Storage: PVC usage", "storage"}, {"GitOps: Argo CD & Flux apps", "gitops"}, {"Audit log of changes", "audit"},
 	{"AI chat", "ai"}, {"Saved views", "view"}, {"Export table to CSV", "export csv"}, {"Export table to Markdown", "export md"},
-	{"Toggle live updates (watch/poll)", "live"}, {"Help", "help"},
+	{"Toggle live updates (watch/poll)", "live"}, {"Upgrade readiness (deprecated APIs)", "upgrade"},
+	{"My permissions here (RBAC)", "rbac"}, {"Why was I forbidden?", "why"}, {"Alerts from the watch list", "alerts"},
+	{"Watch this namespace (alerts)", "pin ns"}, {"Quotas & node pool capacity", "quota"}, {"Policy reports: Kyverno, Gatekeeper, PSA", "policyreports"},
+	{"Velero backups", "backups"}, {"Search all connected clusters", "find "}, {"Incident report of the selected object", "report"},
+	{"PromQL query", "prom "}, {"Help", "help"},
 }
 
 // openPalette fuzzy-searches resources, kubesage screens, saved views, contexts and plugins (ctrl+p).
@@ -36,7 +40,15 @@ func (a *App) openPalette() tea.Cmd {
 	var items []item
 	for _, p := range paletteItems {
 		cmd := p.cmd
-		items = append(items, item{fmt.Sprintf("▸ %-36s :%s", p.label, cmd), func() tea.Cmd { return a.runCommand(cmd) }})
+		items = append(items, item{fmt.Sprintf("▸ %-36s :%s", p.label, strings.TrimSpace(cmd)), func() tea.Cmd {
+			if strings.HasSuffix(cmd, " ") { // needs an argument: open the command line prefilled
+				a.openInput(ovCommand, ":", func(s string) tea.Cmd { return a.runCommand(s) })
+				a.input.SetValue(cmd)
+				a.input.CursorEnd()
+				return nil
+			}
+			return a.runCommand(cmd)
+		}})
 	}
 	views := make([]string, 0, len(a.cfg.Views))
 	for n := range a.cfg.Views {

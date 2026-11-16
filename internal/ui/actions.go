@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 type rowActionItem struct {
@@ -40,12 +40,16 @@ func (a *App) rowActions(row kube.Row) []rowActionItem {
 			key("t", "timeline: events, rollouts, restarts, scaling"))
 	}
 	if r.Name == "pods" {
-		add(key("h", "health report"), key("l", "logs"), key("s", "shell"), key("P", "network policies: who may connect"))
+		add(key("h", "health report"), key("l", "logs"), key("s", "shell"), key("P", "network policies: who may connect"),
+			key("N", "network debug: DNS, TCP and HTTP test from inside this pod"))
 	} else if r.CanLogs() {
 		add(key("l", "logs"))
 	}
 	if r.Name == "nodes" {
 		add(key("h", "node health"), key("u", "cordon / uncordon"), key("X", "drain preview"))
+	}
+	if r.Name == "serviceaccounts" {
+		add(key("p", "permissions: bindings and rules"))
 	}
 	if r.Name == "cronjobs" {
 		add(key("h", "run history"), key("J", "run now"), key("u", "suspend / resume"))
@@ -54,6 +58,11 @@ func (a *App) rowActions(row kube.Row) []rowActionItem {
 		add(key("o", "rollout history · diff · rollback"))
 	}
 	add(key("a", "AI analyze"))
+	if graphKinds[r.Kind] {
+		add(rowActionItem{":report", "save an incident report (relationships, timeline, issues, AI answer) as Markdown", func() tea.Cmd { return a.exportReport("") }})
+	}
+	add(rowActionItem{":pin", "watch this " + strings.ToLower(r.Kind) + ": alert on new problems", func() tea.Cmd { return a.pinCommand("", false) }},
+		rowActionItem{":whocan", "who else can change this " + strings.ToLower(r.Kind), func() tea.Cmd { return a.openWhoCan("update " + r.Name) }})
 	if r.Name == "deployments" || r.Name == "statefulsets" || r.Name == "daemonsets" {
 		ws := strings.TrimSuffix(r.Kind, "") + "/" + row.Name
 		add(rowActionItem{":rightsize", "right-sizing: requests vs peak usage", func() tea.Cmd {

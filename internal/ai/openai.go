@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/config"
 )
 
 // openAI speaks the Chat Completions wire format, which covers OpenAI, Azure OpenAI,

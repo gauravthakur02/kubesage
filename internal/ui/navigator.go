@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 // discoverMsg delivers custom resources and other API resources for one cluster.
@@ -106,8 +106,9 @@ func (a *App) showNavigator() {
 	rel, charts := a.helmResource(), a.chartsResource()
 	rel.Group, charts.Group = "Helm", "Helm"
 	rel.Aliases = []string{"helm"}
-	insights := []kube.Resource{a.sizingResource(), a.certsResource(), a.imagesResource(), a.storageResource(), a.gitopsResource()}
-	for i, al := range []string{"rightsize", "certs", "images", "storage", "gitops"} {
+	insights := []kube.Resource{a.sizingResource(), a.certsResource(), a.imagesResource(), a.storageResource(), a.gitopsResource(),
+		a.alertsResource(), a.policyReportsResource(), a.backupsResource()}
+	for i, al := range []string{"rightsize", "certs", "images", "storage", "gitops", "alerts", "policyreports", "backups"} {
 		insights[i].Group, insights[i].Aliases = "Insights", []string{al}
 	}
 	all = append(append([]kube.Resource{rel, charts}, insights...), all...)

@@ -1,4 +1,4 @@
-module kubesage
+module github.com/gauravthakur02/kubesage
 
 go 1.27.3
 

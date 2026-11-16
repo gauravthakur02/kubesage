@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kubesage/internal/config"
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 // viewReadyMsg carries clients for every cluster a saved view needs.
@@ -198,6 +198,12 @@ func (a *App) resourceByName(name string) kube.Resource {
 		return a.storageResource()
 	case name == gitopsRes:
 		return a.gitopsResource()
+	case name == alertsRes:
+		return a.alertsResource()
+	case name == policyRepRes:
+		return a.policyReportsResource()
+	case name == backupsRes:
+		return a.backupsResource()
 	case strings.HasPrefix(name, rolloutPrefix):
 		ns, n, _ := strings.Cut(strings.TrimPrefix(name, rolloutPrefix), "/")
 		return a.rolloutResource(ns, n)

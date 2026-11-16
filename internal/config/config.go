@@ -162,6 +162,14 @@ type Config struct {
 	Plugins []Plugin `yaml:"plugins,omitempty"`
 	// AuditLog records every change kubesage makes (default on); set false to disable.
 	AuditLog *bool `yaml:"audit_log,omitempty"`
+	// UpdateCheck looks for a newer kubesage release at startup (default on for release builds).
+	UpdateCheck *bool `yaml:"update_check,omitempty"`
+	// Watchlist is what the background monitor watches for new problems (:pin / :unpin).
+	Watchlist []Pin `yaml:"watchlist,omitempty"`
+	// Alerts configures how new problems on the watch list are announced.
+	Alerts Alerts `yaml:"alerts,omitempty"`
+	// Prometheus enables long-term metrics (right-sizing over days, metric spikes in the timeline).
+	Prometheus Prometheus `yaml:"prometheus,omitempty"`
 
 	path string
 }
@@ -339,3 +347,29 @@ type Plugin struct {
 
 // AuditEnabled reports whether the audit log is on.
 func (c *Config) AuditEnabled() bool { return c.AuditLog == nil || *c.AuditLog }
+
+// Pin is a watched namespace (Name empty) or workload.
+type Pin struct {
+	Context   string `yaml:"context"`
+	Namespace string `yaml:"namespace"`
+	Kind      string `yaml:"kind,omitempty"` // resource name, e.g. deployments
+	Name      string `yaml:"name,omitempty"`
+}
+
+// Alerts controls notifications for the watch list.
+type Alerts struct {
+	Bell        *bool `yaml:"bell,omitempty"`         // terminal bell (default on)
+	Desktop     *bool `yaml:"desktop,omitempty"`      // macOS/Linux desktop notification (default on)
+	CertDays    int   `yaml:"cert_days,omitempty"`    // warn when a certificate expires within this many days (default 14)
+	IntervalSec int   `yaml:"interval_sec,omitempty"` // how often to check (default 30)
+}
+
+// Prometheus is a Prometheus-compatible endpoint (Prometheus, Thanos, Mimir, Azure Monitor managed Prometheus via a local proxy).
+type Prometheus struct {
+	// URL per kube-context, or "*" for all, e.g. {"*": "http://localhost:9090"}. "service:<ns>/<svc>:<port>" goes through the API server proxy.
+	URLs map[string]string `yaml:"urls,omitempty"`
+	// BearerTokenCommand prints a token (e.g. az account get-access-token --resource https://prometheus.monitor.azure.com --query accessToken -o tsv).
+	BearerTokenCommand string `yaml:"bearer_token_command,omitempty"`
+	// Window for right-sizing peaks, e.g. 7d (default).
+	Window string `yaml:"window,omitempty"`
+}

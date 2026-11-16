@@ -12,8 +12,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"kubesage/internal/ai"
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/ai"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 // ---------- messages ----------

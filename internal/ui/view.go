@@ -10,9 +10,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
-	"kubesage/internal/agent"
-	"kubesage/internal/config"
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/agent"
+	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 // View renders the whole screen.
@@ -98,6 +98,14 @@ func (a *App) viewHeader() string {
 		aiLabel = "AI " + a.profile + " · " + a.provider.Model()
 	}
 	left = append(left, s.PillAlt.Render(aiLabel))
+	if n := a.unseenAlerts(); n > 0 {
+		left = append(left, s.Danger.Render(fmt.Sprintf("🔔 %d", n)))
+	} else if len(a.cfg.Watchlist) > 0 {
+		left = append(left, s.Pill.Render(fmt.Sprintf("📌 %d", len(a.cfg.Watchlist))))
+	}
+	if a.newVersion != "" {
+		left = append(left, s.Pill.Render("⬆ "+a.newVersion))
+	}
 	if ps := a.panes(); len(ps) > 1 {
 		var parts []string
 		for i, p := range ps {
@@ -247,7 +255,7 @@ func (a *App) hints() string {
 			break
 		}
 		if a.res.Name == helmRes {
-			list = []kv{{"enter", "values"}, {"m", "manifest"}, {"h", "history · diff · rollback"}, {"/", "filter"}, {"esc", "back"}}
+			list = []kv{{"enter", "values"}, {"m", "manifest"}, {"h", "history · diff · rollback"}, {"u", "upgrade preview"}, {"/", "filter"}, {"esc", "back"}}
 			break
 		}
 		if _, _, ok := isHelmHistory(a.res); ok {
@@ -948,7 +956,13 @@ func (a *App) viewHelp(w, h int) string {
 			{":rightsize", "requests vs peak usage, waste and cost"}, {":certs", "TLS certificates and expiry"},
 			{":images", "images in use, latest tags, Trivy scan"}, {":storage", "PVC usage and mounts"}, {":gitops", "Argo CD and Flux apps"},
 			{":diff @ctx [all]", "compare with another cluster"}, {":export csv|json|md", "save the table"}, {":audit", "log of every change made"},
-			{"h / J / u on cronjobs", "run history / run now / suspend-resume"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
+			{"h / J / u on cronjobs", "run history / run now / suspend-resume"},
+			{"N on a pod", "network debug: DNS, TCP, HTTP from inside the pod"}, {"p on a serviceaccount", "its bindings and rules"},
+			{"u on a Helm release", "upgrade preview (helm --dry-run diff)"}, {":upgrade [1.36]", "deprecated APIs and version skew before an upgrade"},
+			{":rbac · :whocan v r · :why", "your permissions · who has access · explain forbidden"},
+			{":pin · :pin ns · :alerts", "watch list with bell/desktop alerts"}, {":find <text|label=v> [--all]", "search all connected clusters"},
+			{":quota", "quotas, limit ranges, node pool capacity"}, {":policyreports · :backups", "Kyverno/Gatekeeper/PSA · Velero"},
+			{":prom <PromQL>", "query Prometheus"}, {":report", "Markdown incident report"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
 			{":vsplit @ctx [ns]", "compare clusters side by side"}, {"c  :ctx <name>", "switch this tab's cluster"},
 			{":tabname <name>", "rename tab"}, {":tabclose", "close tab (ctrl+x on last pane)"}, {":ns! <ns>", "namespace for all panes"}, {":layout <name>", "triage, ops, dash, ai, single"},
 			{":view save <name>", "save this tab's layout"}, {"b  :view [name]", "open a saved view"}}},

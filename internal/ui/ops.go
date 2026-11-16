@@ -11,7 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 const (
@@ -215,7 +215,10 @@ func (a *App) storageResource() kube.Resource {
 			}
 			mb := kube.ShortList(v.MountedBy, 2)
 			if mb == "" {
-				mb, h = "— not mounted", max(h, kube.HealthNeutral)
+				mb = "— not mounted"
+				if h == kube.HealthOK {
+					h = kube.HealthNeutral
+				}
 			}
 			if v.StatsErr != "" {
 				statsErr = v.StatsErr
@@ -445,7 +448,10 @@ func (a *App) openNetPol(ns, pod string) tea.Cmd {
 // generic resource actions (delete, scale, …) do not apply.
 func (a *App) isKubesageTable() bool {
 	switch a.res.Name {
-	case sizingRes, certsRes, imagesRes, storageRes, gitopsRes:
+	case sizingRes, certsRes, imagesRes, storageRes, gitopsRes, alertsRes, policyRepRes, backupsRes:
+		return true
+	}
+	if strings.HasPrefix(a.res.Name, searchPrefix) {
 		return true
 	}
 	_, _, ok := isCronRuns(a.res)
@@ -457,8 +463,26 @@ func (a *App) extraRowAction(key string, row kube.Row) (tea.Cmd, bool) {
 	switch {
 	case a.res.Name == sizingRes:
 		return a.sizingRowAction(key, row)
+	case a.res.Name == alertsRes:
+		return a.alertRowAction(key, row)
+	case strings.HasPrefix(a.res.Name, searchPrefix):
+		return a.searchRowAction(key, row)
+	case a.res.Name == policyRepRes && key == "enter":
+		kind, name, ok := strings.Cut(row.Name, "/")
+		if r, found := kube.Lookup(strings.ToLower(kind)); ok && found {
+			return a.openText(r, row.Namespace, name, "describe"), true
+		}
+		return nil, true
+	case a.res.Name == backupsRes && key == "enter":
+		return a.runManual("kubectl -n " + row.Namespace + " describe " + strings.ToLower(row.Cells[0]) + "s.velero.io " + row.Name), true
+	case a.res.Name == helmRes && key == "u":
+		return a.helmPreview(row.Namespace, row.Name, ""), true
 	case a.res.Name == "cronjobs":
 		return a.cronRowAction(key, row)
+	case a.res.Name == "serviceaccounts" && key == "p":
+		return a.openSAPermissions(row.Namespace, row.Name), true
+	case a.res.Name == "pods" && key == "N":
+		return a.openNetCheck(row.Namespace, row.Name, ""), true
 	case a.res.Name == "pods" && key == "P":
 		return a.openNetPol(row.Namespace, row.Name), true
 	case a.res.Name == certsRes && key == "enter":
@@ -504,9 +528,18 @@ func (a *App) kubesageTitle() string {
 		return "Storage · " + a.client.NamespaceLabel() + " · " + note
 	case gitopsRes:
 		return "GitOps apps · " + a.client.NamespaceLabel() + " · " + note
+	case alertsRes:
+		return "Alerts · " + note
+	case policyRepRes:
+		return "Policy reports · " + a.client.NamespaceLabel() + " · " + note
+	case backupsRes:
+		return "Velero backups · " + note
 	}
 	if ns, name, ok := isCronRuns(a.res); ok {
 		return fmt.Sprintf("Runs of cronjob %s/%s · %s", ns, name, note)
+	}
+	if q, ok := strings.CutPrefix(a.res.Name, searchPrefix); ok {
+		return "Search " + q + " · " + note
 	}
 	return ""
 }
@@ -524,6 +557,13 @@ func (a *App) kubesageHints() []kv {
 		return []kv{{"enter", "describe"}, {"/", "filter"}, {"esc", "back"}}
 	case gitopsRes:
 		return []kv{{"enter", "details"}, {"/", "filter"}, {"esc", "back"}}
+	case policyRepRes, backupsRes:
+		return []kv{{"enter", "describe"}, {"/", "filter"}, {"esc", "back"}}
+	case alertsRes:
+		return []kv{{"enter", "open object"}, {"a", "AI explain"}, {":pin/:unpin", "watch list"}, {"esc", "back"}}
+	}
+	if strings.HasPrefix(a.res.Name, searchPrefix) {
+		return []kv{{"enter", "open"}, {"y", "yaml"}, {"/", "filter"}, {"esc", "back"}}
 	}
 	if _, _, ok := isCronRuns(a.res); ok {
 		return []kv{{"enter", "describe job"}, {"l", "logs"}, {"J", "run now"}, {"esc", "back"}}

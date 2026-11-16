@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/config"
 )
 
 // Message is one turn of a chat conversation.

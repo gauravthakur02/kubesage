@@ -15,8 +15,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"kubesage/internal/ai"
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/ai"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 type fakeAI struct{}

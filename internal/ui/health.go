@@ -16,7 +16,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	corev1 "k8s.io/api/core/v1"
 
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 // ---------- pod health ----------

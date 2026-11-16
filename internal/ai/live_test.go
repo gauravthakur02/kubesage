@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/config"
 )
 
 // Run with KUBESAGE_LIVE_OLLAMA=1 go test ./internal/ai -run Live -v

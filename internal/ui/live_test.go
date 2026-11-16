@@ -7,8 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
-	"kubesage/internal/config"
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 // Read-only: KUBESAGE_LIVE_CONTEXT=ctx KUBESAGE_LIVE_NS=ns go test ./internal/ui -run LivePanes -v

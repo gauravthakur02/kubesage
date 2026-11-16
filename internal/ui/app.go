@@ -14,10 +14,10 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kubesage/internal/agent"
-	"kubesage/internal/ai"
-	"kubesage/internal/config"
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/agent"
+	"github.com/gauravthakur02/kubesage/internal/ai"
+	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 type mode int
@@ -50,6 +50,8 @@ type Options struct {
 	ExtraContexts []string
 	// ChooseContext starts with the cluster chooser instead of connecting to the current context.
 	ChooseContext bool
+	// Version of this build; release builds check GitHub for a newer one at startup.
+	Version string
 }
 
 type targetRef struct {
@@ -71,14 +73,25 @@ type pickerState struct {
 type App struct {
 	*pane // the focused pane; its fields (res, table, cursor, vp, client…) are promoted
 
-	cfg      *config.Config
-	opts     Options
-	st       Styles
-	w, h     int
-	ov       overlay
-	version  string
-	dangerRe *regexp.Regexp
-	watches  map[*pane]*paneWatch
+	cfg        *config.Config
+	opts       Options
+	st         Styles
+	w, h       int
+	ov         overlay
+	version    string
+	dangerRe   *regexp.Regexp
+	watches    map[*pane]*paneWatch
+	newVersion string // newer release on GitHub, if any
+
+	// background monitor of the watch list
+	alerts        map[string]*alert
+	alertOrder    []string
+	certAlerts    map[string]alert
+	monitorBusy   bool
+	monitorPrimed bool
+	monitorAt     time.Time
+	certCheckAt   time.Time
+	monitorErr    string
 
 	// launcher: the startup cluster chooser is showing (no cluster contacted yet)
 	launcher     bool
@@ -248,7 +261,7 @@ func (a *App) Init() tea.Cmd {
 		a.launchCursor = true
 		return tea.Batch(a.openLauncher(), tick(a.refreshEvery()), a.spin.Tick)
 	}
-	cmds := []tea.Cmd{tagPane(a.pane, fetchList(a.client, a.res, a.listGen)), fetchVersion(a.client), tick(a.refreshEvery()), a.spin.Tick}
+	cmds := []tea.Cmd{tagPane(a.pane, fetchList(a.client, a.res, a.listGen)), fetchVersion(a.client), tick(a.refreshEvery()), a.spin.Tick, a.checkUpdate()}
 	for _, ctx := range a.opts.ExtraContexts {
 		cmds = append(cmds, a.connect(ctx, a.opts.Namespace, "bgtab"))
 	}
@@ -350,6 +363,9 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.checkForwards()
 		cmds := append([]tea.Cmd{tick(a.refreshEvery())}, a.autoMask()...)
 		cmds = append(cmds, a.ensureWatches()...)
+		if len(a.cfg.Watchlist) > 0 && time.Since(a.monitorAt) >= a.alertInterval() {
+			cmds = append(cmds, a.runMonitor())
+		}
 		for _, p := range a.panes() {
 			switch {
 			case p.mode == modeText && p.textKind == "health" && (!a.zoomed || p == a.pane):
@@ -522,6 +538,18 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case shellDoneMsg:
 		return a, a.handleShellDone(msg)
+
+	case alertsMsg:
+		a.handleAlerts(msg)
+		if a.res.Name == alertsRes && a.mode == modeTable {
+			return a, a.refresh()
+		}
+		return a, nil
+
+	case updateMsg:
+		a.newVersion = msg.version
+		a.setStatus(fmt.Sprintf("⬆ kubesage %s is available (you have %s): %s", msg.version, a.opts.Version, msg.url), false)
+		return a, nil
 
 	case watchEventMsg:
 		return a, a.handleWatchEvent(msg)
@@ -1192,6 +1220,38 @@ func (a *App) runCommand(line string) tea.Cmd {
 		return a.exportTable(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
 	case "audit", "changes":
 		return a.openAudit()
+	case "upgrade", "upgrades", "deprecations":
+		return a.openUpgrade(arg)
+	case "rbac", "access", "cani", "can-i":
+		return a.openAccess()
+	case "whocan", "who-can":
+		return a.openWhoCan(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+	case "why":
+		return a.openWhy()
+	case "find", "search", "grep":
+		return a.searchCommand(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+	case "policyreports", "kyverno", "gatekeeper", "psa":
+		return a.openVirtual(a.policyReportsResource(), "Kyverno, Gatekeeper and Pod Security results · enter: open the object")
+	case "quota", "quotas", "capacity":
+		return a.openCapacity()
+	case "backups", "velero":
+		return a.openVirtual(a.backupsResource(), "Velero schedules and backups · enter: describe")
+	case "report":
+		return a.exportReport(arg)
+	case "netcheck", "nettest", "connectivity":
+		if row, ok := a.selected(); ok && a.res.Name == "pods" {
+			return a.openNetCheck(row.Namespace, row.Name, strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+		}
+		a.setStatus("select a pod first, then :netcheck <target> (or press N on it)", true)
+		return nil
+	case "prom", "promql", "metrics":
+		return a.openPromQuery(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+	case "pin", "watch":
+		return a.pinCommand(arg, false)
+	case "unpin", "unwatch":
+		return a.pinCommand(arg, true)
+	case "alerts", "watchlist", "notifications":
+		return a.openAlerts()
 	case "palette":
 		return a.openPalette()
 	case "timeline", "graph", "rel", "relations":

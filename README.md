@@ -14,6 +14,14 @@ reads your cluster's manifests, events and logs and tells you what is wrong and 
 
 ## Install
 
+Prebuilt binaries for macOS, Linux and Windows are attached to each [GitHub release](https://github.com/gauravthakur02/kubesage/releases). With Go installed:
+
+```bash
+go install github.com/gauravthakur02/kubesage@latest
+```
+
+From source:
+
 ```bash
 make build        # → bin/kubesage
 make install      # → $GOPATH/bin/kubesage
@@ -69,6 +77,12 @@ Describe, YAML, edit, delete and AI analysis work on every type. The header's ta
 | `:diff @<context> [all]` | compare the selected object (or the whole namespace) with another cluster |
 | `:export csv\|json\|md [file]` | save the visible table |
 | `:audit` | log of every change kubesage made, by you or the AI |
+| `:upgrade [1.36]` | **upgrade readiness**: deprecated/removed APIs, node version skew, available AKS versions |
+| `:rbac` · `:whocan <verb> <resource>` · `:why` | your permissions here · who has access · why the last action was forbidden |
+| `:pin` · `:pin ns` · `:alerts` | **watch list**: alert (bell + desktop notification) on new problems and expiring certificates |
+| `:find <text\|image\|ip\|label=v> [--all]` | search every connected cluster |
+| `:quota` · `:policyreports` · `:backups` | quotas and node pool capacity · Kyverno/Gatekeeper/PSA results · Velero |
+| `:prom <PromQL>` · `:report` | query Prometheus · save a Markdown incident report |
 | `A` / `:ai <question>` | **AI chat** about the cluster |
 | `?` | help |
 
@@ -106,6 +120,9 @@ There is one AI conversation, shown in whichever pane is in AI mode. Pressing `a
 | `w` | **relationships**: Ingress → Service → Deployment → ReplicaSet → Pods, plus ConfigMaps, Secrets, PVCs and HPA, coloured by health |
 | `t` | **timeline**: events, rollouts, container restarts, scaling and pod starts of the object and its parts, newest first |
 | `P` | **network policies** of a pod: who may connect, where it may connect, missing DNS egress |
+| `N` | **network debug** from inside a pod: DNS, TCP and HTTP to a service, host:port or URL (ephemeral debug container, asks first) |
+| `p` on a serviceaccount | its RoleBindings, ClusterRoleBindings and rules |
+| `u` on a Helm release | **upgrade preview**: `helm upgrade --dry-run=server` diffed against what runs now |
 | `h` / `J` / `u` on a cronjob | run history with durations and failures / run now / suspend or resume |
 | `S` / `R` / `D` | scale, rollout restart, delete |
 | `f` | list port-forwards: open, go to, stop |
@@ -220,6 +237,38 @@ reclaimable CPU and memory and, with `cost` in the config, the monthly waste. `e
 
 **Cluster diff (`:diff @<context>`)** compares the selected object with the same one on another cluster, ignoring status, ids, timestamps and generated fields;
 Secret values are compared by hash, never shown. `:diff @<context> all` lists every object of the current type in the namespace as differs / only here / only there / same.
+
+### Operations
+
+**Upgrade readiness (`:upgrade [version]`)** checks the next (or given) Kubernetes version against: the manifests of every Helm release
+(what the next `helm upgrade` sends), `kubectl apply` last-applied annotations, and the API server's own count of deprecated API calls
+(`apiserver_requested_deprecated_apis`, when `/metrics` is readable). Uses of APIs removed by the target are red. It also shows kubelet versions per
+node pool and, on AKS with the `az` CLI signed in, the versions the cluster can upgrade to.
+
+**RBAC explorer.** `:rbac` draws a grid of what you may do in the namespace (asked of the API server as you). `:whocan get secrets` lists the users,
+groups and service accounts that have that permission and through which binding. After a "forbidden" error, `:why` explains it and who holds the permission.
+`p` on a service account shows its bindings and rules.
+
+**Watch list and alerts.** `:pin` watches the selected workload, `:pin ns` the whole namespace, on any cluster. Every 30 s kubesage checks them in the background
+(also for TLS certificates expiring within 14 days) and announces new problems with the terminal bell, a desktop notification (macOS, Linux) and a 🔔 counter in the header.
+`:alerts` lists active and resolved problems; `enter` opens the object, `a` asks the AI. Problems that already exist when kubesage starts do not ring.
+
+**Prometheus.** With a Prometheus-compatible endpoint, right-sizing uses peaks over 7 days instead of 15 minutes, and `:prom <PromQL>` shows the top series with sparklines.
+kubesage looks for common in-cluster services (`prometheus-operated`, `prometheus-server`, … in `monitoring`) and reaches them through the API server proxy, or set:
+
+```yaml
+prometheus:
+  urls:
+    "*": http://localhost:9090                         # or service:monitoring/prometheus-operated:9090
+  bearer_token_command: az account get-access-token --resource https://prometheus.monitor.azure.com --query accessToken -o tsv
+  window: 7d
+```
+
+**Network debug (`N` on a pod)** runs DNS, TCP and HTTP checks from inside the pod's network namespace with an ephemeral `debug_image` container. Pair it with `P` (network policies).
+
+**Also:** `:find` searches names, images, IPs, hosts and labels across every connected cluster (`--all` for every kubeconfig context); `:quota` shows ResourceQuota usage,
+LimitRanges and request-based node pool utilisation with nodes that could be removed; `:policyreports` collects Kyverno PolicyReports, Gatekeeper violations
+and namespace Pod Security levels; `:backups` lists Velero schedules and backups; `:report` writes relationships, timeline, open issues and the last AI answer to Markdown.
 
 ### Insights
 
@@ -401,6 +450,16 @@ Each pane acts on its own cluster: typed confirmations follow that pane's cluste
 AI analysis and the commands the AI runs are pinned to the cluster of the row you analysed, and the approval dialog names that cluster.
 Unconnected clusters are only contacted when you open them or press `p`, because connecting can trigger a sign-in (e.g. Azure `kubelogin`).
 
+## MCP server for AI agents
+
+`kubesage mcp` serves kubesage's read-only insights over the Model Context Protocol (stdio), so Claude Code and other agents can use them:
+`incident_report`, `find_issues`, `relationships`, `timeline`, `pod_logs`, `list_resources`, `helm_releases`, `upgrade_readiness`, `right_sizing`, `my_access`, `search`, `list_contexts`.
+No tool changes the cluster.
+
+```bash
+claude mcp add kubesage -- kubesage mcp --context my-staging
+```
+
 ## Configure AI
 
 Run `kubesage config init`. The file goes to `~/.config/kubesage/config.yaml` on macOS and Linux, and to `%AppData%\kubesage\config.yaml` on Windows.
@@ -415,6 +474,9 @@ cost:                       # optional: prices for right-sizing waste
   mem_gib_hour: 0.004
   currency: EUR
 audit_log: true
+update_check: true          # release builds look for a newer version at startup
+watchlist: []               # filled by :pin
+alerts: {bell: true, desktop: true, cert_days: 14, interval_sec: 30}
 read_only: false
 choose_context_on_start: true   # show the cluster chooser when --context is not given
 animations: true                # animated logo in the terminal
@@ -558,6 +620,17 @@ make test
 KUBESAGE_LIVE_OLLAMA=1 go test ./internal/ai -run Live -v       # hits a local Ollama
 KUBESAGE_SNAPSHOT_DIR=/tmp/snap go test ./internal/ui -run Snapshot  # dumps ANSI screens
 ```
+
+## Releases
+
+Tag a version and push it; the release workflow runs GoReleaser and attaches archives and checksums for macOS, Linux and Windows:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Homebrew and Scoop formulas are published too once `homebrew-tap` / `scoop-bucket` repositories exist and the
+`HOMEBREW_TAP_GITHUB_TOKEN` / `SCOOP_BUCKET_GITHUB_TOKEN` secrets are set. CI runs the tests on Linux, macOS and Windows for every push and pull request.
 
 ## Roadmap ideas
 

@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	k8stesting "k8s.io/client-go/testing"
 
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 // editApp has a ConfigMap and a fake API server that honours dry-run (it does not persist).

@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kubesage/internal/config"
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 const sizingRes = "rightsizing"
@@ -48,7 +48,8 @@ func (a *App) sizingResource() kube.Resource {
 			}
 			return pc, pm, true
 		}
-		rows, err := c.RightSizing(ctx, peak)
+		long, longNote := a.cachedPeaks(ctx, c)
+		rows, err := c.RightSizing(ctx, peak, long)
 		if err != nil {
 			t.Note = "✗ " + err.Error()
 			return t
@@ -84,7 +85,11 @@ func (a *App) sizingResource() kube.Resource {
 		if m := monthly(cost, wasteCPU, wasteMem); m != "" {
 			t.Note += " ≈ " + m
 		}
-		t.Note += " · peaks from metrics now + up to 15m of history"
+		if long != nil {
+			t.Note += longNote
+		} else {
+			t.Note += " · peaks from metrics now + up to 15m of history" + longNote
+		}
 		return t
 	})
 }

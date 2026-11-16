@@ -16,11 +16,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
-	"kubesage/internal/agent"
-	"kubesage/internal/ai"
-	"kubesage/internal/config"
-	"kubesage/internal/kube"
-	"kubesage/internal/ui"
+	"github.com/gauravthakur02/kubesage/internal/agent"
+	"github.com/gauravthakur02/kubesage/internal/ai"
+	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/mcp"
+	"github.com/gauravthakur02/kubesage/internal/ui"
+	"github.com/gauravthakur02/kubesage/internal/update"
 )
 
 var version = "0.1.0-dev"
@@ -43,6 +45,7 @@ Usage:
   kubesage ai remove <profile>     delete a profile
   kubesage config init             write a starter config file
   kubesage config path             print the config file location
+  kubesage mcp [--context c] [-n ns]     serve read-only tools to AI agents over MCP (stdio)
   kubesage version
 
 Flags:
@@ -88,6 +91,11 @@ func main() {
 			ui.AnimateLogo(os.Stdout, "version "+version, 1500*time.Millisecond)
 		} else {
 			fmt.Println(ui.PrintableLogo("version " + version))
+		}
+		if update.IsRelease(version) && os.Getenv("KUBESAGE_NO_UPDATE_CHECK") == "" {
+			if r, err := update.Latest(context.Background()); err == nil && update.Newer(version, r.Version) {
+				fmt.Printf("\nkubesage %s is available: %s\n", r.Version, r.URL)
+			}
 		}
 		return
 	}
@@ -142,9 +150,13 @@ func main() {
 		// No --context: let the user pick cluster(s) in the UI (unless there is only one).
 		choose := *kctx == "" && cfg.ChooseContext && len(client.Contexts()) > 1
 		app := ui.New(cfg, client, ui.Options{Kubeconfig: *kubeconfig, Context: contexts[0], Namespace: strings.ReplaceAll(namespace, "*all*", "all"),
-			Resource: *res, ReadOnly: *readOnly, ExtraContexts: extra, ChooseContext: choose})
+			Resource: *res, ReadOnly: *readOnly, ExtraContexts: extra, ChooseContext: choose, Version: version})
 		_, err := tea.NewProgram(app, tea.WithAltScreen()).Run()
 		exitIf(err)
+	case "mcp":
+		// MCP over stdio: stdout carries the protocol, so nothing else may be printed there.
+		srv := &mcp.Server{Version: version, Kubeconfig: *kubeconfig, Default: client}
+		exitIf(srv.Serve(context.Background(), os.Stdin, os.Stdout))
 	case "scan":
 		code := runScan(client)
 		for _, a := range subArgs {

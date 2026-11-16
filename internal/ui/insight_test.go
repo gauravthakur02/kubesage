@@ -23,8 +23,8 @@ import (
 	dynfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"kubesage/internal/config"
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 func shopFixtures(t *testing.T) []runtime.Object {
@@ -101,7 +101,14 @@ func newShopApp(t *testing.T, res string, readOnly bool, dynObjs ...runtime.Obje
 		metrics: "PodMetricsList", argo: "ApplicationList", certs: "CertificateList",
 		{Group: "kustomize.toolkit.fluxcd.io", Version: "v1", Resource: "kustomizations"}: "KustomizationList",
 		{Group: "helm.toolkit.fluxcd.io", Version: "v2", Resource: "helmreleases"}:        "HelmReleaseList",
-		{Version: "v1", Resource: "pods"}:                                                 "PodList"}, dynObjs...)
+		{Version: "v1", Resource: "pods"}:                                                 "PodList",
+		{Group: "apps", Version: "v1", Resource: "deployments"}:                           "DeploymentList", {Group: "apps", Version: "v1", Resource: "statefulsets"}: "StatefulSetList",
+		{Group: "apps", Version: "v1", Resource: "daemonsets"}: "DaemonSetList", {Group: "batch", Version: "v1", Resource: "cronjobs"}: "CronJobList",
+		{Group: "networking.k8s.io", Version: "v1", Resource: "ingresses"}: "IngressList", {Group: "autoscaling", Version: "v2", Resource: "horizontalpodautoscalers"}: "HorizontalPodAutoscalerList",
+		{Group: "policy", Version: "v1", Resource: "poddisruptionbudgets"}:        "PodDisruptionBudgetList",
+		{Group: "wgpolicyk8s.io", Version: "v1alpha2", Resource: "policyreports"}: "PolicyReportList", {Group: "wgpolicyk8s.io", Version: "v1alpha2", Resource: "clusterpolicyreports"}: "ClusterPolicyReportList",
+		{Group: "velero.io", Version: "v1", Resource: "backups"}: "BackupList", {Group: "velero.io", Version: "v1", Resource: "schedules"}: "ScheduleList",
+	}, dynObjs...)
 	for _, p := range []string{"web-7d9-aaaaa", "web-7d9-bbbbb"} {
 		u := podMetrics("shop", p, "40m", "300Mi")
 		u.Object["containers"] = []any{map[string]any{"name": "web", "usage": map[string]any{"cpu": "40m", "memory": "300Mi"}}}

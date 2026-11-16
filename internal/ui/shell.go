@@ -13,7 +13,7 @@ import (
 	"golang.org/x/term"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 // shellExec implements tea.ExecCommand: Bubble Tea hands over the terminal, we run an

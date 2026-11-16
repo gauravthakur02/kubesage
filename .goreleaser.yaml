@@ -1,0 +1,66 @@
+# Release with: git tag v0.2.0 && git push origin v0.2.0  (the release workflow runs GoReleaser)
+version: 2
+project_name: kubesage
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - env: [CGO_ENABLED=0]
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    flags: [-trimpath]
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]
+
+release:
+  github:
+    owner: gauravthakur02
+    name: kubesage
+
+# Homebrew and Scoop publish only when their tokens are configured as repository secrets
+# (HOMEBREW_TAP_GITHUB_TOKEN / SCOOP_BUCKET_GITHUB_TOKEN) and the repos below exist.
+brews:
+  - name: kubesage
+    repository:
+      owner: gauravthakur02
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    skip_upload: '{{ if eq .Env.HOMEBREW_TAP_GITHUB_TOKEN "" }}true{{ else }}false{{ end }}'
+    homepage: https://github.com/gauravthakur02/kubesage
+    description: Kubernetes IDE for your terminal with an AI copilot
+    license: MIT
+    test: |
+      system "#{bin}/kubesage", "version"
+
+scoops:
+  - name: kubesage
+    repository:
+      owner: gauravthakur02
+      name: scoop-bucket
+      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
+    skip_upload: '{{ if eq .Env.SCOOP_BUCKET_GITHUB_TOKEN "" }}true{{ else }}false{{ end }}'
+    homepage: https://github.com/gauravthakur02/kubesage
+    description: Kubernetes IDE for your terminal with an AI copilot
+    license: MIT

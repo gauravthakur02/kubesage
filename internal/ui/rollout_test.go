@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 func rolloutFixtures() (*appsv1.Deployment, *appsv1.ReplicaSet, *appsv1.ReplicaSet) {

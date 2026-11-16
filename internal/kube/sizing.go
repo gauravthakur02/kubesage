@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,10 +20,15 @@ type Sizing struct {
 	MemSuggest          int64
 	Verdict             string // over, under, ok, no-requests
 	WasteCPU, WasteMem  int64  // over-requested across all pods
+	LongWindow          bool   // peaks include Prometheus history
 }
 
 // PeakFunc returns the highest usage seen for a pod (from kubesage's own history), if known.
 type PeakFunc func(ns, pod string) (cpu, mem int64, ok bool)
+
+// WorkloadPeaks maps namespace/workload-name to the highest per-pod [cpu millicores, memory bytes]
+// over a long window (from Prometheus), when available.
+type WorkloadPeaks map[string][2]int64
 
 func roundUp(v, step int64) int64 {
 	if v <= 0 {
@@ -33,7 +39,7 @@ func roundUp(v, step int64) int64 {
 
 // RightSizing groups running pods by workload and suggests requests: CPU peak ×1.5 (min 10m),
 // memory peak ×1.3 (min 32Mi). Needs metrics-server.
-func (c *Client) RightSizing(ctx context.Context, peak PeakFunc) ([]Sizing, error) {
+func (c *Client) RightSizing(ctx context.Context, peak PeakFunc, long WorkloadPeaks) ([]Sizing, error) {
 	pods, err := c.listPodsAcross(ctx, c.Namespace)
 	if err != nil {
 		return nil, err
@@ -102,6 +108,13 @@ func (c *Client) RightSizing(ctx context.Context, peak PeakFunc) ([]Sizing, erro
 	out := make([]Sizing, 0, len(keys))
 	for _, k := range keys {
 		s := by[k]
+		if long != nil {
+			_, name, _ := strings.Cut(s.Workload, "/")
+			if pk, ok := long[s.Namespace+"/"+name]; ok {
+				s.CPUPeak, s.MemPeak = max(s.CPUPeak, pk[0]), max(s.MemPeak, pk[1])
+				s.LongWindow = true
+			}
+		}
 		s.CPUSuggest = max(roundUp(s.CPUPeak*3/2, 5), 10)
 		s.MemSuggest = max(roundUp(s.MemPeak*13/10, 1<<20), 32<<20)
 		switch {
