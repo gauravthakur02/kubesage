@@ -289,6 +289,7 @@ func (a *App) startDrain() tea.Cmd {
 }
 
 func (a *App) handleDrainDone(m drainDoneMsg) tea.Cmd {
+	a.audit("node.drain", a.client.Context, "", "node/"+a.target.name, m.err)
 	switch {
 	case m.err != nil:
 		a.setStatus("drain failed: "+m.err.Error(), true)

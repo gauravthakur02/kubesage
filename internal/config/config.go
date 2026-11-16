@@ -154,6 +154,14 @@ type Config struct {
 	Views map[string]View `yaml:"views,omitempty"`
 	// LiveUpdates is "watch" (instant updates via the Kubernetes watch API, default) or "poll".
 	LiveUpdates string `yaml:"live_updates"`
+	// Cost prices compute for the right-sizing view (optional).
+	Cost Cost `yaml:"cost,omitempty"`
+	// Columns adds custom columns per resource (key: resource name such as pods or deployments).
+	Columns map[string][]Column `yaml:"columns,omitempty"`
+	// Plugins are your own commands bound to a key on selected resources.
+	Plugins []Plugin `yaml:"plugins,omitempty"`
+	// AuditLog records every change kubesage makes (default on); set false to disable.
+	AuditLog *bool `yaml:"audit_log,omitempty"`
 
 	path string
 }
@@ -301,3 +309,33 @@ func (c *Config) ProfileNames() []string {
 	sort.Strings(names)
 	return names
 }
+
+// Cost is the price of compute, used to estimate monthly waste.
+type Cost struct {
+	CPUCoreHour float64 `yaml:"cpu_core_hour"` // e.g. 0.031
+	MemGiBHour  float64 `yaml:"mem_gib_hour"`  // e.g. 0.004
+	Currency    string  `yaml:"currency"`      // e.g. EUR
+}
+
+// Column is a custom table column: a JSONPath-like field path (spec.containers[0].image),
+// a label (label: team) or an annotation (annotation: owner).
+type Column struct {
+	Name       string `yaml:"name"`
+	Path       string `yaml:"path,omitempty"`
+	Label      string `yaml:"label,omitempty"`
+	Annotation string `yaml:"annotation,omitempty"`
+}
+
+// Plugin runs a command on the selected resource. Variables: $NAME $NAMESPACE $CONTEXT $KIND $RESOURCE $KUBECONFIG.
+type Plugin struct {
+	Name       string   `yaml:"name"`
+	Key        string   `yaml:"key"`     // single key, e.g. ctrl+g or K
+	Scopes     []string `yaml:"scopes"`  // resources (pods, deployments) or "all"
+	Command    string   `yaml:"command"` // executable
+	Args       []string `yaml:"args,omitempty"`
+	Background bool     `yaml:"background,omitempty"` // capture output into the viewer instead of handing over the terminal
+	Confirm    *bool    `yaml:"confirm,omitempty"`    // ask before running (default true)
+}
+
+// AuditEnabled reports whether the audit log is on.
+func (c *Config) AuditEnabled() bool { return c.AuditLog == nil || *c.AuditLog }

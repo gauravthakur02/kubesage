@@ -188,6 +188,16 @@ func (a *App) resourceByName(name string) kube.Resource {
 		return a.helmResource()
 	case name == chartsRes:
 		return a.chartsResource()
+	case name == sizingRes:
+		return a.sizingResource()
+	case name == certsRes:
+		return a.certsResource()
+	case name == imagesRes:
+		return a.imagesResource()
+	case name == storageRes:
+		return a.storageResource()
+	case name == gitopsRes:
+		return a.gitopsResource()
 	case strings.HasPrefix(name, rolloutPrefix):
 		ns, n, _ := strings.Cut(strings.TrimPrefix(name, rolloutPrefix), "/")
 		return a.rolloutResource(ns, n)

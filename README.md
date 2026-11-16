@@ -62,6 +62,12 @@ Describe, YAML, edit, delete and AI analysis work on every type. The header's ta
 | `H` / `:pulse` | **Pulse**: node/pod/deployment health bars, CPU/memory requests vs capacity, detected issues |
 | `M` / `:helm` / `:charts` | **Helm releases** (values, manifests, history, revision diff, rollback) and the **charts** they use (default values, README, templates) |
 | `b` / `:view <name>` | open a **saved view** (`:view save <name>` stores the current tab) |
+| `I` / `:incident` | **AI incident triage**: everything unhealthy, root cause, fixes you approve one by one |
+| `ctrl+p` | **command palette**: fuzzy search over screens, resources, saved views, plugins and clusters |
+| `:rightsize` `:certs` `:images` `:storage` `:gitops` | right-sizing & cost, TLS expiry, images (Trivy), PVC usage, Argo CD/Flux apps; also under **Insights** in `0` |
+| `:diff @<context> [all]` | compare the selected object (or the whole namespace) with another cluster |
+| `:export csv\|json\|md [file]` | save the visible table |
+| `:audit` | log of every change kubesage made, by you or the AI |
 | `A` / `:ai <question>` | **AI chat** about the cluster |
 | `?` | help |
 
@@ -96,6 +102,10 @@ There is one AI conversation, shown in whichever pane is in AI mode. Pressing `a
 | `a` | **AI analyze**: sends the manifest, events, detected issues and recent and previous logs to the model |
 | `e` | **safe edit**: your editor → diff → server dry-run → apply on request |
 | `o` | **rollout history** of a deployment: diff revisions, `U` to roll back |
+| `w` | **relationships**: Ingress → Service → Deployment → ReplicaSet → Pods, plus ConfigMaps, Secrets, PVCs and HPA, coloured by health |
+| `t` | **timeline**: events, rollouts, container restarts, scaling and pod starts of the object and its parts, newest first |
+| `P` | **network policies** of a pod: who may connect, where it may connect, missing DNS egress |
+| `h` / `J` / `u` on a cronjob | run history with durations and failures / run now / suspend or resume |
 | `S` / `R` / `D` | scale, rollout restart, delete |
 | `f` | list port-forwards: open, go to, stop |
 | `F` | **port-forward** a pod, service, deployment, statefulset or daemonset (services resolve named target ports to a ready pod) |
@@ -188,6 +198,66 @@ policy:
   allowed_registries: ['^[a-z0-9-]+\.azurecr\.io/']   # optional; empty = registry check off
   skip_namespaces: [kube-system, kube-public, kube-node-lease, gatekeeper-system, calico-system, tigera-operator, azure-workload-identity-system]
 ```
+
+### Troubleshooting views
+
+**Relationships (`w`)** on an ingress, service, deployment, statefulset, daemonset, replicaset or pod draws the tree around it,
+with what sits in front of it (Services, Ingresses) on top. A Service that selects no pods, an Ingress pointing at a missing Service,
+an unbound PVC or a crashing pod shows in red, so "why does this ingress return 503?" is one screen. Objects managed by Argo CD,
+Flux or Helm are marked.
+
+**Timeline (`t`)** answers "what changed just before it broke?": warning and normal events, new ReplicaSets (with their images),
+container terminations with exit codes, HPA scaling and pod starts, merged and grouped by day. `r` switches back to the relationships.
+
+**AI incident mode (`I`)** collects detected issues, warning events of the last hour, failed Helm releases, unbound PVCs, node problems and
+rollouts of the last two hours, then asks the AI to group symptoms into incidents, name the root cause, gather missing evidence with
+read-only commands and propose fixes. Every change still needs your approval (and is blocked in `--readonly`).
+
+**Right-sizing (`:rightsize`)** compares each workload's requests with its peak usage (metrics-server now, plus what kubesage has seen in the
+last 15 minutes) and suggests CPU = peak × 1.5 and memory = peak × 1.3. It flags over- and under-provisioned workloads and missing requests, totals the
+reclaimable CPU and memory and, with `cost` in the config, the monthly waste. `enter` shows the `kubectl set resources` command, `e` safe-edits the workload.
+
+**Cluster diff (`:diff @<context>`)** compares the selected object with the same one on another cluster, ignoring status, ids, timestamps and generated fields;
+Secret values are compared by hash, never shown. `:diff @<context> all` lists every object of the current type in the namespace as differs / only here / only there / same.
+
+### Insights
+
+| Command | Shows |
+|---------|-------|
+| `:certs` | every TLS Secret and cert-manager Certificate: subject, DNS names, issuer, expiry, days left (yellow under 30, red when expired or not Ready). Only the public certificate is read |
+| `:images` | every image in use: tag, registry, `latest`/untagged warnings, digest pinning, the digest actually running, pods and workloads. `enter` runs a **Trivy** scan for HIGH/CRITICAL vulnerabilities when `trivy` is installed |
+| `:storage` | PVCs by fill level (red at 90 %), capacity, storage class, access mode and the pods mounting them; usage comes from the kubelet summary API and needs `nodes/proxy` |
+| `:gitops` | Argo CD Applications and Flux Kustomizations/HelmReleases with sync, health, revision and source. Safe edit warns when the object is managed by GitOps, because the next sync reverts a manual change |
+
+### Command palette, export, plugins and audit log
+
+- **`ctrl+p`** opens a fuzzy palette over kubesage's screens, every resource type, saved views, plugins and kubeconfig contexts.
+- **`:export csv|json|md [file]`** writes the visible (filtered) rows of any table, handy for incident reports.
+- **Custom columns** add fields to any table:
+
+  ```yaml
+  columns:
+    pods:
+      - {name: image, path: spec.containers[0].image}
+      - {name: team, label: team}
+    deployments:
+      - {name: owner, annotation: example.com/owner}
+  ```
+
+- **Plugins** bind your own commands to a key on selected resources. Variables: `$NAME $NAMESPACE $CONTEXT $KIND $RESOURCE $KUBECONFIG`.
+  They ask before running unless `confirm: false`, and `background: true` shows the output in the viewer instead of handing over the terminal.
+
+  ```yaml
+  plugins:
+    - name: stern
+      key: K
+      scopes: [pods, deployments]
+      command: stern
+      args: [$NAME, -n, $NAMESPACE, --context, $CONTEXT]
+  ```
+
+- **Audit log**: every change (scale, restart, delete, edit, rollback, drain, cronjob runs, plugins, commands the AI ran after approval) is appended to
+  `audit.log` next to `config.yaml`, with time, context, target, who (you or the AI) and the result. `:audit` shows it; `audit_log: false` turns it off.
 
 ### Helm releases
 
@@ -339,6 +409,11 @@ theme: tokyonight            # tokyonight, dracula, nord, catppuccin, gruvbox, s
 refresh_seconds: 3
 live_updates: watch         # watch (live, falls back to polling) or poll
 debug_image: busybox:1.36   # ephemeral debug container image for shell-less pods
+cost:                       # optional: prices for right-sizing waste
+  cpu_core_hour: 0.031
+  mem_gib_hour: 0.004
+  currency: EUR
+audit_log: true
 read_only: false
 choose_context_on_start: true   # show the cluster chooser when --context is not given
 animations: true                # animated logo in the terminal

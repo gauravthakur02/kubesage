@@ -195,7 +195,6 @@ func (a *App) viewFooter() string {
 }
 
 func (a *App) hints() string {
-	type kv struct{ k, v string }
 	var list []kv
 	switch a.mode {
 	case modeText:
@@ -237,6 +236,10 @@ func (a *App) hints() string {
 		if a.res.Name == clustersRes {
 			list = []kv{{"enter", "open"}, {"space", "select several"}, {"v", "side by side"}, {"c", "switch this tab"},
 				{"p", "health check"}, {"/", "filter"}, {"q", "quit"}}
+			break
+		}
+		if h := a.kubesageHints(); h != nil {
+			list = h
 			break
 		}
 		if a.res.Name == chartsRes {
@@ -301,6 +304,12 @@ func (a *App) tableTitle() string {
 	}
 	if ns, name, ok := isRollout(a.res); ok {
 		return fmt.Sprintf("Rollout history deployment %s/%s · %s", ns, name, a.table.Note)
+	}
+	if t := a.kubesageTitle(); t != "" {
+		if a.filter != "" {
+			t += " · /" + a.filter
+		}
+		return t
 	}
 	if a.res.Name == helmRes || a.res.Name == chartsRes {
 		t := fmt.Sprintf("Helm releases · %s · %s", a.client.NamespaceLabel(), a.table.Note)
@@ -922,7 +931,13 @@ func (a *App) viewHelp(w, h int) string {
 		{"Panes", [][2]string{{"|  :vsplit [res]", "split side by side"}, {"-  :split [res]", "split stacked"}, {"L", "logs in a new pane"},
 			{"ctrl+w  alt+1-6", "focus next / pane N"}, {"z", "zoom pane"}, {"[ ]", "resize pane"}, {"ctrl+x  :close", "close pane"},
 			{":only", "keep only this pane"}, {"ctrl+t  :tabnew [ns|res]", "new tab"}, {">  <  :tab N", "next / prev / go to tab"},
-			{"C  :clusters", "all clusters: health, open"}, {"M  :helm", "Helm releases (M again: charts) · values · history"}, {":charts", "Helm charts in use · defaults · README · templates"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
+			{"C  :clusters", "all clusters: health, open"}, {"M  :helm", "Helm releases (M again: charts) · values · history"}, {":charts", "Helm charts in use · defaults · README · templates"},
+			{"ctrl+p", "command palette: screens, resources, views, clusters"}, {"I  :incident", "AI incident triage of everything unhealthy"},
+			{"w / t", "relationships graph / event timeline of the selected object"}, {"P", "network policies of the selected pod"},
+			{":rightsize", "requests vs peak usage, waste and cost"}, {":certs", "TLS certificates and expiry"},
+			{":images", "images in use, latest tags, Trivy scan"}, {":storage", "PVC usage and mounts"}, {":gitops", "Argo CD and Flux apps"},
+			{":diff @ctx [all]", "compare with another cluster"}, {":export csv|json|md", "save the table"}, {":audit", "log of every change made"},
+			{"h / J / u on cronjobs", "run history / run now / suspend-resume"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
 			{":vsplit @ctx [ns]", "compare clusters side by side"}, {"c  :ctx <name>", "switch this tab's cluster"},
 			{":tabname <name>", "rename tab"}, {":tabclose", "close tab (ctrl+x on last pane)"}, {":ns! <ns>", "namespace for all panes"}, {":layout <name>", "triage, ops, dash, ai, single"},
 			{":view save <name>", "save this tab's layout"}, {"b  :view [name]", "open a saved view"}}},
@@ -996,3 +1011,6 @@ func plural(kind string) string {
 	}
 	return kind + "s"
 }
+
+// kv is a key hint in the footer.
+type kv struct{ k, v string }

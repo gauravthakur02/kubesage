@@ -22,11 +22,13 @@ type editState struct {
 	dry              kube.ApplyResult
 	dryErr           error
 	checking         bool
+	gitops           string // "managed by Argo CD app x" etc.: changes may be reverted
 }
 
 type editLoadedMsg struct {
-	yaml string
-	err  error
+	yaml   string
+	gitops string
+	err    error
 }
 type editDoneMsg struct{ err error }
 type dryRunMsg struct {
@@ -68,7 +70,11 @@ func (a *App) openEdit(r kube.Resource, ns, name string) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		y, err := c.EditableYAML(ctx, r, ns, name)
-		return editLoadedMsg{yaml: y, err: err}
+		owner := ""
+		if obj, gerr := c.Get(ctx, r, ns, name); gerr == nil {
+			owner = kube.GitOpsOwner(obj.GetLabels(), obj.GetAnnotations())
+		}
+		return editLoadedMsg{yaml: y, gitops: owner, err: err}
 	}
 }
 
@@ -81,6 +87,10 @@ func (a *App) handleEditLoaded(m editLoadedMsg) tea.Cmd {
 		a.edit = nil
 		a.setStatus("cannot edit: "+m.err.Error(), true)
 		return nil
+	}
+	e.gitops = m.gitops
+	if strings.HasPrefix(m.gitops, "managed by") {
+		a.setStatus("⚠ "+m.gitops+": a change made here will be reverted on the next sync; change it in Git instead", true)
 	}
 	f, err := os.CreateTemp("", "kubesage-"+strings.ToLower(e.res.Kind)+"-"+e.name+"-*.yaml")
 	if err == nil {
@@ -150,6 +160,9 @@ func (a *App) renderEdit() {
 	add, del := diffStats(d)
 	a.textTitle = fmt.Sprintf("edit %s/%s · %s", strings.ToLower(e.res.Kind), e.name, diffHeader(add, del))
 	var lines []string
+	if strings.HasPrefix(e.gitops, "managed by") {
+		lines = append(lines, s.WarnText.Bold(true).Render("⚠ "+e.gitops+": GitOps will revert this change on the next sync unless you also change it in Git."), "")
+	}
 	switch {
 	case e.checking:
 		lines = append(lines, s.Muted.Render("⋯ server-side dry-run running…"))
@@ -218,6 +231,7 @@ func (a *App) handleApplyDone(m applyDoneMsg) tea.Cmd {
 	if e == nil {
 		return nil
 	}
+	a.audit("edit.apply", a.client.Context, e.ns, strings.ToLower(e.res.Kind)+"/"+e.name, m.err)
 	if m.err != nil {
 		msg := m.err.Error()
 		if strings.Contains(msg, "the object has been modified") {

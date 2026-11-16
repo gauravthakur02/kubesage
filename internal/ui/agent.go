@@ -145,6 +145,9 @@ func (a *App) processQueue() tea.Cmd {
 }
 
 func (a *App) execQueued(c agent.Command) tea.Cmd {
+	if c.Risk == agent.Write {
+		a.auditBy("ai", "ai.command (approved)", a.client.Context, a.client.Namespace, c.Display(), nil)
+	}
 	a.ag.running = true
 	a.aiBusy = true
 	a.renderChat()

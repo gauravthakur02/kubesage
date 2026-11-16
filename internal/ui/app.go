@@ -293,6 +293,9 @@ func (a *App) refresh() tea.Cmd {
 	a.listGen++
 	a.loading = true
 	a.lastList = time.Now()
+	if cols := a.customColumns(a.res); len(cols) > 0 && a.res.Watchable() {
+		return tagPane(a.pane, fetchListColumns(a.client, a.res, a.listGen, cols))
+	}
 	return tagPane(a.pane, fetchList(a.client, a.res, a.listGen))
 }
 
@@ -492,6 +495,7 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	case actionMsg:
+		a.audit(msg.status, a.client.Context, a.client.Namespace, "", msg.err)
 		if msg.err != nil {
 			a.setStatus(msg.status+" failed: "+msg.err.Error(), true)
 		} else {
@@ -733,6 +737,17 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 			}
 		}
 	}
+	if row, ok := a.selected(); ok && a.mode == modeTable {
+		if p, ok := a.pluginFor(k.String()); ok {
+			return a.runPlugin(p, row)
+		}
+		if cmd, handled := a.insightRowAction(k.String(), row); handled {
+			return cmd
+		}
+		if cmd, handled := a.extraRowAction(k.String(), row); handled {
+			return cmd
+		}
+	}
 	if a.res.Name == chartsRes {
 		if row, ok := a.selected(); ok {
 			if cmd, handled := a.chartRowAction(k.String(), row); handled {
@@ -827,6 +842,10 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 		return fetchNamespaces(a.client)
 	case "H":
 		return a.openPulse()
+	case "I":
+		return a.openIncident()
+	case "ctrl+p":
+		return a.openPalette()
 	case "M":
 		if a.mode == modeTable && a.res.Name == helmRes {
 			return a.openCharts() // M again: releases ⇄ charts
@@ -854,6 +873,9 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 	}
 	row, ok := a.selected()
 	if !ok {
+		return nil
+	}
+	if a.isKubesageTable() {
 		return nil
 	}
 	if _, _, hh := isHelmHistory(a.res); hh || a.res.Name == helmRes || a.res.Name == chartsRes {
@@ -1140,6 +1162,43 @@ func (a *App) runCommand(line string) tea.Cmd {
 		return a.openHelm()
 	case "charts", "chart":
 		return a.openCharts()
+	case "incident", "sos":
+		return a.openIncident()
+	case "rightsize", "rightsizing", "sizing", "cost":
+		return a.openSizing()
+	case "certs", "tls", "certificates-expiry":
+		return a.openVirtual(a.certsResource(), "TLS certificates, soonest expiry first · enter: secret (masked) · red = expired or failing, yellow = under 30 days")
+	case "images", "image":
+		return a.openVirtual(a.imagesResource(), "images in use · enter: Trivy vulnerability scan · w: workloads using it")
+	case "storage", "volumes", "pvcusage":
+		return a.openVirtual(a.storageResource(), "PVCs by usage · enter: describe · w: workload using it")
+	case "gitops", "argo", "argocd", "flux":
+		return a.openVirtual(a.gitopsResource(), "Argo CD and Flux apps · enter: details")
+	case "netpol", "netpols", "reach":
+		if a.res.Name == "pods" {
+			if row, ok := a.selected(); ok {
+				return a.openNetPol(row.Namespace, row.Name)
+			}
+		}
+		a.setStatus("select a pod first, then :netpol (or press P on it)", true)
+		return nil
+	case "diff", "compare":
+		return a.compareCommand(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+	case "export":
+		return a.exportTable(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
+	case "audit", "changes":
+		return a.openAudit()
+	case "palette":
+		return a.openPalette()
+	case "timeline", "graph", "rel", "relations":
+		if row, ok := a.selected(); ok && graphKinds[a.res.Kind] {
+			if cmd == "timeline" {
+				return a.openTimeline(a.res.Kind, row.Namespace, row.Name)
+			}
+			return a.openGraph(a.res.Kind, row.Namespace, row.Name)
+		}
+		a.setStatus("select an ingress, service, deployment, statefulset, daemonset, replicaset or pod first", true)
+		return nil
 	case "policy", "policies", "security":
 		return a.openPolicy()
 	case "resources", "res", "api-resources", "all":
@@ -1314,6 +1373,10 @@ func (a *App) updateText(k tea.KeyMsg) tea.Cmd {
 		}
 	case a.textKind == "nodehealth" && k.String() == "X":
 		return a.openDrainPreview(a.target.name)
+	case a.textKind == "graph" && k.String() == "t":
+		return a.openTimeline(a.target.res.Kind, a.target.ns, a.target.name)
+	case a.textKind == "timeline" && k.String() == "r":
+		return a.openGraph(a.target.res.Kind, a.target.ns, a.target.name)
 	}
 	switch k.String() {
 	case "/":
