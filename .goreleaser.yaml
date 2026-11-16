@@ -1,4 +1,5 @@
 # Release with: git tag v0.2.0 && git push origin v0.2.0  (the release workflow runs GoReleaser)
+# Test locally:  goreleaser release --snapshot --clean   (everything lands in dist/)
 version: 2
 project_name: kubesage
 
@@ -10,24 +11,53 @@ before:
 builds:
   - env: [CGO_ENABLED=0]
     goos: [darwin, linux, windows]
-    goarch: [amd64, arm64]
+    goarch: [amd64, arm64, arm]
+    goarm: ["7"]
     ignore:
+      - goos: darwin
+        goarch: arm
       - goos: windows
-        goarch: arm64
+        goarch: arm
     ldflags:
       - -s -w -X main.version={{ .Version }}
     flags: [-trimpath]
+    mod_timestamp: "{{ .CommitTimestamp }}" # reproducible builds
 
 archives:
   - formats: [tar.gz]
     format_overrides:
       - goos: windows
         formats: [zip]
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # kubesage_0.2.0_linux_arm64.tar.gz · kubesage_0.2.0_darwin_arm64.tar.gz · kubesage_0.2.0_windows_amd64.zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}
     files: [LICENSE, README.md]
+
+# Linux packages: .deb (Debian/Ubuntu), .rpm (RHEL/Fedora/SUSE) and .apk (Alpine).
+nfpms:
+  - package_name: kubesage
+    file_name_template: "{{ .ConventionalFileName }}"
+    vendor: kubesage
+    homepage: https://github.com/gauravthakur02/kubesage
+    maintainer: Gaurav Thakur <https://github.com/gauravthakur02>
+    description: Kubernetes IDE for your terminal with an AI copilot
+    license: MIT
+    formats: [deb, rpm, apk]
+    bindir: /usr/bin
+    section: utils
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/kubesage/LICENSE
+      - src: README.md
+        dst: /usr/share/doc/kubesage/README.md
+    recommends: [kubectl]
 
 checksum:
   name_template: checksums.txt
+
+sboms:
+  - artifacts: archive # an SPDX bill of materials per archive (needs syft on PATH)
+    disable: '{{ if index .Env "KUBESAGE_SBOM" }}false{{ else }}true{{ end }}'
 
 changelog:
   sort: asc
@@ -38,21 +68,32 @@ release:
   github:
     owner: gauravthakur02
     name: kubesage
+  footer: |
+    ## Install
+    **macOS / Linux:** `curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.sh | sh`
+    **Windows (PowerShell):** `irm https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.ps1 | iex`
+    **Debian/Ubuntu:** `sudo apt install ./kubesage_{{ .Version }}_amd64.deb` · **RHEL/Fedora:** `sudo dnf install ./kubesage-{{ .Version }}-1.x86_64.rpm`
+    Verify downloads against `checksums.txt`.
 
 # Homebrew and Scoop publish only when their tokens are configured as repository secrets
 # (HOMEBREW_TAP_GITHUB_TOKEN / SCOOP_BUCKET_GITHUB_TOKEN) and the repos below exist.
-brews:
+homebrew_casks:
   - name: kubesage
     repository:
       owner: gauravthakur02
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    skip_upload: '{{ if eq .Env.HOMEBREW_TAP_GITHUB_TOKEN "" }}true{{ else }}false{{ end }}'
+    skip_upload: '{{ if index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
     homepage: https://github.com/gauravthakur02/kubesage
     description: Kubernetes IDE for your terminal with an AI copilot
     license: MIT
-    test: |
-      system "#{bin}/kubesage", "version"
+    binaries: [kubesage]
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/kubesage"]
+          end
 
 scoops:
   - name: kubesage
@@ -60,7 +101,7 @@ scoops:
       owner: gauravthakur02
       name: scoop-bucket
       token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
-    skip_upload: '{{ if eq .Env.SCOOP_BUCKET_GITHUB_TOKEN "" }}true{{ else }}false{{ end }}'
+    skip_upload: '{{ if index .Env "SCOOP_BUCKET_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
     homepage: https://github.com/gauravthakur02/kubesage
     description: Kubernetes IDE for your terminal with an AI copilot
     license: MIT

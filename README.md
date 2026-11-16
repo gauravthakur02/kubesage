@@ -14,18 +14,45 @@ reads your cluster's manifests, events and logs and tells you what is wrong and 
 
 ## Install
 
-Prebuilt binaries for macOS, Linux and Windows are attached to each [GitHub release](https://github.com/gauravthakur02/kubesage/releases). With Go installed:
+**macOS and Linux** (amd64, arm64; Linux also armv7). Downloads the latest release, checks it against `checksums.txt` and installs to
+`/usr/local/bin`, or `~/.local/bin` when that is not writable:
+```bash
+curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.sh | sh
+```
 
+**Windows** (amd64, arm64) in PowerShell. Installs to `%LOCALAPPDATA%\Programs\kubesage` and adds it to your user PATH:
+```powershell
+irm https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.ps1 | iex
+```
+Both scripts take `KUBESAGE_VERSION` (e.g. `0.2.0`) and `KUBESAGE_INSTALL_DIR`; `install.sh` also takes `KUBESAGE_DOWNLOAD_URL` for a mirror.
+
+**Linux packages** from the [release page](https://github.com/gauravthakur02/kubesage/releases):
+```bash
+sudo apt install ./kubesage_<version>_amd64.deb          # Debian, Ubuntu
+sudo dnf install ./kubesage-<version>-1.x86_64.rpm       # RHEL, Fedora, SUSE (zypper)
+sudo apk add --allow-untrusted ./kubesage_<version>_x86_64.apk   # Alpine
+```
+
+**Homebrew and Scoop** (once the tap and bucket repositories are set up):
+```bash
+brew install --cask gauravthakur02/tap/kubesage
+scoop bucket add kubesage https://github.com/gauravthakur02/scoop-bucket && scoop install kubesage
+```
+
+**Manual download:** every [release](https://github.com/gauravthakur02/kubesage/releases) has `.tar.gz` (macOS, Linux) and `.zip` (Windows)
+archives plus `checksums.txt`. Unpack and put `kubesage` on your PATH. On macOS, a binary downloaded with a browser is quarantined
+because it is not notarized; clear it with `xattr -d com.apple.quarantine kubesage`.
+
+**With Go:**
 ```bash
 go install github.com/gauravthakur02/kubesage@latest
 ```
 
-From source:
-
+**From source:**
 ```bash
 make build        # → bin/kubesage
 make install      # → $GOPATH/bin/kubesage
-make release      # cross-compile for macOS, Linux, Windows into dist/
+make snapshot     # every package and archive into dist/ via GoReleaser, nothing published
 ```
 
 Requires the Go version listed in `go.mod`. `kubectl` is optional. It is used for `describe`, `edit` and debug containers; shells and port-forwards work without it. Everything else talks to the API directly through client-go.
@@ -778,13 +805,14 @@ section) and published by the `docs` workflow. Preview it locally with `pip inst
 
 ## Releases
 
-Tag a version and push it; the release workflow runs GoReleaser and attaches archives and checksums for macOS, Linux and Windows:
+Tag a version and push it; the release workflow runs GoReleaser and attaches archives for macOS, Linux (amd64, arm64, armv7) and
+Windows (amd64, arm64), `.deb`/`.rpm`/`.apk` packages and `checksums.txt`, with install instructions in the release notes:
 
 ```bash
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-Homebrew and Scoop formulas are published too once `homebrew-tap` / `scoop-bucket` repositories exist and the
+A Homebrew cask and a Scoop manifest are published too once `homebrew-tap` / `scoop-bucket` repositories exist and the
 `HOMEBREW_TAP_GITHUB_TOKEN` / `SCOOP_BUCKET_GITHUB_TOKEN` secrets are set. CI runs the tests on Linux, macOS and Windows for every push and pull request.
 
 ## Roadmap ideas

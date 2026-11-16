@@ -22,6 +22,17 @@ jobs:
         if: runner.os != 'Windows'
       - run: go test ./...
         if: runner.os == 'Windows'
+  release-config:
+    # Keeps .goreleaser.yaml valid so tagging a release does not fail.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
+      - run: sh -n install.sh
   e2e:
     # Real cluster operations (exec, port-forward, apply, scale schedules, chaos, drain plan) on a throwaway kind cluster.
     runs-on: ubuntu-latest
