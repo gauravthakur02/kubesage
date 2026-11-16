@@ -276,3 +276,19 @@ func TestPluginRunsInBackground(t *testing.T) {
 	press(a, "K")
 	mustContain(t, screen(a), "plugin echo", "web-7d9-aaaaa in shop")
 }
+
+func TestActionsMenuAndHintsShowNewFeatures(t *testing.T) {
+	a, _ := newShopApp(t, "deploy", false)
+	v := screen(a)
+	mustContain(t, v, "space actions", "w relations", "t timeline", "I Incident", "^P Palette")
+	press(a, " ")
+	v = screen(a)
+	mustContain(t, v, "Actions · deployment shop/web", "relationships graph", "timeline", "right-sizing")
+	// filter to the graph entry and run it
+	for _, r := range "relationships" {
+		a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	_, cmd := a.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	run(a, cmd, 0)
+	mustContain(t, screen(a), "relationships deployment shop/web", "Ingress web")
+}

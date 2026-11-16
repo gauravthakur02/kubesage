@@ -62,6 +62,7 @@ Describe, YAML, edit, delete and AI analysis work on every type. The header's ta
 | `H` / `:pulse` | **Pulse**: node/pod/deployment health bars, CPU/memory requests vs capacity, detected issues |
 | `M` / `:helm` / `:charts` | **Helm releases** (values, manifests, history, revision diff, rollback) and the **charts** they use (default values, README, templates) |
 | `b` / `:view <name>` | open a **saved view** (`:view save <name>` stores the current tab) |
+| `space` | **actions menu** for the selected row: every action that applies, including relationships, timeline, network policies, right-sizing and cluster diff |
 | `I` / `:incident` | **AI incident triage**: everything unhealthy, root cause, fixes you approve one by one |
 | `ctrl+p` | **command palette**: fuzzy search over screens, resources, saved views, plugins and clusters |
 | `:rightsize` `:certs` `:images` `:storage` `:gitops` | right-sizing & cost, TLS expiry, images (Trivy), PVC usage, Argo CD/Flux apps; also under **Insights** in `0` |

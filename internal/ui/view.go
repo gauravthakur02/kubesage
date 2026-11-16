@@ -164,7 +164,7 @@ func (a *App) viewHeader() string {
 	if a.mode == modeTable && (a.res.Name == helmRes || a.res.Name == chartsRes) {
 		helmTab = s.TabActive.Render("M ⎈ Helm")
 	}
-	tabs = append(tabs, s.Muted.Render("│"), helmTab, pulse, aiTab)
+	tabs = append(tabs, s.Muted.Render("│"), helmTab, s.Tab.Render("I Incident"), pulse, aiTab, s.Tab.Render("^P Palette"))
 	line2 := ansi.Truncate(strings.Join(tabs, ""), a.w, "…")
 	return line1 + "\n" + line2
 }
@@ -278,6 +278,17 @@ func (a *App) hints() string {
 		}
 		list = []kv{{"0", "all resources"}, {"enter", "describe"}, {"h", "health"}, {"a", "AI analyze"}, {"l", "logs"}, {"s", "shell"}, {"y", "yaml"}, {"/", "filter"},
 			{"F", "port-fwd"}, {"f", "forwards"}, {"|/-", "split"}, {"!", "kubectl"}, {":", "cmd"}, {"n", "ns"}, {"c", "ctx"}, {"H", "pulse"}, {"?", "help"}}
+	}
+	if a.mode == modeTable && a.res.Watchable() && !a.isKubesageTable() {
+		extra := []kv{{"space", "actions"}}
+		if graphKinds[a.res.Kind] {
+			extra = append(extra, kv{"w", "relations"}, kv{"t", "timeline"})
+		}
+		if a.res.Name == "pods" {
+			extra = append(extra, kv{"P", "netpol"})
+		}
+		extra = append(extra, kv{"I", "incident"})
+		list = append(extra, list...)
 	}
 	if len(a.panes()) > 1 {
 		list = append([]kv{{"ctrl+w", "next pane"}, {"z", "zoom"}, {"ctrl+x", "close"}}, list...)

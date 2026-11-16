@@ -844,6 +844,10 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 		return a.openPulse()
 	case "I":
 		return a.openIncident()
+	case " ", "space":
+		if !a.isKubesageTable() && a.res.Watchable() {
+			return a.openActions()
+		}
 	case "ctrl+p":
 		return a.openPalette()
 	case "M":
