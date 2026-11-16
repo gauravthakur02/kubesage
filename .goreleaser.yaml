@@ -7,6 +7,7 @@ before:
   hooks:
     - go mod tidy
     - go test ./...
+    - sh scripts/gen-completions.sh
 
 builds:
   - env: [CGO_ENABLED=0]
@@ -31,7 +32,7 @@ archives:
     # kubesage_0.2.0_linux_arm64.tar.gz · kubesage_0.2.0_darwin_arm64.tar.gz · kubesage_0.2.0_windows_amd64.zip
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}
-    files: [LICENSE, README.md]
+    files: [LICENSE, README.md, completions/*, manpages/*]
 
 # Linux packages: .deb (Debian/Ubuntu), .rpm (RHEL/Fedora/SUSE) and .apk (Alpine).
 nfpms:
@@ -50,6 +51,14 @@ nfpms:
         dst: /usr/share/doc/kubesage/LICENSE
       - src: README.md
         dst: /usr/share/doc/kubesage/README.md
+      - src: completions/kubesage.bash
+        dst: /usr/share/bash-completion/completions/kubesage
+      - src: completions/kubesage.zsh
+        dst: /usr/share/zsh/vendor-completions/_kubesage
+      - src: completions/kubesage.fish
+        dst: /usr/share/fish/vendor_completions.d/kubesage.fish
+      - src: manpages/kubesage.1.gz
+        dst: /usr/share/man/man1/kubesage.1.gz
     recommends: [kubectl]
 
 # macOS Gatekeeper blocks downloaded binaries that Apple has not notarized ("Apple could not verify…").
@@ -109,6 +118,11 @@ homebrew_casks:
     description: Kubernetes IDE for your terminal with an AI copilot
     license: MIT
     binaries: [kubesage]
+    manpages: [manpages/kubesage.1.gz]
+    completions:
+      bash: completions/kubesage.bash
+      zsh: completions/kubesage.zsh
+      fish: completions/kubesage.fish
     hooks:
       post:
         install_steps: |

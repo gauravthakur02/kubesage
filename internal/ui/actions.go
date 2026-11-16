@@ -77,6 +77,24 @@ func (a *App) rowActions(row kube.Row) []rowActionItem {
 		add(rowActionItem{":diff @…", "compare with the same object on another cluster", func() tea.Cmd { return a.pickDiffContext(false) }},
 			rowActionItem{":diff @… all", "compare every " + strings.ToLower(r.Kind) + " in this namespace with another cluster", func() tea.Cmd { return a.pickDiffContext(true) }})
 	}
+	if r.Watchable() && r.Name != "secrets" {
+		add(rowActionItem{":fix", "AI fix: smallest patch, dry-run and diff before anything is applied", a.openAIFix})
+	}
+	if graphKinds[r.Kind] {
+		add(rowActionItem{":narrative", "AI incident narrative from the timeline (incl. stored history)", a.openNarrative})
+	}
+	if r.Name == "pods" || r.HasSelector() {
+		add(rowActionItem{":loki", "search older logs in Loki (also of deleted pods)", func() tea.Cmd { return a.openLoki("") }})
+	}
+	if r.Name == "pods" {
+		add(rowActionItem{":flows", "network flows of this pod (Cilium Hubble)", a.openHubble},
+			rowActionItem{":resize", "change CPU/memory in place, without a restart", func() tea.Cmd {
+				a.openInput(ovCommand, ":", func(s string) tea.Cmd { return a.runCommand(s) })
+				a.input.SetValue("resize cpu=250m memory=512Mi")
+				a.input.CursorEnd()
+				return nil
+			}})
+	}
 	switch r.Name {
 	case "deployments", "statefulsets", "replicasets", "pods":
 		if !a.dangerFor(a.client.Context) {

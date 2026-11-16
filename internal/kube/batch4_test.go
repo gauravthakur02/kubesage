@@ -70,7 +70,9 @@ func TestTimelineMergesHistory(t *testing.T) {
 
 func TestShouldBeDown(t *testing.T) {
 	mon := time.Date(2026, 11, 16, 0, 0, 0, 0, time.Local) // a Monday
-	at := func(d time.Time, h, m int) time.Time { return d.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute) }
+	at := func(d time.Time, h, m int) time.Time {
+		return d.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute)
+	}
 	cases := []struct {
 		now  time.Time
 		down bool

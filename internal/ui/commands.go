@@ -192,6 +192,45 @@ func (a *App) runCommand(line string) tea.Cmd {
 		return a.pinCommand(arg, true)
 	case "alerts", "watchlist", "notifications":
 		return a.openAlerts()
+	case "dev":
+		return a.devCommand(arg)
+	case "clone", "clones", "clone-ns":
+		return a.cloneCommand(arg)
+	case "plugins", "plugin-catalog", "catalog":
+		return a.openVirtual(a.catalogResource(), "plugin catalogue · enter shows the command before installing")
+	case "argo-rollouts", "rollouts":
+		return a.openVirtual(a.argoRolloutsResource(), "Argo Rollouts · p promote · P promote fully · X abort · T retry")
+	case "karpenter":
+		return a.openVirtual(a.karpenterResource(), "Karpenter NodePools and NodeClaims")
+	case "crossplane", "managed":
+		return a.openVirtual(a.crossplaneResource(), "Crossplane managed resources · / filter")
+	case "flows", "hubble":
+		return a.openHubble()
+	case "loki", "logsearch":
+		return a.openLoki(arg)
+	case "trace", "traces":
+		return a.openTrace()
+	case "nodepools", "pools", "np":
+		return a.openNodePools()
+	case "resize":
+		return a.resizePod(arg)
+	case "team":
+		if a.cfg.Team.Repo == "" {
+			a.setStatus("no team repository (team.repo in the config)", false)
+		} else {
+			a.setStatus("team settings from "+a.cfg.Team.Repo+": "+a.cfg.TeamSummary(), false)
+		}
+		return nil
+	case "approvals", "approval":
+		return a.openApprovals()
+	case "fix", "ai-fix":
+		return a.openAIFix()
+	case "narrative", "story":
+		return a.openNarrative()
+	case "nl", "ask-find":
+		return a.openNLSearch(arg)
+	case "tour", "welcome":
+		return a.openTour()
 	case "fleet":
 		return a.openFleet()
 	case "share":

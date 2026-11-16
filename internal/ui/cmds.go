@@ -168,7 +168,16 @@ func runAction(desc string, fn func(ctx context.Context) error) tea.Cmd {
 	}
 }
 
+// WebMode is set by `kubesage serve`: programs that take over the terminal (shells, $EDITOR, kubectl
+// hand-offs, terminal plugins) would run on the server's terminal, so they are refused.
+var WebMode bool
+
+var errWeb = fmt.Errorf("not available in the web UI (it would open on the server's terminal); use kubesage in a terminal")
+
 func kubectlExec(c *kube.Client, args ...string) tea.Cmd {
+	if WebMode {
+		return func() tea.Msg { return execDoneMsg{err: errWeb} }
+	}
 	if !kube.HasKubectl() {
 		return func() tea.Msg { return execDoneMsg{err: fmt.Errorf("kubectl not found on PATH")} }
 	}

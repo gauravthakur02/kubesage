@@ -42,6 +42,8 @@ func (a *App) view() string {
 		title, body = a.picker.title, a.viewPicker(innerW, innerH)
 	case ovHelp:
 		title, body = "Help", a.viewHelp(innerW, innerH)
+	case ovTour:
+		title, body = "Tour", a.viewTour(innerW, innerH)
 	case ovConfirm:
 		title, body = "Confirm", a.viewConfirm(innerW, innerH)
 	case ovApprove:
@@ -691,7 +693,11 @@ func (a *App) aiTitle() string {
 	if a.provider == nil {
 		return "AI assistant · not configured"
 	}
-	return fmt.Sprintf("AI assistant · %s · %s", a.profile, a.provider.Model())
+	t := fmt.Sprintf("AI assistant · %s · %s", a.profile, a.provider.Model())
+	if u := a.aiUsage(); u != "" {
+		t += " · " + u
+	}
+	return t
 }
 
 func (a *App) viewAI(w int) string {
@@ -1039,7 +1045,12 @@ func (a *App) viewHelp(w, h int) string {
 			{":fwd save/name/stop", "port-forward profiles"}, {":fleet", "health of every cluster in one table"},
 			{":history", "events kept locally (days, not 1h) · also in t timelines"}, {":schedules", "scale-to-zero outside office hours"},
 			{":chaos", "delete one pod, measure recovery (non-prod only)"}, {":share [lan] · :share stop", "read-only web view of this screen"},
-			{":daily-report [post]", "summary for Slack/Teams"}, {"J · i/x · ctrl+s in logs", "pretty JSON · include/exclude · save"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
+			{":daily-report [post]", "summary for Slack/Teams"}, {":fix", "AI patch → dry-run → diff → apply with A"},
+			{":narrative", "AI incident story from the timeline"}, {":nl <question>", "plain-English search (e.g. pods restarting > 3)"},
+			{":approvals · :team", "two-person rule · shared team settings"}, {":loki [6h] [text|LogQL] · :trace", "old logs · open trace IDs"},
+			{":nodepools · :resize cpu=… memory=…", "cloud node pools · in-place pod resize"},
+			{":argo-rollouts · :karpenter · :crossplane · :flows", "operator screens · Hubble flows"},
+			{":dev <path> · :clone <ns> [24h]", "apply on save · preview namespace"}, {":plugins · :tour", "plugin catalogue · tour"}, {"J · i/x · ctrl+s in logs", "pretty JSON · include/exclude · save"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
 			{":vsplit @ctx [ns]", "compare clusters side by side"}, {"c  :ctx <name>", "switch this tab's cluster"},
 			{":tabname <name>", "rename tab"}, {":tabclose", "close tab (ctrl+x on last pane)"}, {":ns! <ns>", "namespace for all panes"}, {":layout <name>", "triage, ops, dash, ai, single"},
 			{":view save <name>", "save this tab's layout"}, {"b  :view [name]", "open a saved view"}}},

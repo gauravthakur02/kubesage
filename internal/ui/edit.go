@@ -23,6 +23,8 @@ type editState struct {
 	dryErr           error
 	checking         bool
 	gitops           string // "managed by Argo CD app x" etc.: changes may be reverted
+	why, patch       string // set when the change came from the AI (:fix)
+	tokens           int
 }
 
 type editLoadedMsg struct {
@@ -55,6 +57,9 @@ func editorCommand(path string) *exec.Cmd {
 
 // execEditorFn launches the editor (swapped in tests).
 var execEditorFn = func(path string, done func(error) tea.Msg) tea.Cmd {
+	if WebMode {
+		return func() tea.Msg { return done(errWeb) }
+	}
 	return tea.ExecProcess(editorCommand(path), done)
 }
 
@@ -160,6 +165,14 @@ func (a *App) renderEdit() {
 	add, del := diffStats(d)
 	a.textTitle = fmt.Sprintf("edit %s/%s · %s", strings.ToLower(e.res.Kind), e.name, diffHeader(add, del))
 	var lines []string
+	if e.patch != "" {
+		a.textTitle = "AI fix " + strings.TrimPrefix(a.textTitle, "edit ")
+		lines = append(lines, s.Title.Render("AI-proposed change · review the diff; nothing is applied until you press A and confirm"))
+		for _, l := range strings.Split(e.why, "\n") {
+			lines = append(lines, s.Base.Render("  "+l))
+		}
+		lines = append(lines, "")
+	}
 	if strings.HasPrefix(e.gitops, "managed by") {
 		lines = append(lines, s.WarnText.Bold(true).Render("⚠ "+e.gitops+": GitOps will revert this change on the next sync unless you also change it in Git."), "")
 	}
@@ -231,7 +244,11 @@ func (a *App) handleApplyDone(m applyDoneMsg) tea.Cmd {
 	if e == nil {
 		return nil
 	}
-	a.audit("edit.apply", a.client.Context, e.ns, strings.ToLower(e.res.Kind)+"/"+e.name, m.err)
+	action := "edit.apply"
+	if e.patch != "" {
+		action = "ai-fix.apply"
+	}
+	a.audit(action, a.client.Context, e.ns, strings.ToLower(e.res.Kind)+"/"+e.name, m.err)
 	if m.err != nil {
 		msg := m.err.Error()
 		if strings.Contains(msg, "the object has been modified") {

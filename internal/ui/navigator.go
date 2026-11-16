@@ -109,9 +109,11 @@ func (a *App) showNavigator() {
 	insights := []kube.Resource{a.sizingResource(), a.certsResource(), a.imagesResource(), a.storageResource(), a.gitopsResource(),
 		a.alertsResource(), a.policyReportsResource(), a.backupsResource(), a.staleResource(), a.scalingResource(), a.secretsHealthResource(),
 		a.meshResource(), a.costResource("namespace"), a.runbooksResource(), a.kubeconfigResource(), a.fleetResource(), a.historyResource(),
-		a.schedulesResource()}
+		a.schedulesResource(), a.approvalsResource(), a.nodePoolsResource(), a.argoRolloutsResource(), a.karpenterResource(),
+		a.crossplaneResource(), a.clonesResource(), a.catalogResource()}
 	for i, al := range []string{"rightsize", "certs", "images", "storage", "gitops", "alerts", "policyreports", "backups", "restart-needed",
-		"autoscaling", "secrets-health", "mesh", "opencost", "runbooks", "kubeconfig", "fleet", "history", "schedules"} {
+		"autoscaling", "secrets-health", "mesh", "opencost", "runbooks", "kubeconfig", "fleet", "history", "schedules", "approvals", "nodepools",
+		"argo-rollouts", "karpenter", "crossplane", "clones", "plugins"} {
 		insights[i].Group, insights[i].Aliases = "Insights", []string{al}
 	}
 	all = append(append([]kube.Resource{rel, charts}, insights...), all...)

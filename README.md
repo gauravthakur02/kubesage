@@ -39,6 +39,14 @@ brew install --cask gauravthakur02/tap/kubesage
 scoop bucket add kubesage https://github.com/gauravthakur02/scoop-bucket && scoop install kubesage
 ```
 
+**After installing:**
+```bash
+kubesage update                       # download, verify and install the newest release (--check only looks)
+source <(kubesage completion bash)    # or zsh / fish / powershell; packages and Homebrew install these for you
+man kubesage                          # from packages; otherwise: kubesage man > kubesage.1
+```
+The first start shows a one-minute tour (`:tour` shows it again).
+
 **Manual download:** every [release](https://github.com/gauravthakur02/kubesage/releases) has `.tar.gz` (macOS, Linux) and `.zip` (Windows)
 archives plus `checksums.txt`. Unpack and put `kubesage` on your PATH.
 
@@ -531,6 +539,98 @@ In the AI chat, `ctrl+r` lets you pick any `kubectl` command from the last reply
 - With `redact_secrets: true` (the default), nothing sensitive is sent to an LLM: Secret values and env vars whose
   names look sensitive (`*PASSWORD*`, `*TOKEN*`, `*KEY*` and similar) are replaced with `<redacted>` first.
 
+- `ai.local_only_contexts` (a regex) keeps the data of matching clusters on your computer: there, the AI only works with
+  a local model (Ollama, or an OpenAI-compatible server on localhost).
+
+## AI fixes, narratives and plain-English search
+
+**AI fix with preview (`:fix`, or space → AI fix).** The AI writes the *smallest* patch for the selected object, never a whole manifest.
+kubesage merges it into the live object on your computer (strategic merge, so containers match by name), then shows exactly what a
+safe edit shows: the server-side dry-run verdict (validation, admission webhooks, policies), warnings and the diff, with the AI's reasons
+on top. Nothing changes until you press `A` and confirm; the change is audited as `ai-fix.apply`. Patches that touch a `<redacted>` value
+are refused, so masked secrets can never overwrite real ones, and Secrets are never sent.
+
+**Incident narrative (`:narrative`).** Turns the timeline of the selected object (events, rollouts, restarts, scaling, and the locally
+stored history) into a summary, a chronological account, the likely cause and follow-ups, ready for a postmortem (`:report` saves Markdown).
+
+**Plain-English search (`:nl`).** `:nl pods restarting more than 3 times in shop` becomes the right resource, namespace and filters
+(including a restart threshold); the status bar says what is shown and `esc` clears it.
+
+**Cost hint.** The AI pane title shows an estimate of the tokens used in this session and, when the profile has prices, the cost:
+```yaml
+ai:
+  local_only_contexts: '(prod|-p$)'      # cloud AI refused here; use a local model
+  profiles:
+    claude: {provider: anthropic, model: claude-opus-5-5, api_key_env: ANTHROPIC_API_KEY, price_in_per_mtok: 5, price_out_per_mtok: 25}
+```
+
+## Teams: approvals, shared settings and a tamper-evident audit log
+
+**Two-person rule.** Changes on matching contexts need a teammate's approval. Instead of applying, kubesage stores a request
+(a ConfigMap in `kubesage-approvals`, which you create once and restrict with RBAC) and, if `reports.webhook_env` is set, posts it to
+Slack/Teams. A teammate approves in `:approvals` (`y` approve, `n` reject) or with `kubesage approve <id>`; the requester can never
+approve their own request. Your kubesage notices the approval within 15 seconds, and `enter` on it runs the change after one last
+confirmation. Requests expire after an hour and can run once.
+```yaml
+approvals: {contexts: '(prod|-p$)', namespace: kubesage-approvals, expire_minutes: 60}
+```
+
+**Shared team settings.** Point kubesage at a git repository with a `kubesage.yaml`; at startup it is cloned or updated and its policy
+rules, schedules, fleet list, change windows, freezes, allowed registries, danger contexts, approval rule and runbooks are added to
+yours (your own scalar settings win, and nothing from the team file is written into your config). Plugins in the team file run
+commands on your computer, so they are only loaded with `allow_plugins: true`. `:team` shows what was loaded.
+```yaml
+team: {repo: https://github.com/acme/platform-kubesage.git, ref: main, path: kubesage.yaml}
+```
+
+**Tamper-evident audit log.** Every entry carries a SHA-256 hash of itself and the previous entry. `kubesage audit verify` reports a
+changed or deleted line; `kubesage audit export --since 24h` pushes entries to Grafana Loki (`audit_loki_url`, token in `$KUBESAGE_LOKI_TOKEN`).
+
+## Logs, traces, node pools and operators
+
+| Command | What it does |
+|---|---|
+| `:loki [6h] [text or LogQL]` | search logs kept by Loki, also of deleted pods; without LogQL it searches the selected pod/workload. Loki is found in the `loki`, `monitoring`, `logging` or `observability` namespace, or set `loki: {url: …}` |
+| `:trace` | in logs or Loki results: pick a trace ID (`trace_id=`, `traceparent`, `x-b3-traceid`) and open it in your tracing UI (`traces: {url: "https://grafana/…{trace_id}"}`) |
+| `:nodepools` | AKS agent pools, EKS node groups, GKE node pools and Karpenter NodePools from node labels: nodes ready, spot, instance types, zones, kubelet versions, recent spot evictions. `S` scales an AKS pool (az) or EKS node group (aws) after confirmation |
+| `:resize cpu=250m memory=512Mi` | on a pod: change CPU/memory **in place**, without a restart (Kubernetes 1.33+). Dry-run first, then confirm; the workload template is not changed |
+| `:argo-rollouts` | Argo Rollouts with strategy, step and phase: `p` promote, `P` promote fully, `X` abort, `T` retry |
+| `:karpenter` | NodePools with limits, usage, disruption policy and NodeClaims; `e` safe-edits a NodePool |
+| `:crossplane` | every Crossplane managed resource with Ready/Synced and the external name |
+| `:flows` | network flows of the selected pod or namespace from Cilium Hubble, with drops highlighted (needs the `hubble` CLI and `cilium hubble port-forward`) |
+
+`:secrets-health` now also shows where External Secrets come from (Azure Key Vault, Vault, AWS, GCP, … and the remote keys) and
+lists Secrets Store CSI `SecretProviderClass`es.
+
+## Developer workflow
+
+**Dev loop (`:dev <path>`).** Watches a file or folder (plain YAML, kustomize or a Helm chart) and server-side-applies it to the current
+namespace every time you save, reporting what changed. Refused on production-like contexts and "all namespaces". `:dev stop` ends it.
+
+**Preview namespaces (`:clone <new-namespace> [24h]`).** Copies the Deployments, StatefulSets, CronJobs, Services, ConfigMaps and
+Secrets of the current namespace into a new one labelled with its origin and an expiry time. Load balancers become ClusterIP services;
+Ingresses and volumes are not copied. `:clones` lists them (expired ones are highlighted) and `D` deletes one; kubesage only deletes
+namespaces it created. Refused on production-like contexts.
+
+**Plugin catalogue (`:plugins`).** Lists plugins from [`plugins/index.yaml`](plugins/index.yaml) in this repository (or `plugin_index:` in
+your config). `enter` shows the exact command it will run and installs it on confirmation; `D` removes it. Pull requests with new plugins are welcome.
+
+**Start with a command (`--cmd`).** `kubesage --cmd ":apply ./k8s"` or `--cmd ":dev ./k8s"` opens straight into that command.
+
+## In the browser and in VS Code
+
+**Web UI (`kubesage serve`).** The full kubesage in a browser tab, for teammates who do not live in a terminal. Each tab is its own session.
+It is **read-only unless you pass `--allow-changes`**, listens on 127.0.0.1:7777 unless you pass `--lan` (then anyone with the link can use
+kubesage with *your* credentials), and every request needs the random token in the printed link. Shells, `$EDITOR` and plugins are disabled
+in the browser because they would run on the server's terminal.
+```bash
+kubesage serve                        # http://127.0.0.1:7777/?t=…
+kubesage serve --lan --addr :8080     # on your network, read-only
+```
+
+**VS Code.** [`editors/vscode`](editors/vscode) is a small extension: open kubesage in an editor tab (`Cmd/Ctrl+Alt+K`), pick a cluster,
+open read-only, or right-click a YAML file (diff and apply) or folder (dev loop). Build it with `npx @vscode/vsce package`.
+
 ## Workspace tabs
 
 Tabs sit above panes: each tab has its own split layout, so you can keep for example `shop` debugging in one tab,
@@ -839,7 +939,7 @@ Signing runs on the Linux release runner, so no Mac is needed in CI.
 
 ## Roadmap ideas
 
-AI-generated patches applied after a diff preview, a terminal-recorded demo, and a plugin catalogue.
+A terminal-recorded demo, publishing the VS Code extension to the Marketplace, and more plugins in the catalogue.
 
 ## License
 

@@ -1,0 +1,28 @@
+# kubesage plugin catalogue (:plugins). Add yours with a pull request.
+# Each plugin binds a key on selected rows; variables: $NAME $NAMESPACE $CONTEXT $KIND $RESOURCE $KUBECONFIG.
+# kubesage always shows the exact command before installing it.
+plugins:
+  - name: stern
+    description: tail logs of every pod of a workload, colour per pod
+    requires: stern
+    plugin: {name: stern, key: ctrl+g, scopes: [deployments, statefulsets, daemonsets], command: stern, args: ["--context", "$CONTEXT", "-n", "$NAMESPACE", "$NAME"]}
+  - name: tree
+    description: owner tree of an object (kubectl tree krew plugin)
+    requires: kubectl-tree
+    plugin: {name: tree, key: ctrl+e, scopes: [deployments, statefulsets, daemonsets, services], command: kubectl, args: ["tree", "--context", "$CONTEXT", "-n", "$NAMESPACE", "$KIND", "$NAME"], background: true, confirm: false}
+  - name: neat
+    description: clean YAML without status and managed fields (kubectl neat krew plugin)
+    requires: kubectl-neat
+    plugin: {name: neat, key: ctrl+y, scopes: [all], command: sh, args: ["-c", "kubectl get --context \"$CONTEXT\" -n \"$NAMESPACE\" \"$RESOURCE\" \"$NAME\" -o yaml | kubectl neat"], background: true, confirm: false}
+  - name: dive
+    description: explore the image layers of a pod's first container
+    requires: dive
+    plugin: {name: dive, key: ctrl+b, scopes: [pods], command: sh, args: ["-c", "dive $(kubectl get pod --context \"$CONTEXT\" -n \"$NAMESPACE\" \"$NAME\" -o jsonpath='{.spec.containers[0].image}')"]}
+  - name: kubectl-who-can
+    description: who can update this object (krew who-can)
+    requires: kubectl-who_can
+    plugin: {name: kubectl-who-can, key: ctrl+a, scopes: [all], command: kubectl, args: ["who-can", "--context", "$CONTEXT", "-n", "$NAMESPACE", "update", "$RESOURCE/$NAME"], background: true, confirm: false}
+  - name: popeye
+    description: Popeye lint report for the namespace
+    requires: popeye
+    plugin: {name: popeye, key: ctrl+v, scopes: [all], command: popeye, args: ["--context", "$CONTEXT", "-n", "$NAMESPACE"], background: true}

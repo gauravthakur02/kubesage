@@ -33,6 +33,9 @@ type AIProfile struct {
 	// KeyInKeyring means `kubesage ai set-key` (or :ai-key) stored the key in the OS keychain
 	// (macOS Keychain, Windows Credential Manager, Linux Secret Service) under service "kubesage".
 	KeyInKeyring bool `yaml:"key_in_keyring,omitempty"`
+	// PriceInPerMTok / PriceOutPerMTok (USD per million tokens) turn the token estimate into a cost hint.
+	PriceInPerMTok  float64 `yaml:"price_in_per_mtok,omitempty"`
+	PriceOutPerMTok float64 `yaml:"price_out_per_mtok,omitempty"`
 	// APIKey is a literal key. Prefer APIKeyEnv, APIKeyCmd or the keychain so secrets stay out of config files.
 	APIKey string `yaml:"api_key,omitempty"`
 	// APIVersion is used by Azure OpenAI.
@@ -124,6 +127,8 @@ type AIConfig struct {
 	Active   string `yaml:"active"`
 	Redact   bool   `yaml:"redact_secrets"`
 	LogLines int    `yaml:"log_lines"`
+	// LocalOnlyContexts is a regex of kube-contexts whose data may only go to a local model (Ollama or localhost).
+	LocalOnlyContexts string `yaml:"local_only_contexts,omitempty"`
 	// AllowCommands lets the AI run kubectl commands (```run blocks).
 	AllowCommands bool `yaml:"allow_commands"`
 	// AutoRunReadOnly runs read-only commands without asking; changes always need approval.
@@ -192,6 +197,8 @@ type Config struct {
 	Keys map[string]string `yaml:"keys,omitempty"`
 	// HideColumns hides table columns per resource, e.g. {pods: [IP, NODE]} (:cols toggles).
 	HideColumns map[string][]string `yaml:"hide_columns,omitempty"`
+	// TourDone is set after the first-run tour has been shown (:tour shows it again).
+	TourDone bool `yaml:"tour_done,omitempty"`
 	// Fleet lists kube-contexts (regular expressions) for the fleet view; empty = contexts already connected.
 	Fleet []string `yaml:"fleet,omitempty"`
 	// EventHistory keeps Kubernetes events on local disk so timelines go back days.
@@ -200,10 +207,24 @@ type Config struct {
 	Rules []Rule `yaml:"rules,omitempty"`
 	// Schedules scale workloads to zero outside office hours (`kubesage schedule run` from cron, :schedules).
 	Schedules []Schedule `yaml:"schedules,omitempty"`
+	// PluginIndex is the plugin catalogue URL or file for :plugins (default: the one in the kubesage repository).
+	PluginIndex string `yaml:"plugin_index,omitempty"`
+	// Loki is where logs are kept beyond the pods' lifetime (:loki).
+	Loki Loki `yaml:"loki,omitempty"`
+	// Traces opens trace IDs found in logs (:trace) in your tracing UI.
+	Traces Traces `yaml:"traces,omitempty"`
+	// Approvals require a second person to approve changes on matching contexts.
+	Approvals Approvals `yaml:"approvals,omitempty"`
+	// Team loads shared settings (rules, schedules, fleet, plugins, runbooks, windows) from a git repository.
+	Team Team `yaml:"team,omitempty"`
+	// AuditLoki is a Grafana Loki push URL for `kubesage audit export` (…/loki/api/v1/push).
+	AuditLoki string `yaml:"audit_loki_url,omitempty"`
 	// Reports configures `kubesage report` (summary posted to a Slack/Teams webhook).
 	Reports Reports `yaml:"reports,omitempty"`
 
-	path string
+	path        string
+	teamSummary string
+	local       *teamUndo // what the config held before the team settings were merged in
 }
 
 // EventHistory configures the local event store.
@@ -244,6 +265,37 @@ type Schedule struct {
 	Days []string `yaml:"days,omitempty"`
 	// AllowDanger lets the schedule touch contexts matching danger_contexts (off by default).
 	AllowDanger bool `yaml:"allow_danger,omitempty"`
+}
+
+// Loki configures log search.
+type Loki struct {
+	// URL is http(s)://… or service:<ns>/<svc>:<port> (default: look for common Loki services).
+	URL string `yaml:"url,omitempty"`
+}
+
+// Traces configures trace links.
+type Traces struct {
+	// URL with {trace_id}, e.g. https://grafana.example.com/explore?left={"queries":[{"query":"{trace_id}"}]} or a Jaeger /trace/{trace_id} URL.
+	URL string `yaml:"url,omitempty"`
+}
+
+// Approvals configures the two-person rule.
+type Approvals struct {
+	// Contexts is a regex of kube-contexts where every change needs another person's approval.
+	Contexts string `yaml:"contexts,omitempty"`
+	// Namespace holds the approval requests as ConfigMaps (default kubesage-approvals).
+	Namespace string `yaml:"namespace,omitempty"`
+	// ExpireMinutes is how long a request stays valid (default 60).
+	ExpireMinutes int `yaml:"expire_minutes,omitempty"`
+}
+
+// Team points at a git repository with a shared kubesage.yaml.
+type Team struct {
+	Repo string `yaml:"repo,omitempty"` // git URL
+	Ref  string `yaml:"ref,omitempty"`  // branch or tag (default: the repository default)
+	Path string `yaml:"path,omitempty"` // file in the repo (default kubesage.yaml)
+	// AllowPlugins also loads the team's plugins (they run commands on your computer).
+	AllowPlugins bool `yaml:"allow_plugins,omitempty"`
 }
 
 // Reports configures the summary posted by `kubesage report`.
@@ -388,7 +440,7 @@ func (c *Config) Save() error {
 	if err := os.MkdirAll(filepath.Dir(c.path), 0o755); err != nil {
 		return err
 	}
-	data, err := yaml.Marshal(c)
+	data, err := yaml.Marshal(c.withoutTeam())
 	if err != nil {
 		return err
 	}

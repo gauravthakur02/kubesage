@@ -40,6 +40,7 @@ const (
 	ovPicker
 	ovHelp
 	ovApprove
+	ovTour
 )
 
 // Options are command-line overrides.
@@ -52,6 +53,10 @@ type Options struct {
 	ChooseContext bool
 	// Version of this build; release builds check GitHub for a newer one at startup.
 	Version string
+	// Tour shows the first-run tour.
+	Tour bool
+	// Command is a : command run once at startup (--cmd).
+	Command string
 }
 
 type targetRef struct {
@@ -94,7 +99,20 @@ type App struct {
 	monitorPrimed bool
 	monitorAt     time.Time
 	// read-only web view of the screen (:share)
-	sharing *share.Server
+	sharing  *share.Server
+	tourPage int
+	// dev loop (:dev)
+	dev    *devState
+	devGen int
+	// two-person rule: changes waiting for approval in this session
+	awaitingFn  map[string]func() tea.Cmd
+	pendingFn   func() tea.Cmd
+	notified    map[string]bool
+	approvalsAt time.Time
+	runApproved bool
+	// AI usage estimate for the session, and the restart floor set by natural-language search
+	aiTokIn, aiTokOut int
+	minRestarts       int
 	// local event history
 	evStore     *kube.EventStore
 	evAt        time.Time
@@ -267,6 +285,9 @@ func (a *App) danger() bool   { return a.dangerFor(a.client.Context) }
 // Init starts the first fetches and timers.
 func (a *App) Init() tea.Cmd {
 	a.loading = true
+	if a.opts.Tour {
+		a.openTour()
+	}
 	if a.opts.ChooseContext {
 		a.launchCursor = true
 		return tea.Batch(a.openLauncher(), tick(a.refreshEvery()), a.spin.Tick, a.mouseInit())
@@ -274,6 +295,9 @@ func (a *App) Init() tea.Cmd {
 	cmds := []tea.Cmd{tagPane(a.pane, fetchList(a.client, a.res, a.listGen)), fetchVersion(a.client), tick(a.refreshEvery()), a.spin.Tick, a.checkUpdate(), a.mouseInit()}
 	for _, ctx := range a.opts.ExtraContexts {
 		cmds = append(cmds, a.connect(ctx, a.opts.Namespace, "bgtab"))
+	}
+	if a.opts.Command != "" {
+		cmds = append(cmds, a.runCommand(a.opts.Command))
 	}
 	return tea.Batch(cmds...)
 }
@@ -295,8 +319,23 @@ func (a *App) setStatus(s string, isErr bool) { a.status, a.statusErr = s, isErr
 func (a *App) applyFilter() {
 	a.visible = a.visible[:0]
 	f := strings.ToLower(a.filter)
+	words := strings.Fields(f)
 	for i, r := range a.table.Rows {
-		if f == "" || strings.Contains(strings.ToLower(strings.Join(r.Cells, " ")), f) {
+		if a.minRestarts > 0 && a.rowRestarts(r) < a.minRestarts {
+			continue
+		}
+		line := strings.ToLower(strings.Join(r.Cells, " "))
+		match := f == "" || strings.Contains(line, f)
+		if !match && len(words) > 1 { // several words: every word must appear (natural-language search)
+			match = true
+			for _, w := range words {
+				if !strings.Contains(line, w) {
+					match = false
+					break
+				}
+			}
+		}
+		if match {
 			a.visible = append(a.visible, i)
 		}
 	}
@@ -315,7 +354,7 @@ func (a *App) selected() (kube.Row, bool) {
 
 func (a *App) switchResource(r kube.Resource) tea.Cmd {
 	a.stopLogs()
-	a.res, a.mode, a.cursor, a.offset, a.filter = r, modeTable, 0, 0, ""
+	a.res, a.mode, a.cursor, a.offset, a.filter, a.minRestarts = r, modeTable, 0, 0, "", 0
 	a.table = kube.Table{}
 	a.visible = nil
 	return a.refresh()
@@ -388,6 +427,9 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.checkForwards()
 		cmds := append([]tea.Cmd{tick(a.refreshEvery())}, a.autoMask()...)
 		cmds = append(cmds, a.ensureWatches()...)
+		if cmd := a.pollApprovals(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 		if cmd := a.recordEvents(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -523,6 +565,7 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		last.content += msg.text
 		if msg.done {
 			a.aiBusy = false
+			a.countTokens("", last.content)
 			if msg.err != nil && msg.err != context.Canceled {
 				a.chat = append(a.chat, chatEntry{role: "error", display: msg.err.Error()})
 				a.renderChat()
@@ -588,6 +631,25 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.handleAKSClusters(msg)
 	case kubeconfigChangedMsg:
 		return a, a.handleKubeconfigChanged(msg)
+
+	case approvalRequestedMsg:
+		return a, a.handleApprovalRequested(msg)
+	case approvalsPolledMsg:
+		return a, a.handleApprovalsPolled(msg)
+	case devTickMsg:
+		return a, a.handleDevTick(msg)
+	case devAppliedMsg:
+		return a, a.handleDevApplied(msg)
+	case pluginChosenMsg:
+		return a, a.handlePluginChosen(msg)
+	case poolScaledMsg:
+		return a, a.handlePoolScaled(msg)
+	case resizeCheckedMsg:
+		return a, a.handleResizeChecked(msg)
+	case aiFixMsg:
+		return a, a.handleAIFix(msg)
+	case nlSearchMsg:
+		return a, a.handleNLSearch(msg)
 
 	case eventsRecordedMsg:
 		return a, a.handleEventsRecorded(msg)
@@ -945,6 +1007,16 @@ func (a *App) ask(q string) tea.Cmd {
 
 // sendToAI appends the user turn and starts streaming the reply.
 func (a *App) sendToAI(display, prompt string) tea.Cmd {
+	kctx := a.client.Context
+	if a.aiClient != nil {
+		kctx = a.aiClient.Context
+	}
+	if why := a.aiBlocked(kctx); why != "" {
+		a.aiBusy = false
+		a.chat = append(a.chat, chatEntry{role: "error", display: why})
+		a.renderChat()
+		return nil
+	}
 	// Replace a pending placeholder ("collecting…") with the real user turn.
 	if n := len(a.chat); n > 0 && a.chat[n-1].role == "user" && a.chat[n-1].content == "" {
 		a.chat = a.chat[:n-1]
@@ -959,6 +1031,9 @@ func (a *App) sendToAI(display, prompt string) tea.Cmd {
 	a.chat = append(a.chat, chatEntry{role: "assistant"})
 	a.aiBusy = true
 	a.aiGen++
+	for _, m := range msgs {
+		a.countTokens(m.Content, "")
+	}
 	a.aiCh, a.aiErrCh, a.aiCancel = startAIStream(a.provider, a.systemPrompt(), msgs)
 	a.renderChat()
 	return waitAI(a.aiCh, a.aiErrCh, a.aiGen)
@@ -986,6 +1061,11 @@ func (a *App) openInput(kind overlay, hint string, onSubmit func(string) tea.Cmd
 }
 
 func (a *App) askConfirm(question, typeToConfirm string, fn func() tea.Cmd) {
+	if a.writeIntent && a.needsApproval() {
+		a.writeIntent = false
+		a.requestApproval(question, fn)
+		return
+	}
 	if a.writeIntent && a.reasonRequired() {
 		fn = a.withReason(fn)
 	}

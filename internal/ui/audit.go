@@ -7,27 +7,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/gauravthakur02/kubesage/internal/audit"
 	"github.com/gauravthakur02/kubesage/internal/config"
 )
 
-// auditEntry is one line of the audit log (JSON lines, next to config.yaml).
-type auditEntry struct {
-	Time    time.Time `json:"time"`
-	Context string    `json:"context"`
-	NS      string    `json:"namespace,omitempty"`
-	Action  string    `json:"action"`
-	Target  string    `json:"target,omitempty"`
-	By      string    `json:"by"` // user or ai
-	Reason  string    `json:"reason,omitempty"`
-	Result  string    `json:"result"`
-}
-
-var auditMu sync.Mutex
+// auditEntry is one line of the audit log (JSON lines, hash-chained, next to config.yaml).
+type auditEntry = audit.Entry
 
 func (a *App) auditPath() string {
 	p := a.cfg.Path()
@@ -52,17 +41,7 @@ func (a *App) auditBy(by, action, ctx, ns, target string, err error) {
 	}
 	e := auditEntry{Time: time.Now().UTC(), Context: ctx, NS: ns, Action: action, Target: target, By: by, Result: res, Reason: a.changeReason}
 	a.changeReason = ""
-	b, _ := json.Marshal(e)
-	auditMu.Lock()
-	defer auditMu.Unlock()
-	path := a.auditPath()
-	_ = os.MkdirAll(filepath.Dir(path), 0o755)
-	f, ferr := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if ferr != nil {
-		return
-	}
-	defer f.Close()
-	_, _ = f.Write(append(b, '\n'))
+	_ = audit.Append(a.auditPath(), e)
 }
 
 // openAudit shows the most recent changes (:audit).

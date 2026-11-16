@@ -97,7 +97,12 @@ type shellDoneMsg struct {
 }
 
 // execShellFn is swapped in tests (no real terminal there).
-var execShellFn = func(s *shellExec, done func(error) tea.Msg) tea.Cmd { return tea.Exec(s, done) }
+var execShellFn = func(s *shellExec, done func(error) tea.Msg) tea.Cmd {
+	if WebMode {
+		return func() tea.Msg { return done(errWeb) }
+	}
+	return tea.Exec(s, done)
+}
 
 // shellAllowedMsg carries the RBAC pre-check result for opening a shell.
 type shellAllowedMsg struct {

@@ -66,6 +66,7 @@ func (c *Client) SecretsHealth(ctx context.Context, rotationDays int) ([]SecretH
 		}
 	}
 	managed := map[string]string{} // ns/secret → ExternalSecret/SealedSecret managing it
+	stores := c.secretStoreProviders(ctx)
 	if c.Dynamic != nil {
 		for _, gvr := range esGVRs {
 			items, err := c.listDyn(ctx, gvr)
@@ -80,8 +81,16 @@ func (c *Client) SecretsHealth(ctx context.Context, rotationDays int) ([]SecretH
 				refresh, _, _ := unstructured.NestedString(u.Object, "status", "refreshTime")
 				t, _ := time.Parse(time.RFC3339, refresh)
 				store, _, _ := unstructured.NestedString(u.Object, "spec", "secretStoreRef", "name")
+				storeKind, _, _ := unstructured.NestedString(u.Object, "spec", "secretStoreRef", "kind")
+				src := stores[storeKey(storeKind, u.GetNamespace(), store)]
+				if keys := remoteKeys(u.Object); keys != "" {
+					src = strings.TrimSpace(src + " " + keys)
+				}
 				h := HealthOK
 				status := "synced from " + store
+				if src != "" {
+					status += " (" + src + ")"
+				}
 				if st != "True" {
 					h, status = HealthErr, "not synced: "+nonEmptyStr(reason, firstLine(msg))
 				}
@@ -105,6 +114,21 @@ func (c *Client) SecretsHealth(ctx context.Context, rotationDays int) ([]SecretH
 					h, status = HealthErr, "cannot unseal: "+nonEmptyStr(firstLine(msg), reason)
 				}
 				out = append(out, SecretHealth{Kind: "SealedSecret", Namespace: u.GetNamespace(), Name: u.GetName(), Changed: u.GetCreationTimestamp().Time, Status: status, H: h})
+			}
+		}
+	}
+	if c.Dynamic != nil { // Secrets Store CSI driver: secrets mounted straight from Key Vault, Vault, AWS or GCP
+		if items, err := c.listDyn(ctx, spcGVR); err == nil {
+			for _, u := range items {
+				prov, _, _ := unstructured.NestedString(u.Object, "spec", "provider")
+				params, _, _ := unstructured.NestedStringMap(u.Object, "spec", "parameters")
+				where := nonEmptyStr(params["keyvaultName"], nonEmptyStr(params["vaultAddress"], params["roleName"]))
+				status := "mounted by CSI from " + prov
+				if where != "" {
+					status += ": " + where
+				}
+				out = append(out, SecretHealth{Kind: "SecretProviderClass", Namespace: u.GetNamespace(), Name: u.GetName(), Type: prov,
+					Changed: u.GetCreationTimestamp().Time, Status: status, H: HealthOK})
 			}
 		}
 	}
@@ -143,6 +167,83 @@ func (c *Client) SecretsHealth(ctx context.Context, rotationDays int) ([]SecretH
 		return rank[out[i].H] < rank[out[j].H]
 	})
 	return out, nil
+}
+
+var (
+	spcGVR      = schema.GroupVersionResource{Group: "secrets-store.csi.x-k8s.io", Version: "v1", Resource: "secretproviderclasses"}
+	storeGVRs   = []schema.GroupVersionResource{{Group: "external-secrets.io", Version: "v1", Resource: "secretstores"}, {Group: "external-secrets.io", Version: "v1beta1", Resource: "secretstores"}}
+	cstoreGVRs  = []schema.GroupVersionResource{{Group: "external-secrets.io", Version: "v1", Resource: "clustersecretstores"}, {Group: "external-secrets.io", Version: "v1beta1", Resource: "clustersecretstores"}}
+	providerTag = map[string]string{"azurekv": "Azure Key Vault", "vault": "HashiCorp Vault", "aws": "AWS", "gcpsm": "GCP Secret Manager",
+		"kubernetes": "Kubernetes", "onepassword": "1Password", "doppler": "Doppler", "akeyless": "Akeyless", "gitlab": "GitLab", "ibm": "IBM"}
+)
+
+func storeKey(kind, ns, name string) string {
+	if kind == "ClusterSecretStore" {
+		return "cluster/" + name
+	}
+	return ns + "/" + name
+}
+
+// secretStoreProviders maps External Secrets stores to a readable source, e.g. "Azure Key Vault https://kv.vault.azure.net".
+func (c *Client) secretStoreProviders(ctx context.Context) map[string]string {
+	out := map[string]string{}
+	if c.Dynamic == nil {
+		return out
+	}
+	describe := func(u unstructured.Unstructured) string {
+		prov, _, _ := unstructured.NestedMap(u.Object, "spec", "provider")
+		for k, v := range prov {
+			name := nonEmptyStr(providerTag[k], k)
+			if m, ok := v.(map[string]any); ok {
+				for _, f := range []string{"vaultUrl", "server", "region", "projectID"} {
+					if s, ok := m[f].(string); ok && s != "" {
+						return name + " " + s
+					}
+				}
+			}
+			return name
+		}
+		return ""
+	}
+	for _, set := range [][]schema.GroupVersionResource{storeGVRs, cstoreGVRs} {
+		for _, gvr := range set {
+			items, err := c.listDyn(ctx, gvr)
+			if err != nil && len(items) == 0 {
+				continue
+			}
+			for _, u := range items {
+				kind := "SecretStore"
+				if u.GetNamespace() == "" {
+					kind = "ClusterSecretStore"
+				}
+				out[storeKey(kind, u.GetNamespace(), u.GetName())] = describe(u)
+			}
+			break
+		}
+	}
+	return out
+}
+
+// remoteKeys lists the remote keys an ExternalSecret reads (at most three).
+func remoteKeys(obj map[string]any) string {
+	var keys []string
+	data, _, _ := unstructured.NestedSlice(obj, "spec", "data")
+	for _, d := range data {
+		if m, ok := d.(map[string]any); ok {
+			if rr, ok := m["remoteRef"].(map[string]any); ok {
+				if k, ok := rr["key"].(string); ok {
+					keys = append(keys, k)
+				}
+			}
+		}
+	}
+	if len(keys) == 0 {
+		return ""
+	}
+	if len(keys) > 3 {
+		keys = append(keys[:3], fmt.Sprintf("+%d", len(keys)-3))
+	}
+	return "keys " + strings.Join(keys, ", ")
 }
 
 // ---------- service mesh ----------

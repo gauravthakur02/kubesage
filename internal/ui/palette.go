@@ -35,7 +35,13 @@ var paletteItems = []struct{ label, cmd string }{
 	{"Port-forward profiles", "fwd"},
 	{"Fleet: health of every cluster", "fleet"}, {"Event history (kept locally, beyond 1h)", "history"},
 	{"Scale-to-zero schedules", "schedules"}, {"Chaos test the selected workload", "chaos"},
-	{"Share this screen read-only (web)", "share"}, {"Stop sharing", "share stop"}, {"Daily report (Slack/Teams)", "daily-report"}, {"Show/hide columns", "cols"}, {"Toggle mouse", "mouse"}, {"Help", "help"},
+	{"Share this screen read-only (web)", "share"}, {"Stop sharing", "share stop"}, {"Daily report (Slack/Teams)", "daily-report"}, {"Show/hide columns", "cols"}, {"Toggle mouse", "mouse"}, {"AI fix the selected object (preview first)", "fix"}, {"AI incident narrative", "narrative"},
+	{"Ask in plain English: find…", "nl "}, {"Approvals (two-person rule)", "approvals"}, {"Team settings", "team"},
+	{"Search old logs in Loki", "loki "}, {"Open a trace from these logs", "trace"}, {"Node pools (AKS, EKS, GKE, Karpenter)", "nodepools"},
+	{"Resize pod in place", "resize "}, {"Argo Rollouts: promote / abort", "argo-rollouts"}, {"Karpenter NodePools", "karpenter"},
+	{"Crossplane managed resources", "crossplane"}, {"Network flows (Hubble)", "flows"}, {"Dev loop: apply on save", "dev "},
+	{"Clone this namespace (preview env)", "clone "}, {"Namespace clones", "clones"}, {"Plugin catalogue", "plugins"},
+	{"Tour of kubesage", "tour"}, {"Help", "help"},
 }
 
 // openPalette fuzzy-searches resources, kubesage screens, saved views, contexts and plugins (ctrl+p).
@@ -139,6 +145,10 @@ func (a *App) pluginEnv(row kube.Row) map[string]string {
 
 // runPlugin runs a user plugin on the selected row (after confirmation unless confirm: false).
 func (a *App) runPlugin(p config.Plugin, row kube.Row) tea.Cmd {
+	if WebMode { // plugins run commands on the server's computer: never for web viewers
+		a.setStatus("plugins are disabled in the web UI", true)
+		return nil
+	}
 	env := a.pluginEnv(row)
 	expand := func(s string) string { return os.Expand(s, func(k string) string { return env[k] }) }
 	args := make([]string, len(p.Args))
@@ -162,6 +172,9 @@ func (a *App) runPlugin(p config.Plugin, row kube.Row) tea.Cmd {
 				}
 				return title, string(out), nil
 			})
+		}
+		if WebMode {
+			return func() tea.Msg { return execDoneMsg{err: errWeb} }
 		}
 		return tea.ExecProcess(cmd, func(err error) tea.Msg { return execDoneMsg{err: err} })
 	}

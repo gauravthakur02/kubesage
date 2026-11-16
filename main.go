@@ -8,20 +8,27 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"golang.org/x/term"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/gauravthakur02/kubesage/internal/agent"
 	"github.com/gauravthakur02/kubesage/internal/ai"
+	"github.com/gauravthakur02/kubesage/internal/audit"
+	"github.com/gauravthakur02/kubesage/internal/cli"
 	"github.com/gauravthakur02/kubesage/internal/config"
 	"github.com/gauravthakur02/kubesage/internal/kube"
 	"github.com/gauravthakur02/kubesage/internal/mcp"
 	"github.com/gauravthakur02/kubesage/internal/report"
+	"github.com/gauravthakur02/kubesage/internal/serve"
 	"github.com/gauravthakur02/kubesage/internal/ui"
 	"github.com/gauravthakur02/kubesage/internal/update"
 )
@@ -51,6 +58,14 @@ Usage:
                                    Slack/Teams webhook in $<reports.webhook_env> (run it from cron)
   kubesage schedule run [--dry-run]   apply scale-to-zero schedules now (run from cron every 10 min)
   kubesage schedule status         show what each schedule wants right now
+  kubesage approve list | <id> [--reject]   two-person rule: list or decide pending changes
+  kubesage audit verify            check the audit log's hash chain (exit 1 if tampered)
+  kubesage audit export [--since 24h]       push the audit log to Grafana Loki (audit_loki_url)
+  kubesage serve [--addr 127.0.0.1:7777] [--lan] [--allow-changes]
+                                   the full UI in a web browser (read-only unless --allow-changes)
+  kubesage update [--check]        download, verify and install the latest release
+  kubesage completion bash|zsh|fish|powershell   shell completion script
+  kubesage man                     print the man page (kubesage man > kubesage.1)
   kubesage version
 
 Flags:
@@ -66,6 +81,7 @@ func main() {
 	readOnly := fs.Bool("readonly", false, "disable every change to the cluster (UI actions and AI commands)")
 	cfgPath := fs.String("config", "", "config file (default: "+config.DefaultPath()+")")
 	profile := fs.String("ai", "", "AI profile to use (overrides config ai.active)")
+	startCmd := fs.String("cmd", "", "kubesage command to run at startup, e.g. \":apply ./k8s\" or \":dev ./k8s\"")
 	theme := fs.String("theme", "", "colour theme: "+strings.Join(ui.ThemeNames(), ", "))
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, ui.PrintableLogo("version "+version))
@@ -89,6 +105,26 @@ func main() {
 			rest = append(rest[:1], cfs.Args()...)
 		}
 		runConfig(rest, *path)
+		return
+	}
+	switch sub {
+	case "completion":
+		shell := ""
+		if len(args) > 0 {
+			shell = args[0]
+		}
+		script, err := cli.Completion(shell)
+		exitIf(err)
+		fmt.Print(script)
+		return
+	case "man":
+		fmt.Print(cli.Man(version, time.Now()))
+		return
+	case "update":
+		runUpdate(args)
+		return
+	case "__complete": // used by the completion scripts
+		runComplete(args)
 		return
 	}
 	if sub == "version" {
@@ -123,6 +159,11 @@ func main() {
 
 	cfg, err := config.Load(*cfgPath)
 	exitIf(err)
+	if cfg.Team.Repo != "" && sub != "completion" && sub != "__complete" {
+		if _, err := cfg.SyncTeam(context.Background()); err != nil {
+			fmt.Fprintln(os.Stderr, "⚠ "+err.Error())
+		}
+	}
 	if *profile != "" {
 		cfg.AI.Active = *profile
 	}
@@ -153,9 +194,10 @@ func main() {
 			}
 		}
 		// No --context: let the user pick cluster(s) in the UI (unless there is only one).
-		choose := *kctx == "" && cfg.ChooseContext && len(client.Contexts()) > 1
+		choose := *kctx == "" && *startCmd == "" && cfg.ChooseContext && len(client.Contexts()) > 1
 		app := ui.New(cfg, client, ui.Options{Kubeconfig: *kubeconfig, Context: contexts[0], Namespace: strings.ReplaceAll(namespace, "*all*", "all"),
-			Resource: *res, ReadOnly: *readOnly, ExtraContexts: extra, ChooseContext: choose, Version: version})
+			Resource: *res, ReadOnly: *readOnly, ExtraContexts: extra, ChooseContext: choose, Version: version,
+			Tour: !cfg.TourDone && term.IsTerminal(int(os.Stdout.Fd())) && *startCmd == "", Command: strings.TrimPrefix(*startCmd, ":")})
 		_, err := tea.NewProgram(app, tea.WithAltScreen()).Run()
 		exitIf(err)
 	case "mcp":
@@ -172,6 +214,12 @@ func main() {
 			}
 		}
 		os.Exit(code)
+	case "serve":
+		runServe(cfg, *cfgPath, *kubeconfig, *kctx, namespace, *readOnly, subArgs)
+	case "approve":
+		runApprove(cfg, client, subArgs)
+	case "audit":
+		runAudit(cfg, subArgs)
 	case "report":
 		runReport(cfg, *kubeconfig, client, subArgs)
 	case "schedule":
@@ -620,4 +668,197 @@ func runSchedule(cfg *config.Config, kubeconfig string, args []string) {
 		dry = true
 	}
 	exitIf(ui.RunSchedules(cfg, kubeconfig, time.Now(), dry, os.Stdout))
+}
+
+func runUpdate(args []string) {
+	checkOnly := false
+	for _, a := range args {
+		if a == "--check" || a == "-check" {
+			checkOnly = true
+		}
+	}
+	r, err := update.Latest(context.Background())
+	exitIf(err)
+	if !update.Newer(version, r.Version) {
+		fmt.Printf("✓ kubesage %s is the latest version\n", version)
+		return
+	}
+	fmt.Printf("kubesage %s is available (you have %s): %s\n", r.Version, version, r.URL)
+	if checkOnly {
+		return
+	}
+	exe, err := os.Executable()
+	exitIf(err)
+	if p, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = p
+	}
+	if by := update.ManagedBy(exe); by != "" {
+		exitIf(fmt.Errorf("this kubesage was installed by %s; update it there", by))
+	}
+	fmt.Printf("downloading and verifying %s…\n", update.ArchiveName(r.Version, runtime.GOOS, runtime.GOARCH))
+	exitIf(update.Apply(context.Background(), r.Version, exe))
+	fmt.Printf("✓ updated %s to %s\n", exe, r.Version)
+}
+
+// runComplete prints candidates for shell completion; it never fails loudly.
+func runComplete(args []string) {
+	if len(args) == 0 {
+		return
+	}
+	switch args[0] {
+	case "themes":
+		fmt.Println(strings.Join(ui.ThemeNames(), "\n"))
+	case "contexts":
+		if list, err := kube.KubeContexts(os.Getenv("KUBECONFIG")); err == nil {
+			for _, c := range list {
+				fmt.Println(c.Name)
+			}
+		}
+	case "namespaces":
+		c, err := kube.New("", "", "")
+		if err != nil {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if l, err := c.Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{}); err == nil {
+			for _, n := range l.Items {
+				fmt.Println(n.Name)
+			}
+		}
+	}
+}
+
+func approvalsNS(cfg *config.Config) string {
+	if cfg.Approvals.Namespace != "" {
+		return cfg.Approvals.Namespace
+	}
+	return "kubesage-approvals"
+}
+
+func runApprove(cfg *config.Config, c *kube.Client, args []string) {
+	exp := time.Hour
+	if cfg.Approvals.ExpireMinutes > 0 {
+		exp = time.Duration(cfg.Approvals.ExpireMinutes) * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	ns := approvalsNS(cfg)
+	if len(args) == 0 || args[0] == "list" {
+		list, err := c.Approvals(ctx, ns, exp)
+		exitIf(err)
+		if len(list) == 0 {
+			fmt.Println("no approval requests in", ns, "on", c.Context)
+		}
+		for _, a := range list {
+			fmt.Printf("%-9s %-28s %s · by %s · %s ago\n", a.Status, a.ID, a.Action, a.Requester, time.Since(a.Created).Round(time.Minute))
+		}
+		return
+	}
+	approve := true
+	for _, a := range args[1:] {
+		if a == "--reject" || a == "-reject" {
+			approve = false
+		}
+	}
+	a, err := c.DecideApproval(ctx, ns, args[0], approve, exp)
+	exitIf(err)
+	fmt.Printf("✓ %s %q (requested by %s)\n", a.Status, a.Action, a.Requester)
+}
+
+func runAudit(cfg *config.Config, args []string) {
+	path := filepath.Join(filepath.Dir(cfg.Path()), "audit.log")
+	if cfg.Path() == "" {
+		path = filepath.Join(filepath.Dir(config.DefaultPath()), "audit.log")
+	}
+	action := "verify"
+	if len(args) > 0 {
+		action = args[0]
+	}
+	switch action {
+	case "verify":
+		n, legacy, err := audit.Verify(path)
+		exitIf(err)
+		fmt.Printf("✓ %s: %d chained entries intact", path, n)
+		if legacy > 0 {
+			fmt.Printf(" (%d older entries without a hash)", legacy)
+		}
+		fmt.Println()
+	case "export":
+		since := 24 * time.Hour
+		for i := 1; i < len(args)-1; i++ {
+			if args[i] == "--since" || args[i] == "-since" {
+				d, err := time.ParseDuration(args[i+1])
+				exitIf(err)
+				since = d
+			}
+		}
+		if cfg.AuditLoki == "" {
+			exitIf(fmt.Errorf("set audit_loki_url in the config (…/loki/api/v1/push)"))
+		}
+		entries, err := audit.Read(path)
+		exitIf(err)
+		headers := map[string]string{}
+		if t := os.Getenv("KUBESAGE_LOKI_TOKEN"); t != "" {
+			headers["Authorization"] = "Bearer " + t
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		n, err := audit.ExportLoki(ctx, cfg.AuditLoki, entries, time.Now().Add(-since), headers)
+		exitIf(err)
+		fmt.Printf("✓ pushed %d audit entries to Loki\n", n)
+	default:
+		exitIf(fmt.Errorf("use: kubesage audit verify | export [--since 24h]"))
+	}
+}
+
+func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, readOnly bool, args []string) {
+	addr, allow := "127.0.0.1:7777", false
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--addr", "-addr":
+			if i+1 < len(args) {
+				addr = args[i+1]
+				i++
+			}
+		case "--lan", "-lan":
+			addr = "0.0.0.0:" + strings.TrimPrefix(addr[strings.LastIndex(addr, ":"):], ":")
+		case "--allow-changes", "-allow-changes":
+			allow = true
+		}
+	}
+	ro := readOnly || cfg.ReadOnly || !allow
+	ui.WebMode = true
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	lipgloss.SetHasDarkBackground(true)
+	ns := strings.ReplaceAll(namespace, "*all*", "")
+	newModel := func() (tea.Model, error) {
+		c, err := config.Load(cfgPath) // each browser tab gets its own copy of the settings
+		if err != nil {
+			return nil, err
+		}
+		client, err := kube.New(kubeconfig, strings.Split(kctx, ",")[0], ns)
+		if err != nil {
+			return nil, err
+		}
+		if namespace == "*all*" {
+			client.Namespace = kube.AllNamespaces
+		}
+		return ui.New(c, client, ui.Options{Kubeconfig: kubeconfig, Context: kctx, Namespace: strings.ReplaceAll(namespace, "*all*", "all"),
+			ReadOnly: ro, ChooseContext: kctx == "" && c.ChooseContext && len(client.Contexts()) > 1, Version: version}), nil
+	}
+	srv, err := serve.Start(addr, ro, newModel)
+	exitIf(err)
+	mode := "read-only"
+	if !ro {
+		mode = "CHANGES ALLOWED"
+	}
+	fmt.Printf("kubesage web UI (%s) · open:\n\n  %s\n\n", mode, srv.URL)
+	if !strings.HasPrefix(addr, "127.0.0.1") && !strings.HasPrefix(addr, "localhost") {
+		fmt.Println("⚠ listening on your network: anyone with this link can use kubesage with YOUR cluster credentials.")
+	}
+	fmt.Println("Shells, $EDITOR and plugins are disabled in the browser. Ctrl+C stops the server.")
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	exitIf(srv.Wait(ctx))
 }

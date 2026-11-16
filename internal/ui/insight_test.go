@@ -112,6 +112,11 @@ func newShopApp(t *testing.T, res string, readOnly bool, dynObjs ...runtime.Obje
 		{Group: "external-secrets.io", Version: "v1beta1", Resource: "externalsecrets"}: "ExternalSecretList", {Group: "external-secrets.io", Version: "v1", Resource: "externalsecrets"}: "ExternalSecretList", {Group: "bitnami.com", Version: "v1alpha1", Resource: "sealedsecrets"}: "SealedSecretList",
 		{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}: "HTTPRouteList", {Group: "gateway.networking.k8s.io", Version: "v1", Resource: "gateways"}: "GatewayList",
 		{Group: "velero.io", Version: "v1", Resource: "backups"}: "BackupList", {Group: "velero.io", Version: "v1", Resource: "schedules"}: "ScheduleList",
+		{Group: "external-secrets.io", Version: "v1", Resource: "secretstores"}: "SecretStoreList", {Group: "external-secrets.io", Version: "v1beta1", Resource: "secretstores"}: "SecretStoreList",
+		{Group: "external-secrets.io", Version: "v1", Resource: "clustersecretstores"}: "ClusterSecretStoreList", {Group: "external-secrets.io", Version: "v1beta1", Resource: "clustersecretstores"}: "ClusterSecretStoreList",
+		{Group: "secrets-store.csi.x-k8s.io", Version: "v1", Resource: "secretproviderclasses"}: "SecretProviderClassList",
+		{Group: "argoproj.io", Version: "v1alpha1", Resource: "rollouts"}: "RolloutList",
+		{Group: "karpenter.sh", Version: "v1", Resource: "nodepools"}: "NodePoolList", {Group: "karpenter.sh", Version: "v1", Resource: "nodeclaims"}: "NodeClaimList",
 	}, dynObjs...)
 	for _, p := range []string{"web-7d9-aaaaa", "web-7d9-bbbbb"} {
 		u := podMetrics("shop", p, "40m", "300Mi")

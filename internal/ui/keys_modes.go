@@ -240,6 +240,8 @@ func (a *App) updateAI(k tea.KeyMsg) tea.Cmd {
 
 func (a *App) updateOverlay(k tea.KeyMsg) tea.Cmd {
 	switch a.ov {
+	case ovTour:
+		return a.updateTour(k)
 	case ovApprove:
 		return a.updateApprove(k)
 	case ovHelp:
