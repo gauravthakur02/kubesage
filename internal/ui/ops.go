@@ -447,6 +447,9 @@ func (a *App) openNetPol(ns, pod string) tea.Cmd {
 // isKubesageTable reports whether the table is one of kubesage's own lists, where the
 // generic resource actions (delete, scale, …) do not apply.
 func (a *App) isKubesageTable() bool {
+	if _, ok := a.currentScreen(); ok {
+		return true
+	}
 	switch a.res.Name {
 	case sizingRes, certsRes, imagesRes, storageRes, gitopsRes, alertsRes, policyRepRes, backupsRes, staleRes, scalingRes, kubeconfigRes, runbooksRes,
 		secretsHealthRes, meshRes, costRes:
@@ -461,6 +464,12 @@ func (a *App) isKubesageTable() bool {
 
 // extraRowAction handles keys of the newer screens and CronJob/pod extras.
 func (a *App) extraRowAction(key string, row kube.Row) (tea.Cmd, bool) {
+	if sc, ok := a.currentScreen(); ok {
+		if sc.action == nil {
+			return nil, false
+		}
+		return sc.action(a, key, row)
+	}
 	switch {
 	case a.res.Name == sizingRes:
 		return a.sizingRowAction(key, row)
@@ -540,6 +549,9 @@ func (a *App) extraRowAction(key string, row kube.Row) (tea.Cmd, bool) {
 // kubesageTitle is the table title of the newer screens ("" when not one of them).
 func (a *App) kubesageTitle() string {
 	note := a.table.Note
+	if sc, ok := a.currentScreen(); ok && sc.title != nil {
+		return sc.title(a)
+	}
 	switch a.res.Name {
 	case sizingRes:
 		return "Right-sizing · " + a.client.NamespaceLabel() + " · " + note
@@ -583,6 +595,9 @@ func (a *App) kubesageTitle() string {
 
 // kubesageHints are the footer hints of the newer screens.
 func (a *App) kubesageHints() []kv {
+	if sc, ok := a.currentScreen(); ok {
+		return sc.hints
+	}
 	switch a.res.Name {
 	case sizingRes:
 		return []kv{{"enter", "suggested change"}, {"e", "safe edit"}, {"y", "yaml"}, {":export csv", "export"}, {"esc", "back"}}

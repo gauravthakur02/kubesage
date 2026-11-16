@@ -226,6 +226,27 @@ policy:
   skip_namespaces: [kube-system, kube-public, kube-node-lease, gatekeeper-system, calico-system, tigera-operator, azure-workload-identity-system]
 ```
 
+**Your own rules (policy as code).** Add checks to the config; they show up in `V` / `:policy` and in `kubesage scan --policy` (so CI fails on them too):
+
+```yaml
+rules:
+  - name: owner label
+    require_labels: [owner, app.kubernetes.io/name]       # kinds default to deployments, statefulsets, daemonsets
+    severity: error
+  - name: memory limit
+    path: spec.template.spec.containers[*].resources.limits.memory   # [*] = every item; [0] = the first
+    message: every container needs a memory limit
+  - name: no latest tag
+    path: spec.template.spec.containers[*].image
+    forbid: ':latest$'
+  - name: ingress class
+    kinds: [ingresses]
+    namespaces: '^team-'                                 # regex; default = all except skip_namespaces
+    path: spec.ingressClassName
+    match: '^(nginx|internal)$'
+```
+A rule may require labels/annotations, require a path to exist (`path` alone), require every value to `match` a regex, or `forbid` values.
+
 ### Troubleshooting views
 
 **Relationships (`w`)** on an ingress, service, deployment, statefulset, daemonset, replicaset or pod draws the tree around it,
@@ -676,6 +697,64 @@ the cluster chooser, the help screen, the AI chat and `kubesage version`. It is 
 the leaf breathes and the sparkle twinkles. The animation only changes colours, so it never shifts the layout. Set `animations: false` in the config for a static logo,
 and `NO_COLOR=1 kubesage version` prints it without animation.
 
+## Fleet, event history, schedules, chaos tests and sharing
+
+**Fleet (`:fleet`).** One table with the health of many clusters: version, API latency, nodes ready, pods running, detected issues and
+warning events, problems first. `enter` opens a cluster in a new tab. By default it shows the clusters you are connected to; list the
+ones you care about (regular expressions) to always include them:
+```yaml
+fleet: ['^aks-.*-dev$', 'staging']
+```
+
+**Event history (`:history`).** Kubernetes forgets events after about an hour. While kubesage runs it saves the events of every cluster
+shown in a pane once a minute (in `events/` next to the config file, kept 7 days). `:history` lists them, and the timeline (`t`)
+merges them in, marked `(history)`, so you can see what happened yesterday. Turn it off or change the retention:
+```yaml
+event_history: {off: false, days: 14}
+```
+
+**Scale-to-zero schedules (`:schedules`).** Save money on dev and test clusters by scaling Deployments and StatefulSets to zero outside
+office hours. kubesage remembers the replica count in the `kubesage.io/scaled-down-replicas` annotation and restores it in the morning.
+Contexts matching `danger_contexts` are refused unless the schedule says `allow_danger: true`.
+```yaml
+schedules:
+  - name: nights and weekends
+    context: '-dev$'           # regex of kube-contexts
+    namespace: shop
+    selector: 'tier!=db'       # optional label selector
+    down: "19:00"
+    up: "07:00"
+    days: [mon, tue, wed, thu, fri]   # other days: down all day
+```
+Run `kubesage schedule run` from cron (every 10 minutes is plenty) and `kubesage schedule status` (or `run --dry-run`) to see what it would do.
+In the UI, `:schedules` shows whether each schedule is in step; `d` scales down now and `u` restores now (both ask first and go to the audit log).
+If a HorizontalPodAutoscaler manages the workload, its `minReplicas` will scale it back up; use KEDA or pause the HPA for those.
+
+**Chaos-light tests (`:chaos`, or space → chaos test).** On a Deployment, StatefulSet, ReplicaSet or pod: deletes **one** ready pod and
+measures how long the workload takes to be fully ready again (up to 5 minutes), with advice when recovery is slow. You type the name to
+confirm. It is refused on production-like contexts, in read-only mode and outside change windows, and recorded in the audit log.
+
+**Daily report (`kubesage report`).** A short summary of each cluster: health, top issues and certificates expiring within 14 days.
+Without flags it prints to the terminal; `--post` sends it to a Slack or Microsoft Teams incoming webhook. Keep the URL out of the config:
+```yaml
+reports:
+  webhook_env: KUBESAGE_WEBHOOK   # export KUBESAGE_WEBHOOK=https://hooks.slack.com/services/…
+  contexts: ['-dev$', 'staging']   # default: the current context
+```
+```bash
+# crontab: every weekday at 08:30
+30 8 * * 1-5  KUBESAGE_WEBHOOK=https://hooks.slack.com/services/… kubesage report --post
+```
+In the UI, `:daily-report` shows the same summary for the focused cluster and `:daily-report post` sends it (after asking).
+
+**Share your screen read-only (`:share`).** Starts a small web server that shows exactly what your kubesage window shows, refreshed every
+second, for pairing during an incident. Viewers cannot type or change anything. `:share` listens on this computer only; `:share lan [port]`
+listens on your network so colleagues can open the link. The link contains a random token; anyone with the link can watch until
+`:share stop`. The shared view pauses while a secret is revealed.
+
+**Performance on big clusters.** kubesage's own report screens (certificates, images, right-sizing, storage, fleet …) query a lot, so they
+refresh every 30 seconds instead of every 3 (`r` refreshes now; the status bar shows the interval). Change it with `slow_refresh_seconds`.
+
 ## Tests
 
 ```bash
@@ -683,6 +762,19 @@ make test
 KUBESAGE_LIVE_OLLAMA=1 go test ./internal/ai -run Live -v       # hits a local Ollama
 KUBESAGE_SNAPSHOT_DIR=/tmp/snap go test ./internal/ui -run Snapshot  # dumps ANSI screens
 ```
+
+End-to-end tests run exec, port-forward, apply, scale schedules, a chaos test and a drain plan against a real
+[kind](https://kind.sigs.k8s.io) cluster (CI does this on every push). They skip unless the current context starts with `kind-`:
+```bash
+kind create cluster --name kubesage-e2e
+go test -tags e2e -v ./e2e/
+```
+
+## Documentation site and demo
+
+The [documentation site](https://gauravthakur02.github.io/kubesage/) is built from this README by `docs/build.py` (one page per
+section) and published by the `docs` workflow. Preview it locally with `pip install mkdocs-material && python docs/build.py && mkdocs serve`.
+`docs/demo.tape` records the demo GIF with [VHS](https://github.com/charmbracelet/vhs) against a throwaway kind cluster.
 
 ## Releases
 
@@ -697,7 +789,7 @@ Homebrew and Scoop formulas are published too once `homebrew-tap` / `scoop-bucke
 
 ## Roadmap ideas
 
-Multi-cluster pulse, log search and highlighting, AI-generated patches applied after a diff preview, and plugins.
+AI-generated patches applied after a diff preview, a terminal-recorded demo, and a plugin catalogue.
 
 ## License
 

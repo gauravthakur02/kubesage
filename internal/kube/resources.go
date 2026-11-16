@@ -51,7 +51,9 @@ type Resource struct {
 	GVR        schema.GroupVersionResource
 	Group      string // navigator section: Workloads, Network, Config & Storage, Access control (RBAC), Cluster, Custom resources
 	keepOrder  bool   // rows are already in a meaningful order (UI-provided lists)
-	list       func(ctx context.Context, c *Client, ns string) (Table, error)
+	// Slow tables query the cluster heavily (kubesage's own reports); the UI refreshes them less often.
+	Slow bool
+	list func(ctx context.Context, c *Client, ns string) (Table, error)
 }
 
 // Capabilities used by the UI to enable key bindings.
@@ -764,9 +766,16 @@ func listNamespaces(ctx context.Context, c *Client, _ string) (Table, error) {
 	return t, nil
 }
 
+// LocalResource is a UI-provided table built from memory only; it refreshes at the normal rate.
+func LocalResource(name, kind, short string, rows func() Table) Resource {
+	r := VirtualResource(name, kind, short, rows)
+	r.Slow = false
+	return r
+}
+
 // VirtualResource is a UI-provided table (e.g. the Clusters overview) that is not a Kubernetes API resource.
 func VirtualResource(name, kind, short string, rows func() Table) Resource {
-	return Resource{Name: name, Kind: kind, Short: short, keepOrder: true, list: func(context.Context, *Client, string) (Table, error) {
+	return Resource{Name: name, Kind: kind, Short: short, keepOrder: true, Slow: true, list: func(context.Context, *Client, string) (Table, error) {
 		return rows(), nil
 	}}
 }

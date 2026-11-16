@@ -8,13 +8,22 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"sigs.k8s.io/yaml"
 
+	"github.com/gauravthakur02/kubesage/internal/config"
 	"github.com/gauravthakur02/kubesage/internal/kube"
 )
 
 const policyRes = "policy"
 
-func (a *App) policyOptions() kube.PolicyOptions {
-	return kube.PolicyOptions{AllowedRegistries: a.cfg.Policy.AllowedRegistries, SkipNamespaces: a.cfg.Policy.SkipNamespaces}
+func (a *App) policyOptions() kube.PolicyOptions { return PolicyOptionsFor(a.cfg) }
+
+// PolicyOptionsFor builds the policy checks (built-in and custom rules) from the config.
+func PolicyOptionsFor(cfg *config.Config) kube.PolicyOptions {
+	o := kube.PolicyOptions{AllowedRegistries: cfg.Policy.AllowedRegistries, SkipNamespaces: cfg.Policy.SkipNamespaces}
+	for _, r := range cfg.Rules {
+		o.Rules = append(o.Rules, kube.CustomRule{Name: r.Name, Kinds: r.Kinds, Namespaces: r.Namespaces, Severity: r.Severity,
+			RequireLabels: r.RequireLabels, RequireAnnotations: r.RequireAnnotations, Path: r.Path, Match: r.Match, Forbid: r.Forbid, Message: r.Message})
+	}
+	return o
 }
 
 // policyResource lists policy/security findings for the focused namespace (or all).

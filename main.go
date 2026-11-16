@@ -21,6 +21,7 @@ import (
 	"github.com/gauravthakur02/kubesage/internal/config"
 	"github.com/gauravthakur02/kubesage/internal/kube"
 	"github.com/gauravthakur02/kubesage/internal/mcp"
+	"github.com/gauravthakur02/kubesage/internal/report"
 	"github.com/gauravthakur02/kubesage/internal/ui"
 	"github.com/gauravthakur02/kubesage/internal/update"
 )
@@ -46,6 +47,10 @@ Usage:
   kubesage config init             write a starter config file
   kubesage config path             print the config file location
   kubesage mcp [--context c] [-n ns]     serve read-only tools to AI agents over MCP (stdio)
+  kubesage report [--post]         cluster summary (issues, expiring certs); --post sends it to the
+                                   Slack/Teams webhook in $<reports.webhook_env> (run it from cron)
+  kubesage schedule run [--dry-run]   apply scale-to-zero schedules now (run from cron every 10 min)
+  kubesage schedule status         show what each schedule wants right now
   kubesage version
 
 Flags:
@@ -167,6 +172,10 @@ func main() {
 			}
 		}
 		os.Exit(code)
+	case "report":
+		runReport(cfg, *kubeconfig, client, subArgs)
+	case "schedule":
+		runSchedule(cfg, *kubeconfig, subArgs)
 	case "ask":
 		runAsk(cfg, client, strings.Join(subArgs, " "), *readOnly || cfg.ReadOnly)
 	default:
@@ -532,7 +541,7 @@ func splitGlobalFlags(fs *flag.FlagSet, args []string) (globals, rest []string) 
 func runPolicyScan(cfg *config.Config, c *kube.Client) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	fs, err := c.PolicyScan(ctx, kube.PolicyOptions{AllowedRegistries: cfg.Policy.AllowedRegistries, SkipNamespaces: cfg.Policy.SkipNamespaces})
+	fs, err := c.PolicyScan(ctx, ui.PolicyOptionsFor(cfg))
 	exitIf(err)
 	red := lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e")).Bold(true)
 	yellow := lipgloss.NewStyle().Foreground(lipgloss.Color("#e0af68")).Bold(true)
@@ -558,4 +567,57 @@ func runPolicyScan(cfg *config.Config, c *kube.Client) int {
 	}
 	fmt.Printf("\n%d errors · %d warnings · %d findings in total\n", errs, warns, len(fs))
 	return code
+}
+
+func runReport(cfg *config.Config, kubeconfig string, client *kube.Client, args []string) {
+	post := false
+	for _, a := range args {
+		if a == "--post" || a == "-post" {
+			post = true
+		}
+	}
+	clients := []*kube.Client{client}
+	if len(cfg.Reports.Contexts) > 0 {
+		clients = nil
+		for _, name := range client.Contexts() {
+			for _, p := range cfg.Reports.Contexts {
+				if re, err := regexp.Compile(p); err == nil && re.MatchString(name) {
+					c, err := kube.New(kubeconfig, name, "")
+					exitIf(err)
+					clients = append(clients, c)
+					break
+				}
+			}
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	text := report.Build(ctx, clients, report.Options{}, time.Now())
+	if !post {
+		fmt.Print(text)
+		return
+	}
+	env := cfg.Reports.WebhookEnv
+	url := os.Getenv(env)
+	if env == "" || url == "" {
+		exitIf(fmt.Errorf("--post needs reports.webhook_env in the config and that environment variable set to the webhook URL"))
+	}
+	exitIf(report.Post(ctx, url, text))
+	fmt.Printf("✓ report on %d cluster(s) posted\n", len(clients))
+}
+
+func runSchedule(cfg *config.Config, kubeconfig string, args []string) {
+	action, dry := "status", false
+	for _, a := range args {
+		switch a {
+		case "run", "status":
+			action = a
+		case "--dry-run", "-dry-run":
+			dry = true
+		}
+	}
+	if action == "status" {
+		dry = true
+	}
+	exitIf(ui.RunSchedules(cfg, kubeconfig, time.Now(), dry, os.Stdout))
 }

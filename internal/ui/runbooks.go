@@ -151,7 +151,7 @@ func (a *App) withRunbooks(prompt string) (string, int) {
 }
 
 func (a *App) runbooksResource() kube.Resource {
-	return kube.VirtualResource(runbooksRes, "Runbook", "Runbooks", func() kube.Table {
+	return kube.LocalResource(runbooksRes, "Runbook", "Runbooks", func() kube.Table {
 		t := kube.Table{Columns: []string{"TITLE", "MATCHES", "FILE"}}
 		rbs, err := a.loadRunbooks()
 		if err != nil {

@@ -17,6 +17,20 @@ import (
 
 // View renders the whole screen.
 func (a *App) View() string {
+	v := a.view()
+	if a.sharing != nil {
+		shared := v
+		for _, p := range a.panes() {
+			if p.reveal {
+				shared = "kubesage: a secret is revealed on screen, so the shared view is paused until it is hidden again."
+			}
+		}
+		a.sharing.Update(shared)
+	}
+	return v
+}
+
+func (a *App) view() string {
 	if a.w == 0 {
 		return "starting kubesage…"
 	}
@@ -193,7 +207,11 @@ func (a *App) viewFooter() string {
 	if a.statusErr {
 		style = s.ErrText
 	}
-	right := s.Muted.Render(fmt.Sprintf("↻ %ds · %s", a.cfg.RefreshSeconds, time.Now().Format("15:04:05")))
+	every := a.refreshEvery()
+	if a.res.Slow && a.mode == modeTable {
+		every = a.slowRefreshEvery()
+	}
+	right := s.Muted.Render(fmt.Sprintf("↻ %s · %s", shortDuration(every), time.Now().Format("15:04:05")))
 	if a.loading || a.aiBusy || a.pulseBusy || a.ag.running {
 		right = a.spin.View() + " " + right
 	}
@@ -1018,7 +1036,10 @@ func (a *App) viewHelp(w, h int) string {
 			{":autoscaling · :mesh · :secrets-health", "HPA/KEDA/VPA · sidecars · secret sync and rotation"},
 			{":kubeconfig", "contexts: rename, delete, add AKS clusters"}, {":runbooks", "team runbooks (used by the AI)"},
 			{":apply <path>", "diff local manifests, then apply"}, {":opencost [workload]", "cost from OpenCost/Kubecost"},
-			{":fwd save/name/stop", "port-forward profiles"}, {"J · i/x · ctrl+s in logs", "pretty JSON · include/exclude · save"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
+			{":fwd save/name/stop", "port-forward profiles"}, {":fleet", "health of every cluster in one table"},
+			{":history", "events kept locally (days, not 1h) · also in t timelines"}, {":schedules", "scale-to-zero outside office hours"},
+			{":chaos", "delete one pod, measure recovery (non-prod only)"}, {":share [lan] · :share stop", "read-only web view of this screen"},
+			{":daily-report [post]", "summary for Slack/Teams"}, {"J · i/x · ctrl+s in logs", "pretty JSON · include/exclude · save"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
 			{":vsplit @ctx [ns]", "compare clusters side by side"}, {"c  :ctx <name>", "switch this tab's cluster"},
 			{":tabname <name>", "rename tab"}, {":tabclose", "close tab (ctrl+x on last pane)"}, {":ns! <ns>", "namespace for all panes"}, {":layout <name>", "triage, ops, dash, ai, single"},
 			{":view save <name>", "save this tab's layout"}, {"b  :view [name]", "open a saved view"}}},

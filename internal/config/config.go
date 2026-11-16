@@ -137,8 +137,10 @@ type AIConfig struct {
 type Config struct {
 	Theme          string `yaml:"theme"`
 	RefreshSeconds int    `yaml:"refresh_seconds"`
-	ReadOnly       bool   `yaml:"read_only"`
-	OpenBrowser    bool   `yaml:"open_browser"` // open http://localhost:<port> after a port-forward starts
+	// SlowRefreshSeconds is how often kubesage's own report tables (certs, images, sizing, …) re-query the cluster (default 30).
+	SlowRefreshSeconds int  `yaml:"slow_refresh_seconds,omitempty"`
+	ReadOnly           bool `yaml:"read_only"`
+	OpenBrowser        bool `yaml:"open_browser"` // open http://localhost:<port> after a port-forward starts
 	// ChooseContext shows the cluster chooser at startup when --context is not given.
 	ChooseContext bool `yaml:"choose_context_on_start"`
 	// Animations turns the animated logo (turning wheel, twinkling sparkle) on or off.
@@ -190,8 +192,66 @@ type Config struct {
 	Keys map[string]string `yaml:"keys,omitempty"`
 	// HideColumns hides table columns per resource, e.g. {pods: [IP, NODE]} (:cols toggles).
 	HideColumns map[string][]string `yaml:"hide_columns,omitempty"`
+	// Fleet lists kube-contexts (regular expressions) for the fleet view; empty = contexts already connected.
+	Fleet []string `yaml:"fleet,omitempty"`
+	// EventHistory keeps Kubernetes events on local disk so timelines go back days.
+	EventHistory EventHistory `yaml:"event_history,omitempty"`
+	// Rules are your own policy checks (policy as code), shown in V/:policy and `kubesage scan --policy`.
+	Rules []Rule `yaml:"rules,omitempty"`
+	// Schedules scale workloads to zero outside office hours (`kubesage schedule run` from cron, :schedules).
+	Schedules []Schedule `yaml:"schedules,omitempty"`
+	// Reports configures `kubesage report` (summary posted to a Slack/Teams webhook).
+	Reports Reports `yaml:"reports,omitempty"`
 
 	path string
+}
+
+// EventHistory configures the local event store.
+type EventHistory struct {
+	Off  bool `yaml:"off,omitempty"`
+	Days int  `yaml:"days,omitempty"` // retention, default 7
+}
+
+// Rule is a custom policy check on Kubernetes objects.
+type Rule struct {
+	Name string `yaml:"name"`
+	// Kinds are resource names, default deployments, statefulsets, daemonsets.
+	Kinds []string `yaml:"kinds,omitempty"`
+	// Namespaces is a regex of namespaces the rule applies to (default all except policy.skip_namespaces).
+	Namespaces string `yaml:"namespaces,omitempty"`
+	// Severity is warn (default) or error.
+	Severity           string   `yaml:"severity,omitempty"`
+	RequireLabels      []string `yaml:"require_labels,omitempty"`
+	RequireAnnotations []string `yaml:"require_annotations,omitempty"`
+	// Path is a dotted path into the object; [*] walks lists, e.g. spec.template.spec.containers[*].resources.limits.memory.
+	Path string `yaml:"path,omitempty"`
+	// Match is a regex every value at Path must match (empty: the value must exist).
+	Match string `yaml:"match,omitempty"`
+	// Forbid is a regex no value at Path may match.
+	Forbid  string `yaml:"forbid,omitempty"`
+	Message string `yaml:"message,omitempty"`
+}
+
+// Schedule scales matching workloads to zero between Down and Up (local time, HH:MM).
+type Schedule struct {
+	Name      string `yaml:"name"`
+	Context   string `yaml:"context"`            // regex of kube-contexts
+	Namespace string `yaml:"namespace"`          // namespace (required)
+	Selector  string `yaml:"selector,omitempty"` // label selector; empty = every Deployment and StatefulSet
+	Down      string `yaml:"down"`               // e.g. "19:00"
+	Up        string `yaml:"up"`                 // e.g. "07:00"
+	// Days the schedule is active on (mon..sun); on other days workloads stay down all day. Default mon-fri.
+	Days []string `yaml:"days,omitempty"`
+	// AllowDanger lets the schedule touch contexts matching danger_contexts (off by default).
+	AllowDanger bool `yaml:"allow_danger,omitempty"`
+}
+
+// Reports configures the summary posted by `kubesage report`.
+type Reports struct {
+	// WebhookEnv names the environment variable holding a Slack or Teams incoming-webhook URL.
+	WebhookEnv string `yaml:"webhook_env,omitempty"`
+	// Contexts are regexes of kube-contexts to include (default: the current context).
+	Contexts []string `yaml:"contexts,omitempty"`
 }
 
 // View is a saved layout: a split tree of panes (leaf = one pane).
@@ -217,15 +277,16 @@ type Policy struct {
 // Default returns a config with sensible defaults (local Ollama first).
 func Default() *Config {
 	return &Config{
-		Theme:          "tokyonight",
-		RefreshSeconds: 3,
-		OpenBrowser:    true,
-		ChooseContext:  true,
-		Animations:     true,
-		DangerContexts: `(?i)(prod|prd|-p$|live)`,
-		Favorites:      []string{"pods", "deployments", "services", "events", "nodes"},
-		DebugImage:     "busybox:1.36",
-		LiveUpdates:    "watch",
+		Theme:              "tokyonight",
+		RefreshSeconds:     3,
+		SlowRefreshSeconds: 30,
+		OpenBrowser:        true,
+		ChooseContext:      true,
+		Animations:         true,
+		DangerContexts:     `(?i)(prod|prd|-p$|live)`,
+		Favorites:          []string{"pods", "deployments", "services", "events", "nodes"},
+		DebugImage:         "busybox:1.36",
+		LiveUpdates:        "watch",
 		Policy: Policy{SkipNamespaces: []string{"kube-system", "kube-public", "kube-node-lease", "gatekeeper-system",
 			"calico-system", "tigera-operator", "azure-workload-identity-system"}},
 		AI: AIConfig{
@@ -284,6 +345,12 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 	loaded.path = path
+	if loaded.EventHistory.Days <= 0 {
+		loaded.EventHistory.Days = 7
+	}
+	if loaded.SlowRefreshSeconds <= 0 {
+		loaded.SlowRefreshSeconds = 30
+	}
 	if loaded.RefreshSeconds <= 0 {
 		loaded.RefreshSeconds = 3
 	}

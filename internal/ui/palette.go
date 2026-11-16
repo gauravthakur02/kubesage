@@ -32,7 +32,10 @@ var paletteItems = []struct{ label, cmd string }{
 	{"Autoscaling: HPA, KEDA, VPA", "autoscaling"}, {"Kubeconfig: contexts, add AKS cluster", "kubeconfig"},
 	{"Team runbooks", "runbooks"}, {"Secrets health & rotation", "secrets-health"}, {"Service mesh sidecars", "mesh"},
 	{"Cost per namespace (OpenCost)", "opencost"}, {"Apply local manifests (dry-run diff)", "apply "},
-	{"Port-forward profiles", "fwd"}, {"Show/hide columns", "cols"}, {"Toggle mouse", "mouse"}, {"Help", "help"},
+	{"Port-forward profiles", "fwd"},
+	{"Fleet: health of every cluster", "fleet"}, {"Event history (kept locally, beyond 1h)", "history"},
+	{"Scale-to-zero schedules", "schedules"}, {"Chaos test the selected workload", "chaos"},
+	{"Share this screen read-only (web)", "share"}, {"Stop sharing", "share stop"}, {"Daily report (Slack/Teams)", "daily-report"}, {"Show/hide columns", "cols"}, {"Toggle mouse", "mouse"}, {"Help", "help"},
 }
 
 // openPalette fuzzy-searches resources, kubesage screens, saved views, contexts and plugins (ctrl+p).

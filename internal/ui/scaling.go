@@ -48,7 +48,7 @@ func (a *App) scalingResource() kube.Resource {
 
 func (a *App) kubeconfigResource() kube.Resource {
 	kc, store := a.client.Kubeconfig, a.cl
-	return kube.VirtualResource(kubeconfigRes, "Context", "Contexts", func() kube.Table {
+	return kube.LocalResource(kubeconfigRes, "Context", "Contexts", func() kube.Table {
 		t := kube.Table{Columns: []string{"", "CONTEXT", "SERVER", "AUTH", "NAMESPACE", "LAST CHECK"}}
 		list, err := kube.KubeContexts(kc)
 		if err != nil {

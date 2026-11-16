@@ -77,6 +77,12 @@ func (a *App) rowActions(row kube.Row) []rowActionItem {
 		add(rowActionItem{":diff @…", "compare with the same object on another cluster", func() tea.Cmd { return a.pickDiffContext(false) }},
 			rowActionItem{":diff @… all", "compare every " + strings.ToLower(r.Kind) + " in this namespace with another cluster", func() tea.Cmd { return a.pickDiffContext(true) }})
 	}
+	switch r.Name {
+	case "deployments", "statefulsets", "replicasets", "pods":
+		if !a.dangerFor(a.client.Context) {
+			add(rowActionItem{":chaos", "chaos test: delete one pod and measure how fast it recovers", a.openChaos})
+		}
+	}
 	add(key("e", "safe edit (diff + dry-run)"))
 	if r.CanScale() {
 		add(key("S", "scale"))

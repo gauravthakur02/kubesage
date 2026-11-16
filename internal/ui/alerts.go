@@ -258,7 +258,7 @@ func (a *App) unseenAlerts() int {
 }
 
 func (a *App) alertsResource() kube.Resource {
-	return kube.VirtualResource(alertsRes, "Alert", "Alerts", func() kube.Table {
+	return kube.LocalResource(alertsRes, "Alert", "Alerts", func() kube.Table {
 		t := kube.Table{Columns: []string{"SINCE", "STATE", "CLUSTER", "NAMESPACE", "OBJECT", "REASON", "MESSAGE"}}
 		active := 0
 		for i := len(a.alertOrder) - 1; i >= 0; i-- {

@@ -121,8 +121,9 @@ func (a *App) openGraph(kind, ns, name string) tea.Cmd {
 func (a *App) openTimeline(kind, ns, name string) tea.Cmd {
 	c := a.client
 	a.target = targetRef{a.res, ns, name}
+	history := a.storedHistory()
 	return a.openReport("timeline", "building timeline…", func(ctx context.Context) (string, string, error) {
-		entries, err := c.Timeline(ctx, kind, ns, name)
+		entries, err := c.TimelineWith(ctx, kind, ns, name, history)
 		if err != nil {
 			return "", "", err
 		}

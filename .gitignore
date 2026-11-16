@@ -2,3 +2,6 @@ bin/
 dist/
 *.ans
 /kubesage
+/site-src/
+/site/
+/mkdocs.yml

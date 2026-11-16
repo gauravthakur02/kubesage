@@ -156,6 +156,9 @@ func (a *App) handleWatchEnd(m watchEndMsg) tea.Cmd {
 
 // liveBadge is the title marker: ● live (watch) or ↻ Ns (polling).
 func (a *App) liveBadge() string {
+	if a.res.Slow {
+		return " · ↻ " + a.slowRefreshEvery().String() + " (r now)"
+	}
 	if !a.res.Watchable() {
 		return ""
 	}

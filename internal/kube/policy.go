@@ -28,6 +28,7 @@ type Finding struct {
 type PolicyOptions struct {
 	AllowedRegistries []string // regular expressions; empty = registry check off
 	SkipNamespaces    []string
+	Rules             []CustomRule // your own checks (policy as code)
 }
 
 type workloadTemplate struct {
@@ -92,6 +93,13 @@ func (c *Client) PolicyScan(ctx context.Context, o PolicyOptions) ([]Finding, er
 			continue
 		}
 		out = append(out, checkPodSpec(t, regs)...)
+	}
+	if len(o.Rules) > 0 {
+		custom, err := c.RuleScan(ctx, o.Rules, skip)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, custom...)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Severity != out[j].Severity {

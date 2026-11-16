@@ -33,6 +33,11 @@ func walk(n *GraphNode, fn func(*GraphNode)) {
 
 // Timeline merges events, rollouts, container restarts and pod starts for an object and its parts, newest first.
 func (c *Client) Timeline(ctx context.Context, kind, ns, name string) ([]TimelineEntry, error) {
+	return c.TimelineWith(ctx, kind, ns, name, nil)
+}
+
+// TimelineWith also merges locally stored events (older than the API server keeps).
+func (c *Client) TimelineWith(ctx context.Context, kind, ns, name string, history []StoredEvent) ([]TimelineEntry, error) {
 	root, _, err := c.Relations(ctx, kind, ns, name)
 	if err != nil {
 		return nil, err
@@ -46,12 +51,14 @@ func (c *Client) Timeline(ctx context.Context, kind, ns, name string) ([]Timelin
 		names[n.Name] = true
 	})
 	var out []TimelineEntry
+	live := map[string]bool{}
 	evs, err := c.Clientset.CoreV1().Events(ns).List(ctx, metav1.ListOptions{})
 	if err == nil {
 		for _, e := range evs.Items {
 			if !names[e.InvolvedObject.Name] {
 				continue
 			}
+			live[string(e.UID)] = true
 			t := e.LastTimestamp.Time
 			if t.IsZero() {
 				t = e.EventTime.Time
@@ -73,6 +80,17 @@ func (c *Client) Timeline(ctx context.Context, kind, ns, name string) ([]Timelin
 			out = append(out, TimelineEntry{Time: t, Source: src, Object: e.InvolvedObject.Kind + "/" + e.InvolvedObject.Name, Health: h,
 				Text: e.Reason + ": " + firstLine(e.Message), Count: e.Count})
 		}
+	}
+	for _, e := range history {
+		if live[e.UID] || e.Namespace != ns || !names[e.Name] {
+			continue
+		}
+		src := "event"
+		if e.Kind == "HorizontalPodAutoscaler" || e.Reason == "ScalingReplicaSet" {
+			src = "scale"
+		}
+		out = append(out, TimelineEntry{Time: e.Last, Source: src, Object: e.Kind + "/" + e.Name, Health: EventHealth(e.Type, e.Reason),
+			Text: e.Reason + ": " + e.Message + " (history)", Count: e.Count})
 	}
 	if kind == "Deployment" || kind == "ReplicaSet" || kind == "Pod" || kind == "Service" || kind == "Ingress" {
 		rss, err := c.Clientset.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{})

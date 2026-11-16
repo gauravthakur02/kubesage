@@ -268,7 +268,7 @@ func (a *App) clustersResource() kube.Resource {
 	clusterOf := a.client.ClusterOf
 	store := a.cl
 	danger := a.dangerFor
-	return kube.VirtualResource(clustersRes, "Cluster", "Clusters", func() kube.Table {
+	return kube.LocalResource(clustersRes, "Cluster", "Clusters", func() kube.Table {
 		u := a.usageSnapshot()
 		t := kube.Table{Columns: []string{"CONTEXT", "CLUSTER", "STATUS", "VERSION", "NODES", "API", "OPEN", "CHECKED"}}
 		for _, ctx := range contexts {

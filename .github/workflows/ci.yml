@@ -22,3 +22,16 @@ jobs:
         if: runner.os != 'Windows'
       - run: go test ./...
         if: runner.os == 'Windows'
+  e2e:
+    # Real cluster operations (exec, port-forward, apply, scale schedules, chaos, drain plan) on a throwaway kind cluster.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: kubesage-e2e
+      - run: go test -tags e2e -v -count=1 ./e2e/
