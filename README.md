@@ -17,7 +17,8 @@ reads your cluster's manifests, events and logs and tells you what is wrong and 
 **macOS: Homebrew** (builds from source on your Mac, so there is no "Apple could not verify" warning):
 ```bash
 brew tap gauravthakur02/kubesage https://github.com/gauravthakur02/kubesage
-brew install kubesage          # later: brew upgrade kubesage
+brew trust gauravthakur02/kubesage   # once: Homebrew 7 asks you to trust third-party taps
+brew install kubesage                # later: brew upgrade kubesage
 ```
 
 **macOS and Linux: install script** (amd64, arm64; Linux also armv7). Downloads the latest release, checks it against

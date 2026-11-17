@@ -100,7 +100,7 @@ release:
     name: kubesage
   footer: |
     ## Install
-    **macOS:** `brew tap gauravthakur02/kubesage https://github.com/gauravthakur02/kubesage && brew install kubesage`, or the install script below
+    **macOS:** `brew tap gauravthakur02/kubesage https://github.com/gauravthakur02/kubesage && brew trust gauravthakur02/kubesage && brew install kubesage`, or the install script below
     (downloading the macOS archives in a browser triggers "Apple could not verify…": run `xattr -d com.apple.quarantine kubesage` after unpacking)
     **macOS / Linux:** `curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.sh | sh`
     **Go:** `go install github.com/gauravthakur02/kubesage@v{{ .Version }}`

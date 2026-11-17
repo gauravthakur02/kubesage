@@ -2,6 +2,7 @@
 # "Apple could not verify" warning (that only happens to binaries downloaded in a browser).
 #
 #   brew tap gauravthakur02/kubesage https://github.com/gauravthakur02/kubesage
+#   brew trust gauravthakur02/kubesage   # Homebrew 7+: trust the tap once
 #   brew install kubesage
 #
 # The release workflow updates url and sha256 for every new tag.
