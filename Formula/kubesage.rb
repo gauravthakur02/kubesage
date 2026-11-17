@@ -9,8 +9,8 @@
 class Kubesage < Formula
   desc "Kubernetes IDE for your terminal with an AI copilot"
   homepage "https://github.com/gauravthakur02/kubesage"
-  url "https://github.com/gauravthakur02/kubesage/archive/refs/tags/v0.3.0.tar.gz"
-  sha256 "becf32cbba1d123a71ec22fc13fb655ccec74f6c12b24c4e0b260e4a4cc05a88"
+  url "https://github.com/gauravthakur02/kubesage/archive/refs/tags/v0.4.0.tar.gz"
+  sha256 "f72df2d78b1e9edaf015ab56360d0cfa4f7ffce5256b5f51d29130a5d9829527"
   license "MIT"
   head "https://github.com/gauravthakur02/kubesage.git", branch: "main"
 
