@@ -25,6 +25,8 @@ func (a *App) updateText(k tea.KeyMsg) tea.Cmd {
 		}
 	case a.textKind == "nodehealth" && k.String() == "X":
 		return a.openDrainPreview(a.target.name)
+	case a.textKind == "logs" && k.String() == "D":
+		return a.downloadContainerLog()
 	case a.textKind == "logs" && (k.String() == "J" || k.String() == "i" || k.String() == "x" || k.String() == "ctrl+s"):
 		cmd, _ := a.logsKey(k.String())
 		return cmd

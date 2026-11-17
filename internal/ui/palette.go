@@ -43,7 +43,7 @@ var paletteItems = []struct{ label, cmd string }{
 	{"Clone this namespace (preview env)", "clone "}, {"Namespace clones", "clones"}, {"Plugin catalogue", "plugins"},
 	{"What changed? (rollouts, config, Helm, GitOps)", "changes"}, {"SLOs and error budgets", "slo"},
 	{"Snapshot this namespace", "snapshot save"}, {"Snapshots: compare with now", "snapshots"},
-	{"Tour of kubesage", "tour"}, {"Help", "help"},
+	{"Download logs (zip of all pods)", "download-logs"}, {"Tour of kubesage", "tour"}, {"Help", "help"},
 }
 
 // openPalette fuzzy-searches resources, kubesage screens, saved views, contexts and plugins (ctrl+p).

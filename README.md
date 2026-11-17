@@ -242,6 +242,16 @@ With more than one container you pick one; init containers are left out because 
 - **All pods at once:** on a deployment, statefulset, daemonset or job, `l` offers **★ all N pods, merged**. It follows one container in up to 20 pods in a single stream,
   with each line prefixed by a colour-coded `[pod]` tag (the pod name's suffix). Search works across the merged stream.
 
+**Download logs.** `ctrl+s` saves what the view shows (after your filters). To get the **complete** log from the cluster instead:
+
+- `D` in the logs view downloads the whole log of that container (or, for a merged multi-pod stream, a zip of those pods).
+- `:download-logs [6h]` on a pod or workload (also in the space menu) downloads a **zip** with every pod and container:
+  `<pod>/<container>.log`, `<pod>/<container>.previous.log` for containers that restarted (the crash you are after), and a
+  `SUMMARY.txt` with pod phases, nodes and restart counts. Without a window you get everything the kubelet still keeps.
+- In the browser, the Logs tab has *This container (.log)* and *All pods (.zip)* buttons with the same window choice.
+
+Files go to `~/Downloads` (or `downloads_dir:` in the config). Each container log is capped at 200 MiB.
+
 ### Resource trends
 
 kubesage keeps about 15 minutes of CPU and memory samples per pod in memory (one every 10 s, from the pods table and health reports).

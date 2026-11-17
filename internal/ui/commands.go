@@ -223,6 +223,8 @@ func (a *App) runCommand(line string) tea.Cmd {
 		return nil
 	case "approvals", "approval":
 		return a.openApprovals()
+	case "download-logs", "logs-download":
+		return a.downloadLogsCommand(arg)
 	case "changes", "what-changed":
 		return a.openChanges(arg)
 	case "slo", "slos":

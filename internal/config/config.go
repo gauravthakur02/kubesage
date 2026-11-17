@@ -199,6 +199,8 @@ type Config struct {
 	Keys map[string]string `yaml:"keys,omitempty"`
 	// HideColumns hides table columns per resource, e.g. {pods: [IP, NODE]} (:cols toggles).
 	HideColumns map[string][]string `yaml:"hide_columns,omitempty"`
+	// DownloadsDir is where downloaded logs go (default ~/Downloads).
+	DownloadsDir string `yaml:"downloads_dir,omitempty"`
 	// TourDone is set after the first-run tour has been shown (:tour shows it again).
 	TourDone bool `yaml:"tour_done,omitempty"`
 	// Fleet lists kube-contexts (regular expressions) for the fleet view; empty = contexts already connected.

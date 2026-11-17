@@ -76,3 +76,18 @@ func TestSortRows(t *testing.T) {
 }
 
 var _ = http.MethodGet
+
+func TestLogDownloads(t *testing.T) {
+	_, srv := testApp(t, "dev", true)
+	r, err := http.Get(srv.URL + "/api/logs/download?ctx=dev&ns=shop&pod=web-1&container=web")
+	if err != nil || r.StatusCode != 200 || !strings.Contains(r.Header.Get("Content-Disposition"), `filename="kubesage-logs_dev_shop_web-1_web-`) {
+		t.Fatalf("download = %v %v", r, err)
+	}
+	if r, _ := http.Get(srv.URL + "/api/logs/download?ctx=dev&ns=shop"); r.StatusCode != 400 {
+		t.Fatalf("download without pod = %d", r.StatusCode)
+	}
+	r, _ = http.Get(srv.URL + "/api/logs/bundle?ctx=dev&ns=shop&res=secrets&name=db")
+	if r.StatusCode != 400 {
+		t.Fatalf("logs of a secret = %d", r.StatusCode)
+	}
+}

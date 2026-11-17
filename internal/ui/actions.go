@@ -83,6 +83,9 @@ func (a *App) rowActions(row kube.Row) []rowActionItem {
 	if graphKinds[r.Kind] {
 		add(rowActionItem{":narrative", "AI incident narrative from the timeline (incl. stored history)", a.openNarrative})
 	}
+	if r.CanLogs() {
+		add(rowActionItem{":download-logs", "download the logs of every pod and container as a zip (incl. before restarts)", func() tea.Cmd { return a.downloadLogsCommand("") }})
+	}
 	if r.Name == "pods" || r.HasSelector() {
 		add(rowActionItem{":loki", "search older logs in Loki (also of deleted pods)", func() tea.Cmd { return a.openLoki("") }})
 	}

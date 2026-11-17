@@ -232,7 +232,7 @@ func (a *App) hints() string {
 		}
 		list = []kv{{"esc", "back"}, {"↑↓/pgup", "scroll"}, {"g/G", "top/bottom"}, {"a", "ask AI"}, {"y", "yaml"}, {"d", "describe"}}
 		if a.textKind == "logs" {
-			list = append(list, kv{"f", "follow"}, kv{"t", "time window"}, kv{"T", "timestamps"}, kv{"J", "pretty JSON"}, kv{"i/x", "include/exclude"}, kv{"ctrl+s", "save"})
+			list = append(list, kv{"f", "follow"}, kv{"t", "time window"}, kv{"T", "timestamps"}, kv{"J", "pretty JSON"}, kv{"i/x", "include/exclude"}, kv{"ctrl+s", "save view"}, kv{"D", "download full log"})
 		}
 		list = append(list, kv{"/", "search"})
 		if a.search != "" {
@@ -1051,7 +1051,8 @@ func (a *App) viewHelp(w, h int) string {
 			{":nodepools · :resize cpu=… memory=…", "cloud node pools · in-place pod resize"},
 			{":argo-rollouts · :karpenter · :crossplane · :flows", "operator screens · Hubble flows"},
 			{":dev <path> · :clone <ns> [24h]", "apply on save · preview namespace"}, {":plugins · :tour", "plugin catalogue · tour"},
-			{":changes [2h] · :slo", "what changed recently · SLOs and error budgets"}, {":snapshot [name] · :snapshots", "save a namespace · compare later"}, {"J · i/x · ctrl+s in logs", "pretty JSON · include/exclude · save"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
+			{":changes [2h] · :slo", "what changed recently · SLOs and error budgets"}, {":snapshot [name] · :snapshots", "save a namespace · compare later"}, {"J · i/x · ctrl+s · D in logs", "pretty JSON · include/exclude · save view · download full log"},
+			{":download-logs [6h]", "zip of every pod and container (incl. before restarts)"}, {"V  :policy", "policy & security checks"}, {":tabnew @ctx [ns]", "tab on another cluster"},
 			{":vsplit @ctx [ns]", "compare clusters side by side"}, {"c  :ctx <name>", "switch this tab's cluster"},
 			{":tabname <name>", "rename tab"}, {":tabclose", "close tab (ctrl+x on last pane)"}, {":ns! <ns>", "namespace for all panes"}, {":layout <name>", "triage, ops, dash, ai, single"},
 			{":view save <name>", "save this tab's layout"}, {"b  :view [name]", "open a saved view"}}},

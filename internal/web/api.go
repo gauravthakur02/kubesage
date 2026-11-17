@@ -187,6 +187,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /api/graph", a.graph)
 	mux.HandleFunc("GET /api/pods", a.pods)
 	mux.HandleFunc("GET /api/logs", a.logs)
+	mux.HandleFunc("GET /api/logs/download", a.logsDownload)
+	mux.HandleFunc("GET /api/logs/bundle", a.logsBundle)
 	mux.HandleFunc("GET /api/issues", a.issues)
 	mux.HandleFunc("POST /api/action", a.action)
 	mux.HandleFunc("GET /api/edit", a.editYAML)

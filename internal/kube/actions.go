@@ -236,6 +236,7 @@ type LogOptions struct {
 	Follow     bool
 	Since      time.Duration // only lines newer than this (0 = use Tail)
 	Timestamps bool          // prefix each line with its RFC3339 timestamp
+	All        bool          // downloads: no line cap (streamed to a file, not kept in memory)
 }
 
 // Logs opens a log stream for a pod container.
@@ -244,8 +245,10 @@ func (c *Client) Logs(ctx context.Context, ns, pod string, o LogOptions) (io.Rea
 	if o.Since > 0 {
 		secs := int64(o.Since.Seconds())
 		opts.SinceSeconds = &secs
-		limit := int64(20000) // keep memory bounded even for a busy pod
-		opts.TailLines = &limit
+		if !o.All {
+			limit := int64(20000) // keep the live view bounded even for a busy pod
+			opts.TailLines = &limit
+		}
 	} else if o.Tail > 0 {
 		opts.TailLines = &o.Tail
 	}

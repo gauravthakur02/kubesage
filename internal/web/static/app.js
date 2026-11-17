@@ -608,8 +608,20 @@ async function showLogs(body) {
   podSel.onchange = () => { fillCtr(); start(); };
   ctrSel.onchange = start;
   prev.onchange = start;
+  const win = h("select", { "aria-label": "Download window" }, ...[["", "everything"], ["1h", "last 1h"], ["6h", "last 6h"], ["24h", "last 24h"]].map(([v, l]) => h("option", { value: v, text: l })));
+  const dl = (path, params) => {
+    const q = new URLSearchParams({ ctx: S.ctx, ns: sel.ns, ...params, since: win.value });
+    if (TOKEN) q.set("t", TOKEN);
+    const a = h("a", { href: `/api/${path}?${q}`, download: "" });
+    document.body.append(a); a.click(); a.remove();
+    toast("Download started");
+  };
   body.replaceChildren(h("div", { class: "toolbar" }, podSel, ctrSel, search, h("label", {}, follow, " follow"), h("label", {}, prev, " previous"),
-    h("button", { class: "ghost", onclick: () => { navigator.clipboard?.writeText(out.innerText); toast("Copied"); } }, "Copy"), status), out);
+    h("button", { class: "ghost", onclick: () => { navigator.clipboard?.writeText(out.innerText); toast("Copied"); } }, "Copy"), status),
+    h("div", { class: "toolbar" }, h("span", { class: "muted", text: "Download" }), win,
+      h("button", { class: "ghost", title: "The complete log of this container, not just what is shown", onclick: () => dl("logs/download", { pod: podSel.value, container: ctrSel.value, previous: prev.checked ? "1" : "0", timestamps: "1" }) }, "This container (.log)"),
+      h("button", { class: "ghost", title: "Every pod and container, including logs from before restarts, plus a summary", onclick: () => dl("logs/bundle", { res: sel.res, name: sel.name }) }, pods.length > 1 ? `All ${pods.length} pods (.zip)` : "All containers (.zip)")),
+    out);
   start();
 }
 

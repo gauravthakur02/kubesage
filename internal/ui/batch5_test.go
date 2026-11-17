@@ -208,3 +208,17 @@ func TestOperatorScreensWhenMissing(t *testing.T) {
 	run(a, a.runCommand("karpenter"), 0)
 	mustContain(t, screen(a), "Karpenter")
 }
+
+func TestDownloadLogsToFolder(t *testing.T) {
+	a, _ := newShopApp(t, "pods", true)
+	a.cfg.DownloadsDir = t.TempDir()
+	selectRow(t, a, "web-7d9-aaaaa")
+	run(a, a.runCommand("download-logs"), 0)
+	if !strings.Contains(a.status, "✓ saved") || !strings.Contains(a.status, ".zip") {
+		t.Fatalf("status = %q", a.status)
+	}
+	files, _ := filepath.Glob(filepath.Join(a.cfg.DownloadsDir, "kubesage-logs_*.zip"))
+	if len(files) != 1 {
+		t.Fatalf("files = %v", files)
+	}
+}

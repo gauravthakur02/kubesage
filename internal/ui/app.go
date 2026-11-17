@@ -636,6 +636,9 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.handleApprovalRequested(msg)
 	case approvalsPolledMsg:
 		return a, a.handleApprovalsPolled(msg)
+	case logsDownloadedMsg:
+		a.handleLogsDownloaded(msg)
+		return a, nil
 	case devTickMsg:
 		return a, a.handleDevTick(msg)
 	case devAppliedMsg:
