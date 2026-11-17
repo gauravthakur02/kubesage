@@ -181,11 +181,11 @@ func TestArgoRolloutsKarpenterAndHubble(t *testing.T) {
 			"template": map[string]any{"spec": map[string]any{"containers": []any{map[string]any{"name": "web", "image": "reg.example/web:2"}}}}},
 		"status": map[string]any{"phase": "Paused", "currentStepIndex": int64(1), "readyReplicas": int64(4), "pauseConditions": []any{map[string]any{"reason": "CanaryPauseStep"}}}}}
 	pool := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "karpenter.sh/v1", "kind": "NodePool", "metadata": map[string]any{"name": "default"},
-		"spec": map[string]any{"limits": map[string]any{"cpu": "100"}, "disruption": map[string]any{"consolidationPolicy": "WhenEmptyOrUnderutilized"}},
+		"spec":   map[string]any{"limits": map[string]any{"cpu": "100"}, "disruption": map[string]any{"consolidationPolicy": "WhenEmptyOrUnderutilized"}},
 		"status": map[string]any{"conditions": []any{map[string]any{"type": "Ready", "status": "True"}}}}}
 	claim := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "karpenter.sh/v1", "kind": "NodeClaim",
 		"metadata": map[string]any{"name": "default-x", "labels": map[string]any{"karpenter.sh/nodepool": "default", "node.kubernetes.io/instance-type": "c7g.large"}},
-		"status": map[string]any{"conditions": []any{map[string]any{"type": "Ready", "status": "True"}}}}}
+		"status":   map[string]any{"conditions": []any{map[string]any{"type": "Ready", "status": "True"}}}}}
 	dyn := dynfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
 		RolloutGVR: "RolloutList", KarpenterPoolGVR: "NodePoolList", KarpenterClaimGVR: "NodeClaimList"}, ro, pool, claim)
 	c := NewForTesting(fake.NewSimpleClientset(), "dev", "shop", map[string]string{"dev": "dev"})

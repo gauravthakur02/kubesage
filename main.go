@@ -121,6 +121,14 @@ func main() {
 		runConfig(rest, *path)
 		return
 	}
+	if sub != "" && sub != "__complete" && !cli.Known(sub) {
+		fmt.Fprintf(os.Stderr, "kubesage %s does not have a %q command.\n", version, sub)
+		if update.IsRelease(version) {
+			fmt.Fprintln(os.Stderr, "It may be newer than this version: update with `kubesage update` (or brew upgrade kubesage).")
+		}
+		fmt.Fprintln(os.Stderr, "Run `kubesage help` for the commands this version has.")
+		os.Exit(1)
+	}
 	switch sub {
 	case "completion":
 		shell := ""
@@ -827,7 +835,7 @@ func runAudit(cfg *config.Config, args []string) {
 }
 
 func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, readOnly bool, args []string) {
-	addr, allow := "127.0.0.1:7777", false
+	addr, allow, noBrowser := "127.0.0.1:7777", false, false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--addr", "-addr":
@@ -839,6 +847,8 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 			addr = "0.0.0.0:" + strings.TrimPrefix(addr[strings.LastIndex(addr, ":"):], ":")
 		case "--allow-changes", "-allow-changes":
 			allow = true
+		case "--no-browser", "-no-browser":
+			noBrowser = true
 		}
 	}
 	ro := readOnly || cfg.ReadOnly || !allow
@@ -872,6 +882,11 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 		fmt.Println("⚠ listening on your network: anyone with this link can use kubesage with YOUR cluster credentials.")
 	}
 	fmt.Println("Shells, $EDITOR and plugins are disabled in the browser. Ctrl+C stops the server.")
+	if (strings.HasPrefix(addr, "127.0.0.1") || strings.HasPrefix(addr, "localhost")) && cfg.OpenBrowser && !noBrowser {
+		if err := ui.OpenBrowser(srv.URL); err != nil {
+			fmt.Println("(could not open a browser: " + err.Error() + "; open the link above)")
+		}
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	exitIf(srv.Wait(ctx))

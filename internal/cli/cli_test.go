@@ -21,3 +21,9 @@ func TestCompletionAndMan(t *testing.T) {
 		t.Fatalf("man page:\n%s", m[:200])
 	}
 }
+
+func TestKnown(t *testing.T) {
+	if !Known("serve") || !Known("scan") || Known("serv") || Known("") {
+		t.Fatal("Known is wrong")
+	}
+}

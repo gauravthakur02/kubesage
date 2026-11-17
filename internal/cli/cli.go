@@ -24,7 +24,7 @@ var Commands = []Command{
 	{"schedule", "scale-to-zero schedules", []string{"run", "status", "--dry-run"}},
 	{"approve", "approve a pending production change", []string{"list"}},
 	{"audit", "verify or export the audit log", []string{"verify", "export"}},
-	{"serve", "the full UI in a web browser", []string{"--addr", "--lan"}},
+	{"serve", "the full UI in a web browser", []string{"--addr", "--lan", "--allow-changes", "--no-browser"}},
 	{"update", "update kubesage to the latest release", []string{"--check"}},
 	{"completion", "shell completion script", []string{"bash", "zsh", "fish", "powershell"}},
 	{"man", "print the man page", nil},
@@ -199,4 +199,14 @@ func Man(version string, now time.Time) string {
 		".TP\n.B KUBESAGE_NO_UPDATE_CHECK\ndo not check GitHub for new releases\n")
 	b.WriteString(".SH SEE ALSO\n.BR kubectl (1)\n.PP\nhttps://gauravthakur02.github.io/kubesage/\n")
 	return b.String()
+}
+
+// Known reports whether name is a kubesage subcommand.
+func Known(name string) bool {
+	for _, c := range Commands {
+		if c.Name == name {
+			return true
+		}
+	}
+	return false
 }

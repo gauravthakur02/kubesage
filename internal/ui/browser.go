@@ -32,3 +32,6 @@ func openBrowser(url string) error {
 	go func() { _ = cmd.Wait() }() // reap the child
 	return nil
 }
+
+// OpenBrowser opens url in the default web browser (used by kubesage serve).
+func OpenBrowser(url string) error { return openBrowser(url) }

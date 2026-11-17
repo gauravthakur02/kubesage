@@ -115,8 +115,8 @@ func newShopApp(t *testing.T, res string, readOnly bool, dynObjs ...runtime.Obje
 		{Group: "external-secrets.io", Version: "v1", Resource: "secretstores"}: "SecretStoreList", {Group: "external-secrets.io", Version: "v1beta1", Resource: "secretstores"}: "SecretStoreList",
 		{Group: "external-secrets.io", Version: "v1", Resource: "clustersecretstores"}: "ClusterSecretStoreList", {Group: "external-secrets.io", Version: "v1beta1", Resource: "clustersecretstores"}: "ClusterSecretStoreList",
 		{Group: "secrets-store.csi.x-k8s.io", Version: "v1", Resource: "secretproviderclasses"}: "SecretProviderClassList",
-		{Group: "argoproj.io", Version: "v1alpha1", Resource: "rollouts"}: "RolloutList",
-		{Group: "karpenter.sh", Version: "v1", Resource: "nodepools"}: "NodePoolList", {Group: "karpenter.sh", Version: "v1", Resource: "nodeclaims"}: "NodeClaimList",
+		{Group: "argoproj.io", Version: "v1alpha1", Resource: "rollouts"}:                       "RolloutList",
+		{Group: "karpenter.sh", Version: "v1", Resource: "nodepools"}:                           "NodePoolList", {Group: "karpenter.sh", Version: "v1", Resource: "nodeclaims"}: "NodeClaimList",
 	}, dynObjs...)
 	for _, p := range []string{"web-7d9-aaaaa", "web-7d9-bbbbb"} {
 		u := podMetrics("shop", p, "40m", "300Mi")
