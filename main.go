@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -34,6 +35,18 @@ import (
 )
 
 var version = "0.1.0-dev"
+
+// buildVersion is the version set by GoReleaser or Homebrew (-X main.version), else the module version that
+// `go install github.com/gauravthakur02/kubesage@v0.2.0` records, else the dev placeholder.
+func buildVersion() string {
+	if version != "0.1.0-dev" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && strings.HasPrefix(bi.Main.Version, "v") {
+		return strings.TrimPrefix(bi.Main.Version, "v")
+	}
+	return version
+}
 
 const usage = `kubesage — a Kubernetes IDE for your terminal, with an AI copilot
 
@@ -72,6 +85,7 @@ Flags:
 `
 
 func main() {
+	version = buildVersion()
 	fs := flag.NewFlagSet("kubesage", flag.ExitOnError)
 	kubeconfig := fs.String("kubeconfig", "", "path to kubeconfig (default: $KUBECONFIG or ~/.kube/config)")
 	kctx := fs.String("context", "", "kube context(s); comma-separate to open each cluster in its own tab (default: current context)")

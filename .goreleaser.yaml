@@ -100,36 +100,16 @@ release:
     name: kubesage
   footer: |
     ## Install
+    **macOS:** `brew tap gauravthakur02/kubesage https://github.com/gauravthakur02/kubesage && brew install kubesage`, or the install script below
+    (downloading the macOS archives in a browser triggers "Apple could not verify…": run `xattr -d com.apple.quarantine kubesage` after unpacking)
     **macOS / Linux:** `curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.sh | sh`
+    **Go:** `go install github.com/gauravthakur02/kubesage@v{{ .Version }}`
     **Windows (PowerShell):** `irm https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.ps1 | iex`
     **Debian/Ubuntu:** `sudo apt install ./kubesage_{{ .Version }}_amd64.deb` · **RHEL/Fedora:** `sudo dnf install ./kubesage-{{ .Version }}-1.x86_64.rpm`
     Verify downloads against `checksums.txt`.
 
-# Homebrew and Scoop publish only when their tokens are configured as repository secrets
-# (HOMEBREW_TAP_GITHUB_TOKEN / SCOOP_BUCKET_GITHUB_TOKEN) and the repos below exist.
-homebrew_casks:
-  - name: kubesage
-    repository:
-      owner: gauravthakur02
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    skip_upload: '{{ if index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
-    homepage: https://github.com/gauravthakur02/kubesage
-    description: Kubernetes IDE for your terminal with an AI copilot
-    license: MIT
-    binaries: [kubesage]
-    manpages: [manpages/kubesage.1.gz]
-    completions:
-      bash: completions/kubesage.bash
-      zsh: completions/kubesage.zsh
-      fish: completions/kubesage.fish
-    hooks:
-      post:
-        install_steps: |
-          on_macos do
-            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/kubesage"]
-          end
-
+# Homebrew: Formula/kubesage.rb in this repository builds from source (no Apple notarization needed); the release
+# workflow updates it. Scoop publishes only when SCOOP_BUCKET_GITHUB_TOKEN is set and the bucket repo exists.
 scoops:
   - name: kubesage
     repository:

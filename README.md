@@ -14,8 +14,15 @@ reads your cluster's manifests, events and logs and tells you what is wrong and 
 
 ## Install
 
-**macOS and Linux** (amd64, arm64; Linux also armv7). Downloads the latest release, checks it against `checksums.txt` and installs to
-`/usr/local/bin`, or `~/.local/bin` when that is not writable:
+**macOS: Homebrew** (builds from source on your Mac, so there is no "Apple could not verify" warning):
+```bash
+brew tap gauravthakur02/kubesage https://github.com/gauravthakur02/kubesage
+brew install kubesage          # later: brew upgrade kubesage
+```
+
+**macOS and Linux: install script** (amd64, arm64; Linux also armv7). Downloads the latest release, checks it against
+`checksums.txt` and installs to `/usr/local/bin`, or `~/.local/bin` when that is not writable. `curl` does not mark files as
+quarantined, so macOS runs it without a warning:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.sh | sh
 ```
@@ -26,6 +33,11 @@ irm https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.ps1 |
 ```
 Both scripts take `KUBESAGE_VERSION` (e.g. `0.2.0`) and `KUBESAGE_INSTALL_DIR`; `install.sh` also takes `KUBESAGE_DOWNLOAD_URL` for a mirror.
 
+**With Go** (any OS; no warning on macOS either):
+```bash
+go install github.com/gauravthakur02/kubesage@latest
+```
+
 **Linux packages** from the [release page](https://github.com/gauravthakur02/kubesage/releases):
 ```bash
 sudo apt install ./kubesage_<version>_amd64.deb          # Debian, Ubuntu
@@ -33,9 +45,8 @@ sudo dnf install ./kubesage-<version>-1.x86_64.rpm       # RHEL, Fedora, SUSE (z
 sudo apk add --allow-untrusted ./kubesage_<version>_x86_64.apk   # Alpine
 ```
 
-**Homebrew and Scoop** (once the tap and bucket repositories are set up):
+**Scoop** (Windows, once the bucket repository is set up):
 ```bash
-brew install --cask gauravthakur02/tap/kubesage
 scoop bucket add kubesage https://github.com/gauravthakur02/scoop-bucket && scoop install kubesage
 ```
 
@@ -50,9 +61,9 @@ The first start shows a one-minute tour (`:tour` shows it again).
 **Manual download:** every [release](https://github.com/gauravthakur02/kubesage/releases) has `.tar.gz` (macOS, Linux) and `.zip` (Windows)
 archives plus `checksums.txt`. Unpack and put `kubesage` on your PATH.
 
-> **macOS: "Apple could not verify kubesage is free of malware".** Builds are not yet notarized by Apple, so macOS Gatekeeper
-> blocks binaries **downloaded with a web browser** (the browser marks them as quarantined). The install script and Homebrew do not
-> have this problem. If you downloaded the archive by hand, check it against `checksums.txt`, then clear the quarantine flag on that
+> **macOS: "Apple could not verify kubesage is free of malware".** The release binaries are not notarized by Apple, so macOS
+> Gatekeeper blocks them when they are **downloaded with a web browser** (the browser marks them as quarantined). Homebrew, the
+> install script and `go install` never trigger this; use one of them. If you downloaded the archive by hand, check it against `checksums.txt`, then clear the quarantine flag on that
 > one file (this changes nothing else on your Mac):
 > ```bash
 > shasum -a 256 kubesage_*_darwin_*.tar.gz      # compare with checksums.txt
@@ -921,11 +932,14 @@ Windows (amd64, arm64), `.deb`/`.rpm`/`.apk` packages and `checksums.txt`, with 
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-A Homebrew cask and a Scoop manifest are published too once `homebrew-tap` / `scoop-bucket` repositories exist and the
-`HOMEBREW_TAP_GITHUB_TOKEN` / `SCOOP_BUCKET_GITHUB_TOKEN` secrets are set. CI runs the tests on Linux, macOS and Windows for every push and pull request.
+After the release, the workflow points the Homebrew formula (`Formula/kubesage.rb`, built from source) at the new tag and commits it,
+so `brew upgrade kubesage` picks it up. A Scoop manifest is published once a `scoop-bucket` repository exists and the
+`SCOOP_BUCKET_GITHUB_TOKEN` secret is set. CI runs the tests on Linux, macOS and Windows for every push and pull request.
 
-**Signed and notarized macOS builds.** The release signs and notarizes the macOS binaries as soon as these repository secrets exist
-(it needs an [Apple Developer Program](https://developer.apple.com/programs/) membership; without them the step is skipped):
+**Optional: signed and notarized macOS archives.** Only needed if you want browser downloads to open without a warning; Homebrew,
+the install script and `go install` already avoid it for free. The release signs and notarizes the macOS binaries as soon as these
+repository secrets exist (it needs a paid [Apple Developer Program](https://developer.apple.com/programs/) membership; without them
+the step is skipped):
 
 | Secret | Value |
 |---|---|
