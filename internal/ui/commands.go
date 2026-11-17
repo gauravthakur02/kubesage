@@ -113,7 +113,7 @@ func (a *App) runCommand(line string) tea.Cmd {
 		return a.compareCommand(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
 	case "export":
 		return a.exportTable(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), fields[0])))
-	case "audit", "changes":
+	case "audit":
 		return a.openAudit()
 	case "upgrade", "upgrades", "deprecations":
 		return a.openUpgrade(arg)
@@ -223,6 +223,12 @@ func (a *App) runCommand(line string) tea.Cmd {
 		return nil
 	case "approvals", "approval":
 		return a.openApprovals()
+	case "changes", "what-changed":
+		return a.openChanges(arg)
+	case "slo", "slos":
+		return a.openVirtual(a.sloResource(), "service level objectives from Prometheus")
+	case "snapshot", "snapshots":
+		return a.snapshotCommand(arg)
 	case "fix", "ai-fix":
 		return a.openAIFix()
 	case "narrative", "story":

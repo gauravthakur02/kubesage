@@ -631,39 +631,117 @@ your config). `enter` shows the exact command it will run and installs it on con
 
 ## In the browser and in VS Code
 
-**Web UI (`kubesage serve`).** A browser app for the same clusters, built for mouse *and* keyboard, so it is not just the terminal
-in a tab:
+**Web UI (`kubesage serve`).** A browser app for the same clusters, built for mouse *and* keyboard:
 
-- **Navigate:** a sidebar with every resource type (built-in and CRDs, grouped), cluster and namespace pickers, and a live table that
-  refreshes every 5 seconds, with health dots, sort on any column header and a row filter.
-- **Inspect:** click a row (or press `enter`) to open a side panel with Describe, YAML (secret values stay masked), Timeline (events,
-  rollouts, restarts), Relations (what the object is made of and what reaches it; click a part to open it) and streaming Logs with a
-  pod/container picker, previous-container logs, highlighting and copy.
-- **Health check:** every detected problem in the namespace with what to do about it.
-- **Keys:** `j`/`k` or arrows, `enter`, `esc`, `/` filter, `1`–`9` favourite resources, `d y t w l` panel tabs, `H` health, `r` refresh,
-  `Ctrl+K` go to any resource, cluster or namespace, `?` all keys.
-- **Links:** the address bar always describes the view (cluster, namespace, resource, object, tab), so a link opens the same view.
-  The session token is not part of the copied link.
-- **Changes:** Scale, Restart and Delete appear in the panel only with `--allow-changes`; production-like contexts need the object's
-  name typed, and every change is written to the audit log as `web`.
-- **The terminal UI** is still at `/term` on the same link, for everything else (AI, Helm, port-forwards, …).
+- **Navigate:** a sidebar with every resource type (built-in and CRDs), cluster and namespace pickers, and a live table (refreshes every
+  5 seconds) with health dots, CPU sparklines for pods, sort on any column, and a filter. Filtering, sorting and paging happen on the
+  server, so namespaces with thousands of objects stay fast ("Load 500 more").
+- **Inspect:** click a row (or `enter`) for a side panel: Describe, YAML (secret values masked), **Edit**, Timeline, **Relations** (an
+  interactive diagram: drag to pan, wheel to zoom, click a part to open it; or a list), streaming **Logs**, **Metrics** (CPU and memory
+  charts: the last hour from Prometheus when configured, otherwise sampled while the page is open) and **AI**.
+- **Edit safely:** change YAML in the browser, press *Dry-run & diff* (Ctrl+Enter) to see the server's verdict (validation, admission
+  webhooks, policies) and the diff, then *Apply*. Secrets are never editable or shown.
+- **AI:** *Explain what is wrong* streams an analysis of the object (manifest, events, logs; secrets redacted). *Propose a fix* asks for the
+  smallest patch, merges it, dry-runs it and opens it in the editor with the AI's reasons, so you review the diff before anything is
+  applied. **A** opens a chat about the namespace. `ai.local_only_contexts` applies here too.
+- **Select several rows** (`x`/space or the checkboxes) to restart or delete them together (type the number of objects to confirm), or
+  pick two and **Compare** their YAML.
+- **Port-forward:** *Forward* opens the service or pod in a new browser tab through kubesage itself (`/fwd/<id>/`), so it works for
+  people opening kubesage from another machine too. Active forwards show in the top bar with a stop button.
+- **Health check, What changed?, SLOs, Snapshots** in the sidebar (see below).
+- **Keys:** `j`/`k`, `enter`, `esc`, `/` filter, `1`–`9`, `x` select, `d y e t w l m a` panel tabs, `H` health, `C` what changed,
+  `A` AI chat, `r` refresh, `Ctrl+K` go to anything, `?` all keys. Dialogs keep keyboard focus inside them, everything has screen-reader
+  labels, and motion is reduced when your system asks for it.
+- **Links:** the address bar always describes the view, so a link opens the same view (the session token is never part of it).
+- **The terminal UI** is still at `/term`.
 
-Who it is for, honestly: people who cannot or do not want to install kubesage (a locked-down laptop, a tablet), and running kubesage on
-a **jump host** that can reach private clusters while you browse from your laptop (`ssh -L 7777:127.0.0.1:7777 jumphost`, then
-`kubesage serve` there). If you already use kubesage in a terminal, the browser adds point-and-click and shareable views, not new
-cluster powers.
+**Sign-in and per-person permissions.** Without sign-in, the random token in the printed link is the key and everyone acts with *your*
+credentials, which is fine on your own machine. To share kubesage with a team, turn on OpenID Connect sign-in (Entra ID, Google, Okta,
+Keycloak, Dex, …) and impersonation:
+```yaml
+serve:
+  oidc:
+    issuer: https://login.microsoftonline.com/<tenant-id>/v2.0
+    client_id: <app-registration-client-id>
+    client_secret_env: KUBESAGE_OIDC_SECRET      # export KUBESAGE_OIDC_SECRET=…
+    redirect_url: https://kubesage.example.com/auth/callback
+    allowed_domains: [example.com]
+  impersonate: true    # each person acts with THEIR Kubernetes permissions
+```
+Sign-in uses the authorization-code flow with PKCE, checks the ID token's signature and nonce, and keeps a signed, HttpOnly session
+(8 hours by default; a restart signs everyone out). With `impersonate: true`, kubesage asks the API server to act as the signed-in
+email and groups, so RBAC applies per person and the audit log shows who did what (`web:alice@example.com`). The credentials kubesage
+runs with need permission to impersonate:
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: kubesage-impersonator}
+rules:
+  - apiGroups: [""]
+    resources: [users, groups]
+    verbs: [impersonate]
+```
+Run it behind HTTPS (a reverse proxy or ingress), for example on a jump host that can reach private clusters.
 
-Safety: it is **read-only unless you pass `--allow-changes`**, listens on 127.0.0.1:7777 unless you pass `--lan`, opens your browser
-when it is local (`--no-browser` to skip), and every request needs the random token in the printed link. Everyone who opens the link
-acts with **your** cluster credentials, so only share it with people you would hand your kubeconfig to. Shells, `$EDITOR` and plugins
+Safety in every mode: **read-only unless you pass `--allow-changes`**, listens on 127.0.0.1:7777 unless you pass `--lan`/`--addr`,
+changes on production-like contexts need the object's name typed, and every change is in the audit log. Shells, `$EDITOR` and plugins
 are disabled in the browser because they would run on the server's machine.
 ```bash
 kubesage serve --context staging              # opens http://127.0.0.1:7777/?t=…
-kubesage serve --lan --addr :8080             # on your network, still read-only
+kubesage serve --addr :8080 --allow-changes   # behind your HTTPS proxy, with serve.oidc configured
 ```
 
 **VS Code.** [`editors/vscode`](editors/vscode) is a small extension: open kubesage in an editor tab (`Cmd/Ctrl+Alt+K`), pick a cluster,
 open read-only, or right-click a YAML file (diff and apply) or folder (dev loop). Build it with `npx @vscode/vsce package`.
+
+## What changed, SLOs and snapshots
+
+**What changed? (`:changes [2h]`, *What changed?* in the browser, `changes <ns>` in the bot).** Everything that changed in the namespace in
+a time window, newest first: Deployment rollouts (with images), StatefulSet/DaemonSet revisions, ConfigMap and Secret edits (never their
+values), scaling and autoscaler events, Helm upgrades and rollbacks, Argo CD syncs and Flux reconciliations. The fastest answer to "it
+broke at 14:02, what happened just before?". `enter` opens the object's timeline.
+
+**SLOs (`:slo`, *SLOs* in the browser).** Service level objectives from Prometheus: availability over the window, error budget left, and
+the burn rate over the last hour (above 14.4× pages in the classic multi-window scheme). Define good and total event counters with
+`{{window}}` where the range goes:
+```yaml
+slos:
+  - name: checkout availability
+    context: 'prod'
+    good: sum(increase(nginx_ingress_controller_requests{ingress="checkout",status!~"5.."}[{{window}}]))
+    total: sum(increase(nginx_ingress_controller_requests{ingress="checkout"}[{{window}}]))
+    objective: 0.999
+    window: 30d
+```
+
+**Snapshots (`:snapshot [name]`, `:snapshots`, *Snapshots* in the browser, `kubesage snapshot save|list|diff -n <ns>`).** Save the
+state of a namespace (workloads, services, config, RBAC; Secret values only as hashes) to this computer, and compare it with now later:
+added, removed and changed objects with a diff of each. From cron, `kubesage snapshot save` every night and `kubesage snapshot diff <name>`
+(exit code 3 when something changed) catch drift.
+
+## Chat bot and ownership
+
+**Bot (`kubesage bot`).** A small read-only server for a Slack slash command (`POST /slack`) and a Microsoft Teams outgoing webhook
+(`POST /teams`): `status`, `issues <namespace>`, `changes <namespace> [2h]`, `owner <namespace>/<name>`, `help`. Requests are verified
+(Slack signing secret with replay protection; Teams HMAC), and nothing can change the cluster.
+```yaml
+bot:
+  contexts: ['-dev$', 'staging']           # what `status` covers
+  slack_signing_secret_env: SLACK_SIGNING_SECRET
+  teams_token_env: TEAMS_WEBHOOK_TOKEN     # the base64 token Teams shows when you create the outgoing webhook
+```
+```bash
+SLACK_SIGNING_SECRET=… kubesage bot --addr :8090   # point the slash command's Request URL at https://<host>/slack
+```
+
+**Owners.** kubesage works out who owns a workload: from your rules first (by namespace or label), then from the `owner`, `team` or
+`app.kubernetes.io/part-of` labels or annotations. The owner shows in the browser panel and in the bot, and new watch-list alerts are
+posted to the owning team's webhook:
+```yaml
+owners:
+  - {team: payments, namespaces: '^pay-', contact: '#payments-oncall', webhook_env: PAYMENTS_WEBHOOK}
+  - {team: checkout, label: 'app.kubernetes.io/part-of=checkout', contact: checkout@example.com}
+```
 
 ## Workspace tabs
 

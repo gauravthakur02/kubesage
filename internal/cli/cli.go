@@ -22,6 +22,8 @@ var Commands = []Command{
 	{"mcp", "serve read-only tools to AI agents over MCP", nil},
 	{"report", "cluster summary for Slack/Teams", []string{"--post"}},
 	{"schedule", "scale-to-zero schedules", []string{"run", "status", "--dry-run"}},
+	{"bot", "read-only Slack/Teams bot", []string{"--addr"}},
+	{"snapshot", "save a namespace and compare it later", []string{"save", "list", "diff"}},
 	{"approve", "approve a pending production change", []string{"list"}},
 	{"audit", "verify or export the audit log", []string{"verify", "export"}},
 	{"serve", "the full UI in a web browser", []string{"--addr", "--lan", "--allow-changes", "--no-browser"}},

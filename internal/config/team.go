@@ -87,7 +87,7 @@ func (c *Config) mergeTeam(t *Config, dir string) string {
 		*c = *c.withoutTeam()
 		c.local = nil
 	}
-	c.local = &teamUndo{rules: len(c.Rules), schedules: len(c.Schedules), fleet: len(c.Fleet), windows: len(c.ChangeWindows),
+	c.local = &teamUndo{owners: len(c.Owners), rules: len(c.Rules), schedules: len(c.Schedules), fleet: len(c.Fleet), windows: len(c.ChangeWindows),
 		freezes: len(c.Freezes), registries: len(c.Policy.AllowedRegistries), plugins: len(c.Plugins),
 		danger: c.DangerContexts, approvals: c.Approvals, reason: c.RequireReason, runbooks: c.Runbooks.Dir}
 	var parts []string
@@ -101,6 +101,8 @@ func (c *Config) mergeTeam(t *Config, dir string) string {
 	c.Schedules = append(c.Schedules, t.Schedules...)
 	add(len(t.Schedules), "schedules")
 	c.Fleet = append(c.Fleet, t.Fleet...)
+	c.Owners = append(c.Owners, t.Owners...)
+	add(len(t.Owners), "owner rules")
 	add(len(t.Fleet), "fleet patterns")
 	c.ChangeWindows = append(c.ChangeWindows, t.ChangeWindows...)
 	c.Freezes = append(c.Freezes, t.Freezes...)
@@ -141,9 +143,9 @@ func (c *Config) TeamSummary() string { return c.teamSummary }
 
 // teamUndo remembers the local values so Save never writes team settings into the personal config file.
 type teamUndo struct {
-	rules, schedules, fleet, windows, freezes, registries, plugins int
-	danger, reason, runbooks                                       string
-	approvals                                                      Approvals
+	rules, schedules, fleet, windows, freezes, registries, plugins, owners int
+	danger, reason, runbooks                                               string
+	approvals                                                              Approvals
 }
 
 func cut[T any](s []T, n int) []T {
@@ -163,6 +165,7 @@ func (c *Config) withoutTeam() *Config {
 	cp.Rules, cp.Schedules, cp.Fleet = cut(c.Rules, u.rules), cut(c.Schedules, u.schedules), cut(c.Fleet, u.fleet)
 	cp.ChangeWindows, cp.Freezes, cp.Plugins = cut(c.ChangeWindows, u.windows), cut(c.Freezes, u.freezes), cut(c.Plugins, u.plugins)
 	cp.Policy.AllowedRegistries = cut(c.Policy.AllowedRegistries, u.registries)
+	cp.Owners = cut(c.Owners, u.owners)
 	cp.DangerContexts, cp.Approvals, cp.RequireReason, cp.Runbooks.Dir = u.danger, u.approvals, u.reason, u.runbooks
 	return &cp
 }

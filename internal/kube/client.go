@@ -134,3 +134,23 @@ func NewForTesting(cs kubernetes.Interface, context, namespace string, contexts 
 	}
 	return &Client{Clientset: cs, Context: context, Namespace: namespace, raw: raw}
 }
+
+// Impersonate returns a client that acts as another user (the API server checks that this client may
+// impersonate). Used by kubesage serve so each signed-in person works with their own permissions.
+func (c *Client) Impersonate(user string, groups []string) (*Client, error) {
+	if c.Rest == nil {
+		return nil, fmt.Errorf("impersonation needs a live cluster connection")
+	}
+	rc := rest.CopyConfig(c.Rest)
+	rc.Impersonate = rest.ImpersonationConfig{UserName: user, Groups: groups}
+	cs, err := kubernetes.NewForConfig(rc)
+	if err != nil {
+		return nil, err
+	}
+	dyn, err := dynamic.NewForConfig(rc)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{Clientset: cs, Dynamic: dyn, Rest: rc, warns: c.warns, Context: c.Context, Namespace: c.Namespace,
+		Kubeconfig: c.Kubeconfig, raw: c.raw}, nil
+}

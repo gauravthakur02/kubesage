@@ -219,6 +219,7 @@ func (a *App) handleAlerts(m alertsMsg) {
 		a.monitorPrimed = true // problems that already exist at startup do not ring
 		return
 	}
+	a.routeAlerts(fresh, freshCtx)
 	first := fresh[0]
 	text := fmt.Sprintf("%s %s/%s: %s", freshCtx[0], first.Namespace, first.Name, first.Reason)
 	if len(fresh) > 1 {

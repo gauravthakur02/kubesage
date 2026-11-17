@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/gauravthakur02/kubesage/internal/owners"
 )
 
 // AIProfile describes one LLM backend the user can switch between at runtime.
@@ -213,6 +215,14 @@ type Config struct {
 	Loki Loki `yaml:"loki,omitempty"`
 	// Traces opens trace IDs found in logs (:trace) in your tracing UI.
 	Traces Traces `yaml:"traces,omitempty"`
+	// SLOs are service level objectives computed from Prometheus (:slo).
+	SLOs []SLO `yaml:"slos,omitempty"`
+	// Owners say which team owns what (namespaces or labels); alerts go to the owning team's webhook.
+	Owners []owners.Rule `yaml:"owners,omitempty"`
+	// Bot configures `kubesage bot` (Slack slash command and Teams outgoing webhook).
+	Bot Bot `yaml:"bot,omitempty"`
+	// Serve configures `kubesage serve`: sign-in and per-person permissions.
+	Serve Serve `yaml:"serve,omitempty"`
 	// Approvals require a second person to approve changes on matching contexts.
 	Approvals Approvals `yaml:"approvals,omitempty"`
 	// Team loads shared settings (rules, schedules, fleet, plugins, runbooks, windows) from a git repository.
@@ -277,6 +287,43 @@ type Loki struct {
 type Traces struct {
 	// URL with {trace_id}, e.g. https://grafana.example.com/explore?left={"queries":[{"query":"{trace_id}"}]} or a Jaeger /trace/{trace_id} URL.
 	URL string `yaml:"url,omitempty"`
+}
+
+// SLO is a service level objective: good and total event counters in PromQL with {{window}} for the range.
+type SLO struct {
+	Name      string  `yaml:"name"`
+	Context   string  `yaml:"context,omitempty"` // regex of kube-contexts it applies to (default all)
+	Good      string  `yaml:"good"`              // e.g. sum(increase(http_requests_total{service="web",code!~"5.."}[{{window}}]))
+	Total     string  `yaml:"total"`             // e.g. sum(increase(http_requests_total{service="web"}[{{window}}]))
+	Objective float64 `yaml:"objective"`         // e.g. 0.999
+	Window    string  `yaml:"window,omitempty"`  // default 30d
+}
+
+// Bot configures the chat bot.
+type Bot struct {
+	Contexts              []string `yaml:"contexts,omitempty"`                 // regexes of contexts `status` reports on
+	SlackSigningSecretEnv string   `yaml:"slack_signing_secret_env,omitempty"` // env var with the Slack app's signing secret
+	TeamsTokenEnv         string   `yaml:"teams_token_env,omitempty"`          // env var with the Teams outgoing webhook's security token
+}
+
+// Serve configures the web UI.
+type Serve struct {
+	OIDC OIDC `yaml:"oidc,omitempty"`
+	// Impersonate makes every signed-in person act with their own Kubernetes permissions (the server's credentials
+	// need RBAC permission to impersonate users and groups).
+	Impersonate bool `yaml:"impersonate,omitempty"`
+}
+
+// OIDC is the identity provider used to sign in to kubesage serve.
+type OIDC struct {
+	Issuer          string   `yaml:"issuer,omitempty"` // e.g. https://login.microsoftonline.com/<tenant>/v2.0
+	ClientID        string   `yaml:"client_id,omitempty"`
+	ClientSecretEnv string   `yaml:"client_secret_env,omitempty"` // environment variable holding the client secret
+	RedirectURL     string   `yaml:"redirect_url,omitempty"`      // https://kubesage.example.com/auth/callback
+	AllowedDomains  []string `yaml:"allowed_domains,omitempty"`
+	AllowedEmails   []string `yaml:"allowed_emails,omitempty"`
+	GroupsClaim     string   `yaml:"groups_claim,omitempty"` // default groups
+	SessionHours    int      `yaml:"session_hours,omitempty"`
 }
 
 // Approvals configures the two-person rule.

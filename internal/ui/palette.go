@@ -41,6 +41,8 @@ var paletteItems = []struct{ label, cmd string }{
 	{"Resize pod in place", "resize "}, {"Argo Rollouts: promote / abort", "argo-rollouts"}, {"Karpenter NodePools", "karpenter"},
 	{"Crossplane managed resources", "crossplane"}, {"Network flows (Hubble)", "flows"}, {"Dev loop: apply on save", "dev "},
 	{"Clone this namespace (preview env)", "clone "}, {"Namespace clones", "clones"}, {"Plugin catalogue", "plugins"},
+	{"What changed? (rollouts, config, Helm, GitOps)", "changes"}, {"SLOs and error budgets", "slo"},
+	{"Snapshot this namespace", "snapshot save"}, {"Snapshots: compare with now", "snapshots"},
 	{"Tour of kubesage", "tour"}, {"Help", "help"},
 }
 

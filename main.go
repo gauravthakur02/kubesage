@@ -4,8 +4,10 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -24,8 +27,10 @@ import (
 	"github.com/gauravthakur02/kubesage/internal/agent"
 	"github.com/gauravthakur02/kubesage/internal/ai"
 	"github.com/gauravthakur02/kubesage/internal/audit"
+	"github.com/gauravthakur02/kubesage/internal/bot"
 	"github.com/gauravthakur02/kubesage/internal/cli"
 	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubesage/internal/diff"
 	"github.com/gauravthakur02/kubesage/internal/kube"
 	"github.com/gauravthakur02/kubesage/internal/mcp"
 	"github.com/gauravthakur02/kubesage/internal/report"
@@ -77,6 +82,8 @@ Usage:
   kubesage audit export [--since 24h]       push the audit log to Grafana Loki (audit_loki_url)
   kubesage serve [--addr 127.0.0.1:7777] [--lan] [--allow-changes]
                                    the full UI in a web browser (read-only unless --allow-changes)
+  kubesage snapshot save [name] | list | diff <name>   save a namespace (-n) and compare it later
+  kubesage bot [--addr :8090]      read-only Slack slash command (/slack) and Teams webhook (/teams)
   kubesage update [--check]        download, verify and install the latest release
   kubesage completion bash|zsh|fish|powershell   shell completion script
   kubesage man                     print the man page (kubesage man > kubesage.1)
@@ -239,6 +246,10 @@ func main() {
 		os.Exit(code)
 	case "serve":
 		runServe(cfg, *cfgPath, *kubeconfig, *kctx, namespace, *readOnly, subArgs)
+	case "snapshot":
+		runSnapshot(cfg, *cfgPath, client, subArgs)
+	case "bot":
+		runBot(cfg, *kubeconfig, client, subArgs)
 	case "approve":
 		runApprove(cfg, client, subArgs)
 	case "audit":
@@ -857,7 +868,7 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	lipgloss.SetHasDarkBackground(true)
 	ns := strings.ReplaceAll(namespace, "*all*", "")
-	newModel := func() (tea.Model, error) {
+	newModel := func(r *http.Request) (tea.Model, error) {
 		c, err := config.Load(cfgPath) // each browser tab gets its own copy of the settings
 		if err != nil {
 			return nil, err
@@ -865,6 +876,11 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 		client, err := kube.New(kubeconfig, strings.Split(kctx, ",")[0], ns)
 		if err != nil {
 			return nil, err
+		}
+		if u := web.UserFrom(r); u != nil && cfg.Serve.Impersonate {
+			if client, err = client.Impersonate(u.Email, u.Groups); err != nil {
+				return nil, err
+			}
 		}
 		if namespace == "*all*" {
 			client.Namespace = kube.AllNamespaces
@@ -880,14 +896,54 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 	if cfg.DangerContexts != "" {
 		app.Danger, _ = regexp.Compile(cfg.DangerContexts)
 	}
-	srv, err := serve.StartApp(addr, ro, newModel, &serve.WebApp{API: app.Handler(), Assets: web.Assets(), Index: web.Index})
+	app.LogLines = cfg.AI.LogLines
+	app.AI = func(kctx string) (ai.Provider, error) {
+		p, ok := cfg.AI.Profiles[cfg.AI.Active]
+		if !ok {
+			return nil, fmt.Errorf("AI profile %q not found", cfg.AI.Active)
+		}
+		if re := cfg.AI.LocalOnlyContexts; re != "" {
+			if m, _ := regexp.MatchString(re, kctx); m && !ai.IsLocal(p.Provider, p.BaseURL) {
+				return nil, fmt.Errorf("%s is local-only (ai.local_only_contexts): use a local AI profile", kctx)
+			}
+		}
+		return ai.New(cfg.AI.Active, p)
+	}
+	app.PromURL = func(kctx string) string {
+		if u := cfg.Prometheus.URLs[kctx]; u != "" {
+			return u
+		}
+		return cfg.Prometheus.URLs["*"]
+	}
+	app.PromToken = cfg.Prometheus.BearerTokenCommand
+	app.Owners, app.SLOs = cfg.Owners, cfg.SLOs
+	app.SnapshotBase = filepath.Join(filepath.Dir(cfgPathOrDefault(cfgPath)), "snapshots")
+	wa := &serve.WebApp{API: app.Handler(), Assets: web.Assets(), Index: web.Index, Forward: app.ForwardProxy()}
+	if o := cfg.Serve.OIDC; o.Issuer != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		auth, err := web.NewOIDC(ctx, web.OIDCConfig{Issuer: o.Issuer, ClientID: o.ClientID, ClientSecret: os.Getenv(o.ClientSecretEnv),
+			RedirectURL: o.RedirectURL, AllowedDomains: o.AllowedDomains, AllowedEmails: o.AllowedEmails, GroupsClaim: o.GroupsClaim, SessionHours: o.SessionHours})
+		cancel()
+		exitIf(err)
+		wa.Auth, wa.PublicURL = auth, strings.TrimSuffix(o.RedirectURL, "auth/callback")
+		app.Impersonate = cfg.Serve.Impersonate
+	} else if cfg.Serve.Impersonate {
+		exitIf(fmt.Errorf("serve.impersonate needs serve.oidc: kubesage must know who is signed in"))
+	}
+	srv, err := serve.StartApp(addr, ro, newModel, wa)
 	exitIf(err)
+	defer app.StopForwards()
 	mode := "read-only"
 	if !ro {
 		mode = "CHANGES ALLOWED"
 	}
 	fmt.Printf("kubesage web UI (%s) · open:\n\n  %s\n\n", mode, srv.URL)
-	if !strings.HasPrefix(addr, "127.0.0.1") && !strings.HasPrefix(addr, "localhost") {
+	switch {
+	case wa.Auth != nil && app.Impersonate:
+		fmt.Println("Sign-in is on: everyone acts with their own Kubernetes permissions (impersonation).")
+	case wa.Auth != nil:
+		fmt.Println("Sign-in is on, but without serve.impersonate everyone acts with YOUR cluster credentials.")
+	case !strings.HasPrefix(addr, "127.0.0.1") && !strings.HasPrefix(addr, "localhost"):
 		fmt.Println("⚠ listening on your network: anyone with this link can use kubesage with YOUR cluster credentials.")
 	}
 	fmt.Println("The terminal UI is at /term on the same link. Ctrl+C stops the server.")
@@ -906,4 +962,104 @@ func cfgPathOrDefault(p string) string {
 		return p
 	}
 	return config.DefaultPath()
+}
+
+func runBot(cfg *config.Config, kubeconfig string, def *kube.Client, args []string) {
+	addr := ":8090"
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--addr" || args[i] == "-addr" {
+			addr = args[i+1]
+		}
+	}
+	b := &bot.Bot{Owners: cfg.Owners, SlackSecret: []byte(os.Getenv(cfg.Bot.SlackSigningSecretEnv))}
+	if t := os.Getenv(cfg.Bot.TeamsTokenEnv); t != "" {
+		tok, err := base64.StdEncoding.DecodeString(t)
+		exitIf(err)
+		b.TeamsToken = tok
+	}
+	if len(b.SlackSecret) == 0 && len(b.TeamsToken) == 0 {
+		exitIf(fmt.Errorf("set bot.slack_signing_secret_env and/or bot.teams_token_env in the config, and export those variables"))
+	}
+	var mu sync.Mutex
+	clients := map[string]*kube.Client{def.Context: def, "": def}
+	b.Client = func(name string) (*kube.Client, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if c, ok := clients[name]; ok {
+			return c, nil
+		}
+		c, err := kube.New(kubeconfig, name, "")
+		if err == nil {
+			clients[name] = c
+		}
+		return c, err
+	}
+	for _, name := range def.Contexts() {
+		for _, p := range cfg.Bot.Contexts {
+			if re, err := regexp.Compile(p); err == nil && re.MatchString(name) {
+				b.Contexts = append(b.Contexts, name)
+				break
+			}
+		}
+	}
+	fmt.Printf("kubesage bot (read-only) on %s · Slack: POST /slack · Teams: POST /teams · health: GET /healthz\n", addr)
+	srv := &http.Server{Addr: addr, Handler: b.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	exitIf(srv.ListenAndServe())
+}
+
+func runSnapshot(cfg *config.Config, cfgPath string, c *kube.Client, args []string) {
+	base := filepath.Join(filepath.Dir(cfgPathOrDefault(cfgPath)), "snapshots")
+	ns := c.Namespace
+	if ns == "" {
+		exitIf(fmt.Errorf("pick a namespace with -n"))
+	}
+	action := "list"
+	if len(args) > 0 {
+		action = args[0]
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	switch action {
+	case "save":
+		name := ""
+		if len(args) > 1 {
+			name = args[1]
+		}
+		s, err := c.TakeSnapshot(ctx, ns, name)
+		exitIf(err)
+		p, err := s.Save(base)
+		exitIf(err)
+		fmt.Printf("✓ snapshot %s of %s/%s: %d objects → %s\n", s.Name, c.Context, ns, len(s.Objects), p)
+	case "list":
+		ss, err := kube.ListSnapshots(base, c.Context, ns)
+		exitIf(err)
+		for _, s := range ss {
+			fmt.Printf("%-24s %s  %s objects\n", s.Name, s.Taken.Local().Format("2006-01-02 15:04"), s.Objects[""])
+		}
+	case "diff":
+		if len(args) < 2 {
+			exitIf(fmt.Errorf("usage: kubesage snapshot diff <name> -n <namespace>"))
+		}
+		old, err := kube.LoadSnapshot(base, c.Context, ns, args[1])
+		exitIf(err)
+		cur, err := c.TakeSnapshot(ctx, ns, "now")
+		exitIf(err)
+		changes := kube.DiffSnapshots(old, cur)
+		for _, ch := range changes {
+			fmt.Printf("%-8s %s\n", ch.State, ch.Key)
+			if ch.State == "changed" {
+				for _, l := range diff.Lines(strings.Split(ch.Before, "\n"), strings.Split(ch.After, "\n"), 1) {
+					if l != "@@" && l[0] != ' ' {
+						fmt.Println("    " + l)
+					}
+				}
+			}
+		}
+		fmt.Printf("%d changes since %s\n", len(changes), old.Taken.Local().Format("2006-01-02 15:04"))
+		if len(changes) > 0 {
+			os.Exit(3)
+		}
+	default:
+		exitIf(fmt.Errorf("use: kubesage snapshot save [name] | list | diff <name>"))
+	}
 }

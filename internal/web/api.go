@@ -19,8 +19,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/gauravthakur02/kubesage/internal/audit"
+	"github.com/gauravthakur02/kubesage/internal/config"
 	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/owners"
 )
 
 //go:embed static
@@ -37,10 +38,27 @@ type App struct {
 	Version        string
 	Favorites      []string
 	Redact         bool
+	// AI returns the provider for a context (nil = no AI in the browser).
+	AI       AIFunc
+	LogLines int
+	// PromURL gives the Prometheus URL configured for a context ("" = none); PromToken is its bearer-token command.
+	PromURL   func(kctx string) string
+	PromToken string
+	// Owners are the ownership rules from the config.
+	Owners []owners.Rule
+	// SLOs and SnapshotBase (folder for saved snapshots) come from the config.
+	SLOs         []config.SLO
+	SnapshotBase string
+	// Impersonate makes every request act as the signed-in user (needs the server's credentials to allow impersonation).
+	Impersonate bool
 
-	mu      sync.Mutex
-	clients map[string]*kube.Client
-	crds    map[string][]kube.Resource
+	mu       sync.Mutex
+	clients  map[string]*kube.Client
+	crds     map[string][]kube.Resource
+	samples  map[string][]sample
+	forwards map[int]*webForward
+	nextFwd  int
+	users    map[string]*kube.Client // impersonated clients per context and user
 }
 
 // Assets serves /static/.
@@ -90,6 +108,45 @@ func (a *App) scoped(ctxName, ns string) (*kube.Client, error) {
 	return c.WithNamespace(ns), nil
 }
 
+// scopedFor is scoped acting as the signed-in user when impersonation is on (clients are cached per user).
+func (a *App) scopedFor(r *http.Request, ctxName, ns string) (*kube.Client, error) {
+	u := UserFrom(r)
+	if !a.Impersonate || u == nil {
+		return a.scoped(ctxName, ns)
+	}
+	base, err := a.client(ctxName)
+	if err != nil {
+		return nil, err
+	}
+	key := base.Context + "\x00" + u.Email + "\x00" + strings.Join(u.Groups, ",")
+	a.mu.Lock()
+	c, ok := a.users[key]
+	a.mu.Unlock()
+	if !ok {
+		if c, err = base.Impersonate(u.Email, u.Groups); err != nil {
+			return nil, err
+		}
+		a.mu.Lock()
+		if a.users == nil {
+			a.users = map[string]*kube.Client{}
+		}
+		a.users[key] = c
+		a.mu.Unlock()
+	}
+	if ns == "all" || ns == "" {
+		return c.WithNamespace(kube.AllNamespaces), nil
+	}
+	return c.WithNamespace(ns), nil
+}
+
+// who is the name recorded in the audit log.
+func (a *App) who(r *http.Request) string {
+	if u := UserFrom(r); u != nil {
+		return "web:" + u.Email
+	}
+	return "web"
+}
+
 func (a *App) resource(ctxName, name string) (kube.Resource, bool) {
 	if r, ok := kube.Lookup(name); ok {
 		return r, true
@@ -132,6 +189,31 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /api/logs", a.logs)
 	mux.HandleFunc("GET /api/issues", a.issues)
 	mux.HandleFunc("POST /api/action", a.action)
+	mux.HandleFunc("GET /api/edit", a.editYAML)
+	mux.HandleFunc("POST /api/dryrun", a.dryRun)
+	mux.HandleFunc("POST /api/apply", a.applyYAML)
+	mux.HandleFunc("GET /api/compare", a.compare)
+	mux.HandleFunc("POST /api/ai/analyze", a.aiAnalyze)
+	mux.HandleFunc("POST /api/ai/chat", a.aiChat)
+	mux.HandleFunc("POST /api/ai/fix", a.aiFix)
+	mux.HandleFunc("POST /api/forward", a.forwardStart)
+	mux.HandleFunc("GET /api/forwards", a.forwardList)
+	mux.HandleFunc("POST /api/forward/stop", a.forwardStop)
+	mux.HandleFunc("GET /api/metrics", a.metrics)
+	mux.HandleFunc("GET /api/owner", a.owner)
+	mux.HandleFunc("GET /api/changes", a.changes)
+	mux.HandleFunc("GET /api/slos", a.slos)
+	mux.HandleFunc("GET /api/snapshots", a.snapshots)
+	mux.HandleFunc("POST /api/snapshots", a.snapshots)
+	mux.HandleFunc("GET /api/snapshot/diff", a.snapshotDiff)
+	mux.HandleFunc("GET /api/whoami", func(w http.ResponseWriter, r *http.Request) {
+		u := UserFrom(r)
+		if u == nil {
+			writeJSON(w, map[string]any{"signedIn": false})
+			return
+		}
+		writeJSON(w, map[string]any{"signedIn": true, "email": u.Email, "groups": u.Groups})
+	})
 	return mux
 }
 
@@ -158,8 +240,12 @@ func (a *App) meta(w http.ResponseWriter, r *http.Request) {
 	if ns == "" {
 		ns = "all"
 	}
+	user := ""
+	if u := UserFrom(r); u != nil {
+		user = u.Email
+	}
 	writeJSON(w, map[string]any{"version": a.Version, "readOnly": a.ReadOnly, "contexts": ctxs, "context": c.Context,
-		"namespace": ns, "favorites": a.Favorites, "groups": kube.GroupOrder})
+		"namespace": ns, "favorites": a.Favorites, "groups": kube.GroupOrder, "ai": a.AI != nil, "user": user})
 }
 
 type resourceInfo struct {
@@ -239,11 +325,12 @@ type rowJSON struct {
 	Name   string   `json:"name"`
 	Cells  []string `json:"cells"`
 	Health string   `json:"health"`
+	Trend  []int64  `json:"trend,omitempty"` // CPU millicores over time (pods)
 }
 
 func (a *App) target(r *http.Request) (*kube.Client, kube.Resource, string, string, error) {
 	q := r.URL.Query()
-	c, err := a.scoped(q.Get("ctx"), q.Get("ns"))
+	c, err := a.scopedFor(r, q.Get("ctx"), q.Get("ns"))
 	if err != nil {
 		return nil, kube.Resource{}, "", "", err
 	}
@@ -267,11 +354,89 @@ func (a *App) list(w http.ResponseWriter, r *http.Request) {
 		fail(w, 502, err)
 		return
 	}
-	rows := make([]rowJSON, 0, len(t.Rows))
-	for _, row := range t.Rows {
-		rows = append(rows, rowJSON{NS: row.Namespace, Name: row.Name, Cells: row.Cells, Health: healthName[row.Health]})
+	if res.Name == "pods" {
+		a.record(c.Context, t.Rows)
 	}
-	writeJSON(w, map[string]any{"columns": t.Columns, "rows": rows, "note": t.Note, "at": time.Now().Format(time.RFC3339)})
+	q := r.URL.Query()
+	rows := filterRows(t.Rows, q.Get("filter"))
+	if col, err := strconv.Atoi(q.Get("sort")); err == nil && col >= 0 && col < len(t.Columns) {
+		sortRows(rows, col, q.Get("dir") == "desc")
+	}
+	total := len(rows)
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	if limit <= 0 || limit > 5000 {
+		limit = 500
+	}
+	offset = min(max(0, offset), total)
+	rows = rows[offset:min(total, offset+limit)]
+	out := make([]rowJSON, 0, len(rows))
+	for _, row := range rows {
+		j := rowJSON{NS: row.Namespace, Name: row.Name, Cells: row.Cells, Health: healthName[row.Health]}
+		if res.Name == "pods" {
+			for _, s := range a.trend(c.Context, row.Namespace, row.Name) {
+				j.Trend = append(j.Trend, s.CPU)
+			}
+		}
+		out = append(out, j)
+	}
+	writeJSON(w, map[string]any{"columns": t.Columns, "rows": out, "note": t.Note, "total": total, "all": len(t.Rows),
+		"offset": offset, "at": time.Now().Format(time.RFC3339)})
+}
+
+// filterRows keeps rows whose cells contain every word of the filter.
+func filterRows(rows []kube.Row, filter string) []kube.Row {
+	words := strings.Fields(strings.ToLower(filter))
+	if len(words) == 0 {
+		return append([]kube.Row(nil), rows...)
+	}
+	var out []kube.Row
+	for _, r := range rows {
+		line := strings.ToLower(r.Namespace + " " + strings.Join(r.Cells, " "))
+		ok := true
+		for _, w := range words {
+			if !strings.Contains(line, w) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+var leadingNum = regexp.MustCompile(`^(\d+(?:\.\d+)?)`)
+
+// sortRows sorts by a column, numerically when both cells start with a number ("12", "3/4", "250Mi", "5d").
+func sortRows(rows []kube.Row, col int, desc bool) {
+	cell := func(r kube.Row) string {
+		if col < len(r.Cells) {
+			return r.Cells[col]
+		}
+		return ""
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		x, y := cell(rows[i]), cell(rows[j])
+		mx, my := leadingNum.FindString(x), leadingNum.FindString(y)
+		var less bool
+		if mx != "" && my != "" {
+			fx, _ := strconv.ParseFloat(mx, 64)
+			fy, _ := strconv.ParseFloat(my, 64)
+			if fx == fy {
+				less = x < y
+			} else {
+				less = fx < fy
+			}
+		} else {
+			less = strings.ToLower(x) < strings.ToLower(y)
+		}
+		if desc {
+			return !less && x != y
+		}
+		return less
+	})
 }
 
 func (a *App) text(kind string) http.HandlerFunc {
@@ -386,7 +551,7 @@ func (a *App) pods(w http.ResponseWriter, r *http.Request) {
 // logs streams container logs as server-sent events (one event per line).
 func (a *App) logs(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	c, err := a.scoped(q.Get("ctx"), q.Get("ns"))
+	c, err := a.scopedFor(r, q.Get("ctx"), q.Get("ns"))
 	if err != nil {
 		fail(w, 400, err)
 		return
@@ -427,7 +592,7 @@ func (a *App) logs(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) issues(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	c, err := a.scoped(q.Get("ctx"), q.Get("ns"))
+	c, err := a.scopedFor(r, q.Get("ctx"), q.Get("ns"))
 	if err != nil {
 		fail(w, 400, err)
 		return
@@ -467,7 +632,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err)
 		return
 	}
-	c, err := a.scoped(req.Ctx, req.NS)
+	c, err := a.scopedFor(r, req.Ctx, req.NS)
 	if err != nil {
 		fail(w, 400, err)
 		return
@@ -505,13 +670,28 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		result = "error: " + err.Error()
 	}
-	if a.AuditPath != "" {
-		_ = audit.Append(a.AuditPath, audit.Entry{Time: time.Now().UTC(), Context: c.Context, NS: req.NS, Action: "web: " + desc,
-			Target: res.Name + "/" + req.Name, By: "web", Result: result})
-	}
+	_ = result
+	a.audit(r, c.Context, req.NS, desc, res.Name+"/"+req.Name, err)
 	if err != nil {
 		fail(w, 502, err)
 		return
 	}
 	writeJSON(w, map[string]string{"status": desc + " " + req.Name})
+}
+
+// owner says which team owns an object (config rules first, then owner/team labels).
+func (a *App) owner(w http.ResponseWriter, r *http.Request) {
+	c, res, ns, name, err := a.target(r)
+	if err != nil {
+		fail(w, 400, err)
+		return
+	}
+	ctx, cancel := reqCtx(r, 15*time.Second)
+	defer cancel()
+	var labels, annos map[string]string
+	if obj, err := c.Get(ctx, res, ns, name); err == nil {
+		labels, annos = obj.GetLabels(), obj.GetAnnotations()
+	}
+	o, found := owners.Resolve(a.Owners, ns, labels, annos)
+	writeJSON(w, map[string]any{"found": found, "team": o.Team, "contact": o.Contact, "source": o.Source})
 }

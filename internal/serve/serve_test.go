@@ -1,15 +1,19 @@
 package serve
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/net/websocket"
+
+	"github.com/gauravthakur02/kubesage/internal/web"
 )
 
 // echoModel shows the last key and the window size.
@@ -36,7 +40,7 @@ func (m echoModel) View() string { return "keys=" + m.last + " size=" + itoa(m.w
 func itoa(n int) string { b, _ := json.Marshal(n); return string(b) }
 
 func TestServeSession(t *testing.T) {
-	s, err := Start("127.0.0.1:0", true, func() (tea.Model, error) { return echoModel{}, nil })
+	s, err := Start("127.0.0.1:0", true, func(*http.Request) (tea.Model, error) { return echoModel{}, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +83,7 @@ func TestStartAppRoutes(t *testing.T) {
 		Assets: http.StripPrefix("/static/", http.FileServer(http.Dir(t.TempDir()))),
 		Index:  func(tok string) []byte { return []byte("APP " + tok) },
 	}
-	s, err := StartApp("127.0.0.1:0", true, func() (tea.Model, error) { return echoModel{}, nil }, app)
+	s, err := StartApp("127.0.0.1:0", true, func(*http.Request) (tea.Model, error) { return echoModel{}, nil }, app)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,5 +119,45 @@ func TestStartAppRoutes(t *testing.T) {
 	}
 	if c, _ := status("/", nil); c != 403 {
 		t.Fatalf("index without token = %d", c)
+	}
+}
+
+func TestSignInRequired(t *testing.T) {
+	var idp *httptest.Server
+	idp = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"issuer": idp.URL, "authorization_endpoint": idp.URL + "/authorize",
+			"token_endpoint": idp.URL + "/token", "jwks_uri": idp.URL + "/jwks", "id_token_signing_alg_values_supported": []string{"RS256"}})
+	}))
+	defer idp.Close()
+	auth, err := web.NewOIDC(context.Background(), web.OIDCConfig{Issuer: idp.URL, ClientID: "kubesage", RedirectURL: "http://127.0.0.1/auth/callback"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := &WebApp{API: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("api")) }),
+		Assets: http.NotFoundHandler(), Index: func(string) []byte { return []byte("APP") }, Auth: auth, PublicURL: "http://127.0.0.1/"}
+	s, err := StartApp("127.0.0.1:0", true, func(*http.Request) (tea.Model, error) { return echoModel{}, nil }, app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.srv.Close()
+	base := "http://" + s.ln.Addr().String()
+	cl := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	for path, want := range map[string]int{"/": 302, "/term": 302, "/api/meta": 403, "/?t=" + s.Token: 302, "/auth/login": 302} {
+		r, err := cl.Get(base + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Body.Close()
+		if r.StatusCode != want {
+			t.Errorf("%s = %d, want %d", path, r.StatusCode, want)
+		}
+	}
+	req, _ := http.NewRequest("GET", base+"/api/meta", nil)
+	req.Header.Set("X-Kubesage-Token", s.Token)
+	if r, _ := cl.Do(req); r.StatusCode != 403 {
+		t.Fatalf("token accepted although sign-in is on: %d", r.StatusCode)
+	}
+	if s.URL != "http://127.0.0.1/" {
+		t.Fatalf("printed URL = %s", s.URL)
 	}
 }

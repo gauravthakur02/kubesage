@@ -19,16 +19,19 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/net/websocket"
+
+	"github.com/gauravthakur02/kubesage/internal/web"
 )
 
-// NewModel builds a fresh UI for one browser session.
-type NewModel func() (tea.Model, error)
+// NewModel builds a fresh UI for one browser session; r carries the signed-in user (web.UserFrom), if any.
+type NewModel func(r *http.Request) (tea.Model, error)
 
 // Server serves the web UI.
 type Server struct {
 	Token    string
 	URL      string
 	ReadOnly bool
+	app      *WebApp
 	srv      *http.Server
 	ln       net.Listener
 	mu       sync.Mutex
@@ -37,9 +40,42 @@ type Server struct {
 
 // WebApp is the browser UI mounted at / (the terminal UI then lives at /term).
 type WebApp struct {
-	API    http.Handler        // /api/*, only reached with the session token
-	Assets http.Handler        // /static/* (public files, no cluster data)
-	Index  func(string) []byte // the app page with the token filled in
+	API     http.Handler        // /api/*, only reached when signed in or with the session token
+	Assets  http.Handler        // /static/* (public files, no cluster data)
+	Index   func(string) []byte // the app page with the token filled in
+	Forward http.Handler        // /fwd/<id>/… proxies to port-forwards (optional)
+	// Auth signs people in with OIDC; without it the random token in the link is the only key.
+	Auth *web.OIDC
+	// PublicURL is the address people open when Auth is on (from the OIDC redirect URL).
+	PublicURL string
+}
+
+const fwdCookie = "kubesage_fwd"
+
+// authorize says whether a request may use the app, and attaches the signed-in user.
+func (s *Server) authorize(r *http.Request) (*http.Request, bool) {
+	if s.app != nil && s.app.Auth != nil {
+		u := s.app.Auth.User(r)
+		if u == nil {
+			return r, false
+		}
+		return web.WithUser(r, u), true
+	}
+	if s.ok(r) || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Kubesage-Token")), []byte(s.Token)) == 1 {
+		return r, true
+	}
+	if c, err := r.Cookie(fwdCookie); err == nil && strings.HasPrefix(r.URL.Path, "/fwd/") && subtle.ConstantTimeCompare([]byte(c.Value), []byte(s.Token)) == 1 {
+		return r, true
+	}
+	return r, false
+}
+
+func securityHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 }
 
 // Start listens on addr and serves sessions created by newModel. Only requests carrying the token are served.
@@ -57,38 +93,77 @@ func StartApp(addr string, readOnly bool, newModel NewModel, app *WebApp) (*Serv
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{Token: hex.EncodeToString(b), ln: ln, ReadOnly: readOnly}
+	s := &Server{Token: hex.EncodeToString(b), ln: ln, ReadOnly: readOnly, app: app}
 	host, port, _ := net.SplitHostPort(ln.Addr().String())
 	if host == "::" || host == "0.0.0.0" || host == "" {
 		host = outboundIP()
 	}
 	s.URL = fmt.Sprintf("http://%s/?t=%s", net.JoinHostPort(host, port), s.Token)
+	if app != nil && app.Auth != nil {
+		s.URL = app.PublicURL
+	}
 	mux := http.NewServeMux()
 	if app != nil {
+		if app.Auth != nil {
+			mux.HandleFunc("/auth/login", app.Auth.Login)
+			mux.HandleFunc("/auth/callback", app.Auth.Callback)
+			mux.HandleFunc("/auth/logout", app.Auth.Logout)
+		}
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "/" || !s.ok(r) {
+			if r.URL.Path != "/" {
+				http.NotFound(w, r)
+				return
+			}
+			if _, ok := s.authorize(r); !ok {
+				if app.Auth != nil {
+					http.Redirect(w, r, "/auth/login?back=/", http.StatusFound)
+					return
+				}
 				http.Error(w, "forbidden: open the link printed by kubesage serve", http.StatusForbidden)
 				return
 			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Header().Set("Cache-Control", "no-store")
-			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
-			w.Header().Set("Referrer-Policy", "no-referrer")
-			_, _ = w.Write(app.Index(s.Token))
+			securityHeaders(w)
+			token := s.Token
+			if app.Auth != nil {
+				token = "" // the session cookie authenticates
+			}
+			_, _ = w.Write(app.Index(token))
 		})
 		mux.Handle("/static/", app.Assets)
 		mux.Handle("/api/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Kubesage-Token")), []byte(s.Token)) != 1 && !s.ok(r) {
-				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+			r2, ok := s.authorize(r)
+			if !ok {
+				w.Header().Set("Content-Type", "application/json")
+				http.Error(w, `{"error":"forbidden: sign in again"}`, http.StatusForbidden)
 				return
 			}
-			app.API.ServeHTTP(w, r)
+			if r.Method != http.MethodGet && r.Header.Get("X-Kubesage-Token") == "" && r.Header.Get("X-Kubesage") == "" {
+				http.Error(w, `{"error":"missing X-Kubesage header"}`, http.StatusForbidden) // blocks cross-site form posts
+				return
+			}
+			app.API.ServeHTTP(w, r2)
 		}))
+		if app.Forward != nil {
+			mux.Handle("/fwd/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				r2, ok := s.authorize(r)
+				if !ok {
+					http.Error(w, "forbidden", http.StatusForbidden)
+					return
+				}
+				if s.ok(r) && app.Auth == nil { // remember the token for the forwarded app's own requests
+					http.SetCookie(w, &http.Cookie{Name: fwdCookie, Value: s.Token, Path: "/fwd/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
+				}
+				app.Forward.ServeHTTP(w, r2)
+			}))
+		}
 		mux.HandleFunc("/term", func(w http.ResponseWriter, r *http.Request) { s.page(w, r) })
 	} else {
 		mux.HandleFunc("/", s.page)
 	}
-	mux.Handle("/ws", websocket.Server{Handler: func(ws *websocket.Conn) { s.session(ws, newModel) }, Handshake: s.handshake})
+	mux.Handle("/ws", websocket.Server{Handler: func(ws *websocket.Conn) {
+		r, _ := s.authorize(ws.Request())
+		s.session(ws, func() (tea.Model, error) { return newModel(r) })
+	}, Handshake: s.handshake})
 	s.srv = &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	go s.srv.Serve(ln)
 	return s, nil
@@ -122,7 +197,7 @@ func (s *Server) ok(r *http.Request) bool {
 }
 
 func (s *Server) handshake(cfg *websocket.Config, r *http.Request) error {
-	if !s.ok(r) {
+	if _, ok := s.authorize(r); !ok {
 		return fmt.Errorf("forbidden")
 	}
 	// Same-origin only: a page on another site must not drive this session.
@@ -133,7 +208,15 @@ func (s *Server) handshake(cfg *websocket.Config, r *http.Request) error {
 }
 
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {
-	if (r.URL.Path != "/" && r.URL.Path != "/term") || !s.ok(r) {
+	if r.URL.Path != "/" && r.URL.Path != "/term" {
+		http.NotFound(w, r)
+		return
+	}
+	if _, ok := s.authorize(r); !ok {
+		if s.app != nil && s.app.Auth != nil {
+			http.Redirect(w, r, "/auth/login?back=/term", http.StatusFound)
+			return
+		}
 		http.Error(w, "forbidden: open the link printed by kubesage serve", http.StatusForbidden)
 		return
 	}
@@ -144,7 +227,11 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	if !s.ReadOnly {
 		mode = "changes allowed"
 	}
-	fmt.Fprint(w, strings.NewReplacer("{{TOKEN}}", s.Token, "{{MODE}}", mode).Replace(pageHTML))
+	token := s.Token
+	if s.app != nil && s.app.Auth != nil {
+		token = "" // signed in: the session cookie authenticates, the token is never handed out
+	}
+	fmt.Fprint(w, strings.NewReplacer("{{TOKEN}}", token, "{{MODE}}", mode).Replace(pageHTML))
 }
 
 type wsWriter struct {
@@ -168,7 +255,7 @@ type clientMsg struct {
 	Rows int    `json:"r"`
 }
 
-func (s *Server) session(ws *websocket.Conn, newModel NewModel) {
+func (s *Server) session(ws *websocket.Conn, newModel func() (tea.Model, error)) {
 	defer ws.Close()
 	ws.PayloadType = websocket.BinaryFrame
 	m, err := newModel()

@@ -11,9 +11,11 @@ package e2e
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -26,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubesage/internal/web"
 )
 
 const ns = "kubesage-e2e"
@@ -194,6 +197,76 @@ func TestE2E(t *testing.T) {
 		if err != nil || s.Nodes < 1 || s.Pods < 2 {
 			t.Fatalf("fleet = %+v, %v", s, err)
 		}
+	})
+
+	t.Run("web-api", func(t *testing.T) {
+		app := &web.App{DefaultContext: c.Context, DefaultNS: ns, ReadOnly: false, AuditPath: t.TempDir() + "/audit.log", SnapshotBase: t.TempDir()}
+		srv := httptest.NewServer(app.Handler())
+		defer srv.Close()
+		q := "ctx=" + c.Context + "&ns=" + ns
+		getJSON := func(path string, v any) {
+			t.Helper()
+			r, err := http.Get(srv.URL + path)
+			if err != nil || r.StatusCode != 200 {
+				t.Fatalf("GET %s: %v %v", path, r, err)
+			}
+			defer r.Body.Close()
+			if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+				t.Fatalf("GET %s: %v", path, err)
+			}
+		}
+		postJSON := func(path, body string) map[string]any {
+			t.Helper()
+			r, err := http.Post(srv.URL+path, "application/json", strings.NewReader(body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer r.Body.Close()
+			var out map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&out)
+			if r.StatusCode != 200 {
+				t.Fatalf("POST %s = %d %v", path, r.StatusCode, out)
+			}
+			return out
+		}
+		var list struct{ Rows []struct{ Name string } }
+		getJSON("/api/list?"+q+"&res=deployments", &list)
+		if len(list.Rows) != 1 || list.Rows[0].Name != "web" {
+			t.Fatalf("list = %+v", list)
+		}
+		var y map[string]string
+		getJSON("/api/yaml?"+q+"&res=deployments&name=web", &y)
+		var g map[string]any
+		getJSON("/api/graph?"+q+"&res=deployments&name=web", &g)
+		var tl []any
+		getJSON("/api/timeline?"+q+"&res=deployments&name=web", &tl)
+		if !strings.Contains(y["text"], "nginx") || g["root"] == nil || len(tl) == 0 {
+			t.Fatalf("yaml/graph/timeline empty")
+		}
+		var pods []struct{ Name string }
+		getJSON("/api/pods?"+q+"&res=deployments&name=web", &pods)
+		lr, err := http.Get(srv.URL + "/api/logs?" + q + "&pod=" + pods[0].Name + "&container=web&follow=0&tail=5")
+		if err != nil || lr.StatusCode != 200 || lr.Header.Get("Content-Type") != "text/event-stream" {
+			t.Fatalf("logs: %v %v", lr, err)
+		}
+		lr.Body.Close()
+		var e map[string]string
+		getJSON("/api/edit?"+q+"&res=deployments&name=web", &e)
+		dr := postJSON("/api/dryrun", fmt.Sprintf(`{"Ctx":%q,"NS":%q,"Res":"deployments","Name":"web","YAML":%q}`, c.Context, ns, strings.Replace(e["yaml"], "replicas: 2", "replicas: 3", 1)))
+		if dr["ok"] != true {
+			t.Fatalf("dry-run = %v", dr)
+		}
+		postJSON("/api/action", fmt.Sprintf(`{"Ctx":%q,"NS":%q,"Res":"deployments","Name":"web","Action":"scale","Replicas":3}`, c.Context, ns))
+		waitReady(t, c, 3)
+		postJSON("/api/action", fmt.Sprintf(`{"Ctx":%q,"NS":%q,"Res":"deployments","Name":"web","Action":"scale","Replicas":2}`, c.Context, ns))
+		var changes []map[string]string
+		getJSON("/api/changes?"+q+"&since=1h", &changes)
+		if len(changes) == 0 {
+			t.Fatal("no changes recorded")
+		}
+		postJSON("/api/snapshots", fmt.Sprintf(`{"Ctx":%q,"NS":%q,"Name":"e2e"}`, c.Context, ns))
+		var sd struct{ Changes []any }
+		getJSON("/api/snapshot/diff?"+q+"&name=e2e", &sd)
 	})
 
 	_ = c.Clientset.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{})
