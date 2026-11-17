@@ -32,6 +32,7 @@ import (
 	"github.com/gauravthakur02/kubesage/internal/serve"
 	"github.com/gauravthakur02/kubesage/internal/ui"
 	"github.com/gauravthakur02/kubesage/internal/update"
+	"github.com/gauravthakur02/kubesage/internal/web"
 )
 
 var version = "0.1.0-dev"
@@ -871,7 +872,15 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 		return ui.New(c, client, ui.Options{Kubeconfig: kubeconfig, Context: kctx, Namespace: strings.ReplaceAll(namespace, "*all*", "all"),
 			ReadOnly: ro, ChooseContext: kctx == "" && c.ChooseContext && len(client.Contexts()) > 1, Version: version}), nil
 	}
-	srv, err := serve.Start(addr, ro, newModel)
+	app := &web.App{Kubeconfig: kubeconfig, DefaultContext: strings.Split(kctx, ",")[0], DefaultNS: ns, ReadOnly: ro,
+		Version: version, Favorites: cfg.Favorites, AuditPath: filepath.Join(filepath.Dir(cfgPathOrDefault(cfgPath)), "audit.log")}
+	if namespace == "*all*" {
+		app.DefaultNS = "all"
+	}
+	if cfg.DangerContexts != "" {
+		app.Danger, _ = regexp.Compile(cfg.DangerContexts)
+	}
+	srv, err := serve.StartApp(addr, ro, newModel, &serve.WebApp{API: app.Handler(), Assets: web.Assets(), Index: web.Index})
 	exitIf(err)
 	mode := "read-only"
 	if !ro {
@@ -881,7 +890,7 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 	if !strings.HasPrefix(addr, "127.0.0.1") && !strings.HasPrefix(addr, "localhost") {
 		fmt.Println("⚠ listening on your network: anyone with this link can use kubesage with YOUR cluster credentials.")
 	}
-	fmt.Println("Shells, $EDITOR and plugins are disabled in the browser. Ctrl+C stops the server.")
+	fmt.Println("The terminal UI is at /term on the same link. Ctrl+C stops the server.")
 	if (strings.HasPrefix(addr, "127.0.0.1") || strings.HasPrefix(addr, "localhost")) && cfg.OpenBrowser && !noBrowser {
 		if err := ui.OpenBrowser(srv.URL); err != nil {
 			fmt.Println("(could not open a browser: " + err.Error() + "; open the link above)")
@@ -890,4 +899,11 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	exitIf(srv.Wait(ctx))
+}
+
+func cfgPathOrDefault(p string) string {
+	if p != "" {
+		return p
+	}
+	return config.DefaultPath()
 }

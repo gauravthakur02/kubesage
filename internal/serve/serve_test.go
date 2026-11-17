@@ -2,6 +2,8 @@ package serve
 
 import (
 	"encoding/json"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -68,5 +70,50 @@ func TestServeSession(t *testing.T) {
 	}
 	if s.Sessions() != 1 {
 		t.Fatalf("sessions = %d", s.Sessions())
+	}
+}
+
+func TestStartAppRoutes(t *testing.T) {
+	app := &WebApp{
+		API:    http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"ok":true}`)) }),
+		Assets: http.StripPrefix("/static/", http.FileServer(http.Dir(t.TempDir()))),
+		Index:  func(tok string) []byte { return []byte("APP " + tok) },
+	}
+	s, err := StartApp("127.0.0.1:0", true, func() (tea.Model, error) { return echoModel{}, nil }, app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.srv.Close()
+	base := strings.Split(s.URL, "/?")[0]
+	status := func(path string, hdr map[string]string) (int, string) {
+		req, _ := http.NewRequest("GET", base+path, nil)
+		for k, v := range hdr {
+			req.Header.Set(k, v)
+		}
+		r, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer r.Body.Close()
+		b, _ := io.ReadAll(r.Body)
+		return r.StatusCode, string(b)
+	}
+	if c, _ := status("/api/meta", nil); c != 403 {
+		t.Fatalf("api without token = %d", c)
+	}
+	if c, _ := status("/api/meta", map[string]string{"X-Kubesage-Token": "wrong"}); c != 403 {
+		t.Fatalf("api with wrong token = %d", c)
+	}
+	if c, b := status("/api/meta", map[string]string{"X-Kubesage-Token": s.Token}); c != 200 || !strings.Contains(b, "ok") {
+		t.Fatalf("api with token = %d %s", c, b)
+	}
+	if c, b := status("/?t="+s.Token, nil); c != 200 || b != "APP "+s.Token {
+		t.Fatalf("index = %d %s", c, b)
+	}
+	if c, b := status("/term?t="+s.Token, nil); c != 200 || !strings.Contains(b, "xterm") {
+		t.Fatalf("term = %d", c)
+	}
+	if c, _ := status("/", nil); c != 403 {
+		t.Fatalf("index without token = %d", c)
 	}
 }

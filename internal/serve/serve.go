@@ -35,8 +35,20 @@ type Server struct {
 	sessions int
 }
 
+// WebApp is the browser UI mounted at / (the terminal UI then lives at /term).
+type WebApp struct {
+	API    http.Handler        // /api/*, only reached with the session token
+	Assets http.Handler        // /static/* (public files, no cluster data)
+	Index  func(string) []byte // the app page with the token filled in
+}
+
 // Start listens on addr and serves sessions created by newModel. Only requests carrying the token are served.
 func Start(addr string, readOnly bool, newModel NewModel) (*Server, error) {
+	return StartApp(addr, readOnly, newModel, nil)
+}
+
+// StartApp is Start with the web app at / and the terminal UI at /term.
+func StartApp(addr string, readOnly bool, newModel NewModel, app *WebApp) (*Server, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return nil, err
@@ -52,7 +64,30 @@ func Start(addr string, readOnly bool, newModel NewModel) (*Server, error) {
 	}
 	s.URL = fmt.Sprintf("http://%s/?t=%s", net.JoinHostPort(host, port), s.Token)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", s.page)
+	if app != nil {
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/" || !s.ok(r) {
+				http.Error(w, "forbidden: open the link printed by kubesage serve", http.StatusForbidden)
+				return
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+			w.Header().Set("Referrer-Policy", "no-referrer")
+			_, _ = w.Write(app.Index(s.Token))
+		})
+		mux.Handle("/static/", app.Assets)
+		mux.Handle("/api/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Kubesage-Token")), []byte(s.Token)) != 1 && !s.ok(r) {
+				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				return
+			}
+			app.API.ServeHTTP(w, r)
+		}))
+		mux.HandleFunc("/term", func(w http.ResponseWriter, r *http.Request) { s.page(w, r) })
+	} else {
+		mux.HandleFunc("/", s.page)
+	}
 	mux.Handle("/ws", websocket.Server{Handler: func(ws *websocket.Conn) { s.session(ws, newModel) }, Handshake: s.handshake})
 	s.srv = &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	go s.srv.Serve(ln)
@@ -98,7 +133,7 @@ func (s *Server) handshake(cfg *websocket.Config, r *http.Request) error {
 }
 
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" || !s.ok(r) {
+	if (r.URL.Path != "/" && r.URL.Path != "/term") || !s.ok(r) {
 		http.Error(w, "forbidden: open the link printed by kubesage serve", http.StatusForbidden)
 		return
 	}

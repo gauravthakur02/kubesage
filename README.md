@@ -631,13 +631,35 @@ your config). `enter` shows the exact command it will run and installs it on con
 
 ## In the browser and in VS Code
 
-**Web UI (`kubesage serve`).** The full kubesage in a browser tab, for teammates who do not live in a terminal. Each tab is its own session.
-It is **read-only unless you pass `--allow-changes`**, listens on 127.0.0.1:7777 unless you pass `--lan` (then anyone with the link can use
-kubesage with *your* credentials), and every request needs the random token in the printed link. Shells, `$EDITOR` and plugins are disabled
-in the browser because they would run on the server's terminal.
+**Web UI (`kubesage serve`).** A browser app for the same clusters, built for mouse *and* keyboard, so it is not just the terminal
+in a tab:
+
+- **Navigate:** a sidebar with every resource type (built-in and CRDs, grouped), cluster and namespace pickers, and a live table that
+  refreshes every 5 seconds, with health dots, sort on any column header and a row filter.
+- **Inspect:** click a row (or press `enter`) to open a side panel with Describe, YAML (secret values stay masked), Timeline (events,
+  rollouts, restarts), Relations (what the object is made of and what reaches it; click a part to open it) and streaming Logs with a
+  pod/container picker, previous-container logs, highlighting and copy.
+- **Health check:** every detected problem in the namespace with what to do about it.
+- **Keys:** `j`/`k` or arrows, `enter`, `esc`, `/` filter, `1`–`9` favourite resources, `d y t w l` panel tabs, `H` health, `r` refresh,
+  `Ctrl+K` go to any resource, cluster or namespace, `?` all keys.
+- **Links:** the address bar always describes the view (cluster, namespace, resource, object, tab), so a link opens the same view.
+  The session token is not part of the copied link.
+- **Changes:** Scale, Restart and Delete appear in the panel only with `--allow-changes`; production-like contexts need the object's
+  name typed, and every change is written to the audit log as `web`.
+- **The terminal UI** is still at `/term` on the same link, for everything else (AI, Helm, port-forwards, …).
+
+Who it is for, honestly: people who cannot or do not want to install kubesage (a locked-down laptop, a tablet), and running kubesage on
+a **jump host** that can reach private clusters while you browse from your laptop (`ssh -L 7777:127.0.0.1:7777 jumphost`, then
+`kubesage serve` there). If you already use kubesage in a terminal, the browser adds point-and-click and shareable views, not new
+cluster powers.
+
+Safety: it is **read-only unless you pass `--allow-changes`**, listens on 127.0.0.1:7777 unless you pass `--lan`, opens your browser
+when it is local (`--no-browser` to skip), and every request needs the random token in the printed link. Everyone who opens the link
+acts with **your** cluster credentials, so only share it with people you would hand your kubeconfig to. Shells, `$EDITOR` and plugins
+are disabled in the browser because they would run on the server's machine.
 ```bash
-kubesage serve                        # http://127.0.0.1:7777/?t=…
-kubesage serve --lan --addr :8080     # on your network, read-only
+kubesage serve --context staging              # opens http://127.0.0.1:7777/?t=…
+kubesage serve --lan --addr :8080             # on your network, still read-only
 ```
 
 **VS Code.** [`editors/vscode`](editors/vscode) is a small extension: open kubesage in an editor tab (`Cmd/Ctrl+Alt+K`), pick a cluster,
