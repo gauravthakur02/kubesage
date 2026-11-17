@@ -79,7 +79,8 @@ pre.code { margin: 0; font: 12.5px/1.5 var(--mono); white-space: pre; tab-size: 
 pre.code .k { color: var(--accent); } pre.code .c { color: var(--muted); }
 .toolbar { display: flex; gap: 8px; align-items: center; margin: -10px -14px 8px; padding: 8px 14px; flex-wrap: wrap;
   position: sticky; top: -10px; background: var(--bg2); border-bottom: 1px solid var(--line); z-index: 1; }
-.toolbar + .toolbar { position: static; margin-top: -8px; }
+.toolbar.stack { flex-direction: column; align-items: stretch; gap: 6px; }
+.tbrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .toolbar select, .toolbar input { background: var(--bg3); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
 .logs { font: 12.5px/1.45 var(--mono); white-space: pre-wrap; word-break: break-all; }
 .logs .err { color: var(--err); } .logs .warn { color: var(--warn); }

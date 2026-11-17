@@ -616,11 +616,12 @@ async function showLogs(body) {
     document.body.append(a); a.click(); a.remove();
     toast("Download started");
   };
-  body.replaceChildren(h("div", { class: "toolbar" }, podSel, ctrSel, search, h("label", {}, follow, " follow"), h("label", {}, prev, " previous"),
-    h("button", { class: "ghost", onclick: () => { navigator.clipboard?.writeText(out.innerText); toast("Copied"); } }, "Copy"), status),
-    h("div", { class: "toolbar" }, h("span", { class: "muted", text: "Download" }), win,
+  body.replaceChildren(h("div", { class: "toolbar stack" },
+    h("div", { class: "tbrow" }, podSel, ctrSel, search, h("label", {}, follow, " follow"), h("label", {}, prev, " previous"),
+      h("button", { class: "ghost", onclick: () => { navigator.clipboard?.writeText(out.innerText); toast("Copied"); } }, "Copy"), status),
+    h("div", { class: "tbrow" }, h("span", { class: "muted", text: "⬇ Download" }), win,
       h("button", { class: "ghost", title: "The complete log of this container, not just what is shown", onclick: () => dl("logs/download", { pod: podSel.value, container: ctrSel.value, previous: prev.checked ? "1" : "0", timestamps: "1" }) }, "This container (.log)"),
-      h("button", { class: "ghost", title: "Every pod and container, including logs from before restarts, plus a summary", onclick: () => dl("logs/bundle", { res: sel.res, name: sel.name }) }, pods.length > 1 ? `All ${pods.length} pods (.zip)` : "All containers (.zip)")),
+      h("button", { class: "ghost", title: "Every pod and container, including logs from before restarts, plus a summary", onclick: () => dl("logs/bundle", { res: sel.res, name: sel.name }) }, pods.length > 1 ? `All ${pods.length} pods (.zip)` : "All containers (.zip)"))),
     out);
   start();
 }

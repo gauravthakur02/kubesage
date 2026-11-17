@@ -138,14 +138,16 @@ func unstructuredInt(o map[string]any, f ...string) (int64, bool, error) {
 }
 
 func TestIndexAndAssets(t *testing.T) {
-	if !strings.Contains(string(Index("tok123")), `"tok123"`) {
-		t.Fatal("token not in page")
+	AssetVersion = "9.9.9"
+	page := string(Index("tok123"))
+	if !strings.Contains(page, `"tok123"`) || !strings.Contains(page, "/static/app.js?v=9.9.9") || !strings.Contains(page, "/static/app.css?v=9.9.9") {
+		t.Fatalf("token or versioned assets missing:\n%s", page)
 	}
 	srv := httptest.NewServer(http.StripPrefix("", Assets()))
 	defer srv.Close()
 	for _, f := range []string{"/static/app.js", "/static/app.css"} {
-		r, err := http.Get(srv.URL + f)
-		if err != nil || r.StatusCode != 200 {
+		r, err := http.Get(srv.URL + f + "?v=9.9.9")
+		if err != nil || r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-cache" {
 			t.Fatalf("%s: %v %v", f, r, err)
 		}
 	}

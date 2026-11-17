@@ -865,6 +865,7 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 	}
 	ro := readOnly || cfg.ReadOnly || !allow
 	ui.WebMode = true
+	web.AssetVersion = version
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	lipgloss.SetHasDarkBackground(true)
 	ns := strings.ReplaceAll(namespace, "*all*", "")

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
@@ -61,16 +62,25 @@ type App struct {
 	users    map[string]*kube.Client // impersonated clients per context and user
 }
 
-// Assets serves /static/.
+// AssetVersion is added to script and style URLs (the kubesage version), so an upgrade never shows a cached old app.
+var AssetVersion = "dev"
+
+// Assets serves /static/. Browsers must revalidate, so a restarted server always delivers its own files.
 func Assets() http.Handler {
 	sub, _ := fs.Sub(static, "static")
-	return http.StripPrefix("/static/", http.FileServer(http.FS(sub)))
+	files := http.StripPrefix("/static/", http.FileServer(http.FS(sub)))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		files.ServeHTTP(w, r)
+	})
 }
 
-// Index is the app page with the session token filled in.
+// Index is the app page with the session token and asset version filled in.
 func Index(token string) []byte {
 	b, _ := static.ReadFile("static/index.html")
-	return []byte(strings.ReplaceAll(string(b), "{{TOKEN}}", token))
+	v := url.QueryEscape(AssetVersion)
+	return []byte(strings.NewReplacer("{{TOKEN}}", token, "/static/app.js", "/static/app.js?v="+v, "/static/app.css", "/static/app.css?v="+v).Replace(string(b)))
 }
 
 func (a *App) client(name string) (*kube.Client, error) {
