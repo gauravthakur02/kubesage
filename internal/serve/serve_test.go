@@ -111,11 +111,43 @@ func TestStartAppRoutes(t *testing.T) {
 	if c, b := status("/api/meta", map[string]string{"X-Kubesage-Token": s.Token}); c != 200 || !strings.Contains(b, "ok") {
 		t.Fatalf("api with token = %d %s", c, b)
 	}
-	if c, b := status("/?t="+s.Token, nil); c != 200 || b != "APP "+s.Token {
-		t.Fatalf("index = %d %s", c, b)
+	// the link's token becomes an HttpOnly cookie and leaves the URL
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	r, err := noRedirect.Get(base + "/?t=" + s.Token)
+	if err != nil || r.StatusCode != 302 || r.Header.Get("Location") != "/" {
+		t.Fatalf("token swap = %v %v", r, err)
 	}
-	if c, b := status("/term?t="+s.Token, nil); c != 200 || !strings.Contains(b, "xterm") {
-		t.Fatalf("term = %d", c)
+	var tok *http.Cookie
+	for _, c := range r.Cookies() {
+		if c.Name == tokenCookie {
+			tok = c
+		}
+	}
+	if tok == nil || !tok.HttpOnly || tok.SameSite != http.SameSiteStrictMode {
+		t.Fatalf("cookie = %+v", tok)
+	}
+	withCookie := func(path string) (int, string, http.Header) {
+		req, _ := http.NewRequest("GET", base+path, nil)
+		req.AddCookie(tok)
+		r, err := noRedirect.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer r.Body.Close()
+		b, _ := io.ReadAll(r.Body)
+		return r.StatusCode, string(b), r.Header
+	}
+	if c, b, h := withCookie("/"); c != 200 || b != "APP " || strings.Contains(h.Get("Content-Security-Policy"), "unsafe-inline") {
+		t.Fatalf("index with cookie = %d %q csp=%q", c, b, h.Get("Content-Security-Policy"))
+	}
+	if c, b, _ := withCookie("/api/meta"); c != 200 || !strings.Contains(b, "ok") {
+		t.Fatalf("api with cookie = %d", c)
+	}
+	if c, b, _ := withCookie("/term"); c != 200 || !strings.Contains(b, `integrity="sha384-`) || strings.Contains(b, s.Token) {
+		t.Fatalf("term with cookie = %d (SRI or token leak)", c)
+	}
+	if r, _ := noRedirect.Get(base + "/term?t=" + s.Token); r.StatusCode != 302 || r.Header.Get("Location") != "/term" {
+		t.Fatalf("term with token = %d %s", r.StatusCode, r.Header.Get("Location"))
 	}
 	if c, _ := status("/", nil); c != 403 {
 		t.Fatalf("index without token = %d", c)

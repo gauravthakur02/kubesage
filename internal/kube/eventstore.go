@@ -37,7 +37,21 @@ type EventStore struct {
 	seen map[string]map[string]int32 // context -> uid -> last stored count
 }
 
-var unsafeFile = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+var unsafeChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+
+// unsafeFile makes a safe single path element: no separators, and never "." or "..".
+var unsafeFile = fileNamer{}
+
+type fileNamer struct{}
+
+func (fileNamer) ReplaceAllString(s, repl string) string {
+	s = unsafeChars.ReplaceAllString(s, repl)
+	s = strings.TrimLeft(s, ".")
+	if s == "" {
+		s = repl
+	}
+	return s
+}
 
 func (s *EventStore) file(kctx string) string {
 	return filepath.Join(s.Dir, unsafeFile.ReplaceAllString(kctx, "_")+".jsonl")

@@ -1,7 +1,7 @@
 // kubesage web UI. Plain JavaScript, no build step. Data comes from the kubesage JSON API (/api/*).
 "use strict";
 
-const TOKEN = window.KUBESAGE_TOKEN;
+const TOKEN = document.querySelector('meta[name="kubesage-token"]')?.content || ""; // normally empty: an HttpOnly cookie authenticates
 const $ = (s) => document.querySelector(s);
 
 // h builds DOM nodes; text is always set with textContent, never parsed as HTML.
@@ -27,7 +27,7 @@ const svg = (tag, attrs, ...kids) => {
   return el;
 };
 
-const HEADERS = { "X-Kubesage-Token": TOKEN, "X-Kubesage": "1", "Content-Type": "application/json" };
+const HEADERS = { "X-Kubesage": "1", "Content-Type": "application/json", ...(TOKEN ? { "X-Kubesage-Token": TOKEN } : {}) };
 
 async function api(path, params, opts) {
   const q = new URLSearchParams(params || {});
@@ -107,7 +107,8 @@ async function boot() {
   mode.textContent = S.meta.readOnly ? "READ-ONLY" : "CHANGES ALLOWED";
   mode.className = "badge " + (S.meta.readOnly ? "ro" : "rw");
   $("#termLink").href = "/term" + (TOKEN ? "?t=" + encodeURIComponent(TOKEN) : "");
-  if (S.meta.user) $("#user").replaceChildren(h("span", { class: "muted", text: S.meta.user }), " ", h("a", { href: "/auth/logout", class: "ghost" }, "Sign out"));
+  if (S.meta.user) $("#user").replaceChildren(h("span", { class: "muted", text: S.meta.user }), " ",
+    h("form", { method: "post", action: "/auth/logout", class: "inline" }, h("button", { class: "ghost", type: "submit" }, "Sign out")));
   $("#chatBtn").classList.toggle("hidden", !S.meta.ai);
   wireChrome();
   await loadContext(false);
@@ -757,7 +758,7 @@ async function actForward() {
   try {
     const f = await post("forward", targetBody());
     toast("Forwarding " + f.desc);
-    window.open(f.path + (TOKEN ? "?t=" + encodeURIComponent(TOKEN) : ""), "_blank", "noopener");
+    window.open(f.url, "_blank", "noopener");
     refreshForwards();
   } catch (e) { toast(e.message, true); }
 }
@@ -766,7 +767,7 @@ async function refreshForwards() {
   const box = $("#forwards");
   try {
     const fs = await api("forwards");
-    box.replaceChildren(...fs.map((f) => h("span", { class: "fwd" }, h("a", { href: f.path + (TOKEN ? "?t=" + encodeURIComponent(TOKEN) : ""), target: "_blank", rel: "noopener", text: "⇄ " + f.desc }),
+    box.replaceChildren(...fs.map((f) => h("span", { class: "fwd" }, h("a", { href: f.url, target: "_blank", rel: "noopener noreferrer", text: "⇄ " + f.desc }),
       h("button", { class: "ghost tiny", "aria-label": "Stop " + f.desc, onclick: async () => { await post("forward/stop?id=" + f.id, {}).catch(() => {}); refreshForwards(); } }, "✕"))));
   } catch (_) { box.replaceChildren(); }
 }

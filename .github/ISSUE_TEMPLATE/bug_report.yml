@@ -1,0 +1,44 @@
+name: Bug report
+description: Something in kubesage does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Security problems:** please use the Security tab → Report a vulnerability instead.
+        Do not paste Secret values, tokens, internal hostnames or customer data.
+  - type: input
+    id: version
+    attributes:
+      label: kubesage version
+      description: Output of `kubesage version`
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it happen?
+      options: [Terminal UI, Web UI (kubesage serve), Command line (scan, report, …), Bot, MCP server, Install / update]
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: OS, terminal and Kubernetes
+      placeholder: macOS 26 / iTerm2 / AKS 1.35
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. open :pods in a namespace with …\n2. press …"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error message or screenshot
+      render: text

@@ -142,7 +142,7 @@ type flow struct {
 // Login starts sign-in (/auth/login).
 func (o *OIDC) Login(w http.ResponseWriter, r *http.Request) {
 	f := flow{State: randomString(), Nonce: randomString(), Verifier: oauth2.GenerateVerifier(), Exp: time.Now().Add(10 * time.Minute).Unix()}
-	if b := r.URL.Query().Get("back"); strings.HasPrefix(b, "/") && !strings.HasPrefix(b, "//") {
+	if b := r.URL.Query().Get("back"); strings.HasPrefix(b, "/") && !strings.HasPrefix(b, "//") && !strings.ContainsAny(b, "\\\r\n") {
 		f.Back = b
 	}
 	o.setCookie(w, flowCookie, o.sign(f), "/auth/", 10*time.Minute)
@@ -229,8 +229,13 @@ func (o *OIDC) userFromClaims(claims map[string]any) (*User, error) {
 	return u, nil
 }
 
-// Logout ends the session (/auth/logout).
+// Logout ends the session (POST /auth/logout; a GET cannot sign anyone out, so other sites cannot either).
 func (o *OIDC) Logout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "use POST", http.StatusMethodNotAllowed)
+		return
+	}
 	o.setCookie(w, sessionCookie, "", "/", -time.Second)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte("Signed out of kubesage. <a href=\"/\">Sign in again</a>"))
 }

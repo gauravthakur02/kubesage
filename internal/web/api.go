@@ -50,6 +50,10 @@ type App struct {
 	// SLOs and SnapshotBase (folder for saved snapshots) come from the config.
 	SLOs         []config.SLO
 	SnapshotBase string
+	// Contexts limits which kube-contexts the web UI offers (nil = all in the kubeconfig).
+	Contexts *regexp.Regexp
+	// ForwardBind is the address port-forward proxies listen on (127.0.0.1, or 0.0.0.0 when serving the network).
+	ForwardBind string
 	// Impersonate makes every request act as the signed-in user (needs the server's credentials to allow impersonation).
 	Impersonate bool
 
@@ -94,6 +98,9 @@ func (a *App) client(name string) (*kube.Client, error) {
 	}
 	if c, ok := a.clients[name]; ok {
 		return c, nil
+	}
+	if name != "" && a.Contexts != nil && !a.Contexts.MatchString(name) {
+		return nil, fmt.Errorf("context %q is not offered by this kubesage (serve.contexts)", name)
 	}
 	c, err := kube.New(a.Kubeconfig, name, a.DefaultNS)
 	if err != nil {
@@ -243,6 +250,9 @@ func (a *App) meta(w http.ResponseWriter, r *http.Request) {
 	}
 	var ctxs []contextInfo
 	for _, n := range c.Contexts() {
+		if a.Contexts != nil && !a.Contexts.MatchString(n) && n != c.Context {
+			continue
+		}
 		ctxs = append(ctxs, contextInfo{Name: n, Cluster: c.ClusterOf(n), Danger: a.Danger != nil && a.Danger.MatchString(n)})
 	}
 	ns := a.DefaultNS

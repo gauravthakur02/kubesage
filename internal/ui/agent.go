@@ -145,7 +145,11 @@ func (a *App) processQueue() tea.Cmd {
 	if len(results) == 0 {
 		return nil
 	}
-	return a.sendToAI(fmt.Sprintf("↳ returned %d command result(s) to the AI", len(results)), agent.FormatResults(results))
+	text := agent.FormatResults(results)
+	if !a.cfg.AI.Redact {
+		text = agent.FormatResultsRaw(results)
+	}
+	return a.sendToAI(fmt.Sprintf("↳ returned %d command result(s) to the AI", len(results)), text)
 }
 
 func (a *App) execQueued(c agent.Command) tea.Cmd {

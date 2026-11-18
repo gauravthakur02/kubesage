@@ -170,15 +170,25 @@ func hasFlag(args []string, names ...string) bool {
 			if n == want {
 				return true
 			}
+			// short flags with the value attached: -oyaml, -ojsonpath=…
+			if len(want) == 2 && want[0] == '-' && want[1] != '-' && strings.HasPrefix(a, want) && len(a) > 2 && !strings.HasPrefix(a, "--") {
+				return true
+			}
 		}
 	}
 	return false
 }
 
+// mentionsSecrets catches secret, secrets, secrets.v1, secret.v1., secrets/name and comma lists, plus "all"
+// with an explicit output (which does not include secrets, but is cheap to be careful about).
 func mentionsSecrets(rest []string) bool {
 	for _, r := range rest {
+		if strings.HasPrefix(r, "-") {
+			continue
+		}
 		for _, part := range strings.Split(strings.ToLower(r), ",") {
 			part, _, _ = strings.Cut(part, "/")
+			part, _, _ = strings.Cut(part, ".") // secrets.v1, secrets.v1.
 			if part == "secret" || part == "secrets" {
 				return true
 			}
@@ -215,7 +225,7 @@ func Classify(args []string) (Risk, string) {
 	}
 	switch verb {
 	case "get", "describe":
-		if mentionsSecrets(rest) && (verb == "describe" || hasFlag(args, "-o", "--output")) {
+		if mentionsSecrets(rest) && (verb == "describe" || hasFlag(args, "-o", "--output", "--template", "--show-managed-fields")) {
 			return Write, "may reveal secret values — needs your approval"
 		}
 		return Read, ""
@@ -369,8 +379,73 @@ Rules:
 - Never request secret values.
 - Use ` + "```bash" + ` (not run) for commands you only want to show the user.`
 
-// FormatResults renders executed commands for the model.
+var (
+	sensitiveName = regexp.MustCompile(`(?i)(pass(word|wd)?|secret|token|api[_-]?key|private[_-]?key|credential|auth|cookie|session|conn(ection)?[_-]?str|dsn)`)
+	yamlEnvName   = regexp.MustCompile(`^(\s*)-?\s*name:\s*"?([^"\s]+)"?\s*$`)
+	yamlValue     = regexp.MustCompile(`^(\s*)value:\s*.+$`)
+	jsonEnvPair   = regexp.MustCompile(`("name"\s*:\s*"([^"]+)"\s*,\s*"value"\s*:\s*)"(?:[^"\\]|\\.)*"`)
+	kvSecretLine  = regexp.MustCompile(`(?i)^(\s*"?[\w.-]*(pass(word|wd)?|secret|token|api[_-]?key|private[_-]?key|credential)[\w.-]*"?\s*[:=]\s*)\S.*$`)
+	secretData    = regexp.MustCompile(`^(\s+)([\w.-]+):\s*[A-Za-z0-9+/=]{8,}\s*$`)
+)
+
+// RedactOutput removes values that look secret from command output before it is sent to an AI: env values whose
+// name looks sensitive (YAML and JSON), key=value / key: value lines with sensitive keys, and the data of Secrets.
+func RedactOutput(out string) string {
+	jsonOut := jsonEnvPair.ReplaceAllStringFunc(out, func(m string) string {
+		sub := jsonEnvPair.FindStringSubmatch(m)
+		if sensitiveName.MatchString(sub[2]) {
+			return sub[1] + `"<redacted>"`
+		}
+		return m
+	})
+	lines := strings.Split(jsonOut, "\n")
+	pendingSensitive, inSecretData, dataIndent := false, false, ""
+	isSecret := strings.Contains(out, "kind: Secret") || strings.Contains(out, `"kind": "Secret"`)
+	for i, l := range lines {
+		if m := yamlEnvName.FindStringSubmatch(l); m != nil {
+			pendingSensitive = sensitiveName.MatchString(m[2])
+			continue
+		}
+		if pendingSensitive && yamlValue.MatchString(l) {
+			lines[i] = yamlValue.ReplaceAllString(l, "${1}value: <redacted>")
+			pendingSensitive = false
+			continue
+		}
+		if isSecret {
+			trimmed := strings.TrimSpace(l)
+			if trimmed == "data:" || trimmed == "stringData:" {
+				inSecretData, dataIndent = true, l[:len(l)-len(strings.TrimLeft(l, " "))]
+				continue
+			}
+			if inSecretData {
+				ind := l[:len(l)-len(strings.TrimLeft(l, " "))]
+				if trimmed != "" && len(ind) <= len(dataIndent) {
+					inSecretData = false
+				} else if secretData.MatchString(l) || strings.Contains(l, ":") {
+					k, _, _ := strings.Cut(trimmed, ":")
+					lines[i] = ind + k + ": <redacted>"
+					continue
+				}
+			}
+		}
+		if kvSecretLine.MatchString(l) {
+			lines[i] = kvSecretLine.ReplaceAllString(l, "${1}<redacted>")
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// FormatResults renders executed commands for the model, with secret-looking values redacted.
 func FormatResults(results []Result) string {
+	return formatResults(results, true)
+}
+
+// FormatResultsRaw renders results without redaction (ai.redact_secrets: false).
+func FormatResultsRaw(results []Result) string {
+	return formatResults(results, false)
+}
+
+func formatResults(results []Result, redact bool) string {
 	var b strings.Builder
 	b.WriteString("Command results:\n")
 	for _, r := range results {
@@ -389,6 +464,9 @@ func FormatResults(results []Result) string {
 				fmt.Fprintf(&b, "[exit error: %v]\n", r.Err)
 			}
 			out := strings.TrimRight(r.Output, "\n")
+			if redact {
+				out = RedactOutput(out)
+			}
 			if out == "" {
 				out = "(no output)"
 			}

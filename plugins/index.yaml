@@ -1,6 +1,8 @@
 # kubesage plugin catalogue (:plugins). Add yours with a pull request.
 # Each plugin binds a key on selected rows; variables: $NAME $NAMESPACE $CONTEXT $KIND $RESOURCE $KUBECONFIG.
 # kubesage always shows the exact command before installing it.
+# With sh -c, pass values as positional arguments ("$1") instead of writing $NAME inside the script, so a value
+# can never be read as shell code.
 plugins:
   - name: stern
     description: tail logs of every pod of a workload, colour per pod
@@ -13,11 +15,11 @@ plugins:
   - name: neat
     description: clean YAML without status and managed fields (kubectl neat krew plugin)
     requires: kubectl-neat
-    plugin: {name: neat, key: ctrl+y, scopes: [all], command: sh, args: ["-c", "kubectl get --context \"$CONTEXT\" -n \"$NAMESPACE\" \"$RESOURCE\" \"$NAME\" -o yaml | kubectl neat"], background: true, confirm: false}
+    plugin: {name: neat, key: ctrl+y, scopes: [all], command: sh, args: ["-c", "kubectl get --context \"$1\" -n \"$2\" \"$3\" \"$4\" -o yaml | kubectl neat", "sh", "$CONTEXT", "$NAMESPACE", "$RESOURCE", "$NAME"], background: true, confirm: false}
   - name: dive
     description: explore the image layers of a pod's first container
     requires: dive
-    plugin: {name: dive, key: ctrl+b, scopes: [pods], command: sh, args: ["-c", "dive $(kubectl get pod --context \"$CONTEXT\" -n \"$NAMESPACE\" \"$NAME\" -o jsonpath='{.spec.containers[0].image}')"]}
+    plugin: {name: dive, key: ctrl+b, scopes: [pods], command: sh, args: ["-c", "dive \"$(kubectl get pod --context \"$1\" -n \"$2\" \"$3\" -o jsonpath='{.spec.containers[0].image}')\"", "sh", "$CONTEXT", "$NAMESPACE", "$NAME"]}
   - name: kubectl-who-can
     description: who can update this object (krew who-can)
     requires: kubectl-who_can

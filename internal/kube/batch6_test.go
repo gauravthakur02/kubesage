@@ -142,3 +142,11 @@ func TestParseSince(t *testing.T) {
 		}
 	}
 }
+
+func TestSafeFileNames(t *testing.T) {
+	for in, want := range map[string]string{"..": "_", "../etc": "_etc", "a/b": "a_b", ".hidden": "hidden", "ok-1.2": "ok-1.2"} {
+		if got := unsafeFile.ReplaceAllString(in, "_"); got != want {
+			t.Errorf("%q = %q, want %q", in, got, want)
+		}
+	}
+}

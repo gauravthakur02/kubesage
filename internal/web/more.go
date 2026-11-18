@@ -2,13 +2,16 @@ package web
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -332,18 +335,82 @@ func (a *App) aiFix(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out)
 }
 
-// ---------- port-forward (proxied through kubesage serve) ----------
+// ---------- port-forward (each on its own origin) ----------
+
+// A forwarded app is untrusted: it is served from its own port (a different origin than kubesage), so its
+// JavaScript cannot call the kubesage API with your session, and kubesage's cookies and headers are stripped
+// before requests reach it.
 
 type webForward struct {
 	ID    int    `json:"id"`
 	Desc  string `json:"desc"`
-	Local int    `json:"local"`
-	Path  string `json:"path"`
+	URL   string `json:"url"`
 	fw    *kube.Forward
+	srv   *http.Server
+	key   string
+	port  int
 	proxy *httputil.ReverseProxy
 }
 
 var fwMu sync.Mutex
+
+const fwdKeyParam = "kubesage-fwd"
+
+func randomKey() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func (f *webForward) cookieName() string { return fmt.Sprintf("kubesage_fwd_%d", f.port) }
+
+// ServeHTTP admits the browser that holds the one-time key, then proxies.
+func (f *webForward) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if k := r.URL.Query().Get(fwdKeyParam); k != "" {
+		if subtle.ConstantTimeCompare([]byte(k), []byte(f.key)) != 1 {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{Name: f.cookieName(), Value: f.key, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
+		q := r.URL.Query()
+		q.Del(fwdKeyParam)
+		u := *r.URL
+		u.RawQuery = q.Encode()
+		http.Redirect(w, r, u.RequestURI(), http.StatusFound) // drop the key from the address bar and Referer
+		return
+	}
+	c, err := r.Cookie(f.cookieName())
+	if err != nil || subtle.ConstantTimeCompare([]byte(c.Value), []byte(f.key)) != 1 {
+		http.Error(w, "forbidden: open this port-forward from kubesage", http.StatusForbidden)
+		return
+	}
+	f.proxy.ServeHTTP(w, r)
+}
+
+func newForwardProxy(local int) *httputil.ReverseProxy {
+	target, _ := url.Parse(fmt.Sprintf("http://127.0.0.1:%d", local))
+	p := httputil.NewSingleHostReverseProxy(target)
+	base := p.Director
+	p.Director = func(r *http.Request) {
+		base(r)
+		var keep []string
+		for _, c := range r.Cookies() {
+			if !strings.HasPrefix(c.Name, "kubesage_") {
+				keep = append(keep, c.Name+"="+c.Value)
+			}
+		}
+		r.Header.Del("Cookie")
+		if len(keep) > 0 {
+			r.Header.Set("Cookie", strings.Join(keep, "; "))
+		}
+		for k := range r.Header {
+			if strings.HasPrefix(strings.ToLower(k), "x-kubesage") {
+				r.Header.Del(k)
+			}
+		}
+	}
+	return p
+}
 
 func (a *App) forwardStart(w http.ResponseWriter, r *http.Request) {
 	if a.ReadOnly {
@@ -372,15 +439,32 @@ func (a *App) forwardStart(w http.ResponseWriter, r *http.Request) {
 		fail(w, 502, err)
 		return
 	}
-	target, _ := url.Parse(fmt.Sprintf("http://127.0.0.1:%d", local))
+	bind := a.ForwardBind
+	if bind == "" {
+		bind = "127.0.0.1"
+	}
+	ln, err := net.Listen("tcp", net.JoinHostPort(bind, "0"))
+	if err != nil {
+		fw.Stop()
+		fail(w, 500, err)
+		return
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	host := r.Host
+	if h, _, err := net.SplitHostPort(r.Host); err == nil {
+		host = h
+	}
+	wf := &webForward{Desc: t.Label(), fw: fw, key: randomKey(), port: port, proxy: newForwardProxy(local)}
+	wf.srv = &http.Server{Handler: wf, ReadHeaderTimeout: 10 * time.Second}
+	go wf.srv.Serve(ln)
 	fwMu.Lock()
 	a.nextFwd++
-	id := a.nextFwd
-	wf := &webForward{ID: id, Desc: t.Label(), Local: local, Path: fmt.Sprintf("/fwd/%d/", id), fw: fw, proxy: httputil.NewSingleHostReverseProxy(target)}
+	wf.ID = a.nextFwd
+	wf.URL = fmt.Sprintf("http://%s/?%s=%s", net.JoinHostPort(host, strconv.Itoa(port)), fwdKeyParam, wf.key)
 	if a.forwards == nil {
 		a.forwards = map[int]*webForward{}
 	}
-	a.forwards[id] = wf
+	a.forwards[wf.ID] = wf
 	fwMu.Unlock()
 	writeJSON(w, wf)
 }
@@ -395,6 +479,11 @@ func (a *App) forwardList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out)
 }
 
+func (f *webForward) stop() {
+	f.fw.Stop()
+	_ = f.srv.Close()
+}
+
 func (a *App) forwardStop(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(r.URL.Query().Get("id"))
 	fwMu.Lock()
@@ -405,38 +494,8 @@ func (a *App) forwardStop(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, fmt.Errorf("no such port-forward"))
 		return
 	}
-	f.fw.Stop()
+	f.stop()
 	writeJSON(w, map[string]string{"status": "stopped " + f.Desc})
-}
-
-var fwdPath = regexp.MustCompile(`^/fwd/(\d+)(/.*)?$`)
-
-// ForwardProxy serves /fwd/<id>/… by proxying to the local end of a port-forward.
-func (a *App) ForwardProxy() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		m := fwdPath.FindStringSubmatch(r.URL.Path)
-		if m == nil {
-			http.NotFound(w, r)
-			return
-		}
-		id, _ := strconv.Atoi(m[1])
-		fwMu.Lock()
-		f := a.forwards[id]
-		fwMu.Unlock()
-		if f == nil {
-			http.Error(w, "port-forward stopped", http.StatusGone)
-			return
-		}
-		r2 := r.Clone(r.Context())
-		r2.URL.Path = m[2]
-		if r2.URL.Path == "" {
-			r2.URL.Path = "/"
-		}
-		q := r2.URL.Query()
-		q.Del("t")
-		r2.URL.RawQuery = q.Encode()
-		f.proxy.ServeHTTP(w, r2)
-	})
 }
 
 // StopForwards ends every port-forward (server shutdown).
@@ -444,7 +503,7 @@ func (a *App) StopForwards() {
 	fwMu.Lock()
 	defer fwMu.Unlock()
 	for id, f := range a.forwards {
-		f.fw.Stop()
+		f.stop()
 		delete(a.forwards, id)
 	}
 }

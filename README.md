@@ -4,6 +4,12 @@
 
 # kubesage
 
+> **Public beta.** kubesage is young and moves fast. The core (browsing, logs, shells, port-forwards, Helm, health
+> checks, AI analysis) is used daily; features marked *experimental* below have been tested against fake clusters and
+> services but not yet widely in the field. Try new things with `--readonly` or on a non-production cluster first, and
+> please [report problems](https://github.com/gauravthakur02/kubesage/issues). Security issues:
+> [SECURITY.md](SECURITY.md).
+
 A Kubernetes IDE for the terminal, in the spirit of k9s and Lens, with an AI copilot that
 reads your cluster's manifests, events and logs and tells you what is wrong and how to fix it.
 
@@ -588,7 +594,7 @@ ai:
 
 ## Teams: approvals, shared settings and a tamper-evident audit log
 
-**Two-person rule.** Changes on matching contexts need a teammate's approval. Instead of applying, kubesage stores a request
+**Two-person rule** *(experimental)*. Changes on matching contexts need a teammate's approval. Instead of applying, kubesage stores a request
 (a ConfigMap in `kubesage-approvals`, which you create once and restrict with RBAC) and, if `reports.webhook_env` is set, posts it to
 Slack/Teams. A teammate approves in `:approvals` (`y` approve, `n` reject) or with `kubesage approve <id>`; the requester can never
 approve their own request. Your kubesage notices the approval within 15 seconds, and `enter` on it runs the change after one last
@@ -629,7 +635,7 @@ lists Secrets Store CSI `SecretProviderClass`es.
 **Dev loop (`:dev <path>`).** Watches a file or folder (plain YAML, kustomize or a Helm chart) and server-side-applies it to the current
 namespace every time you save, reporting what changed. Refused on production-like contexts and "all namespaces". `:dev stop` ends it.
 
-**Preview namespaces (`:clone <new-namespace> [24h]`).** Copies the Deployments, StatefulSets, CronJobs, Services, ConfigMaps and
+**Preview namespaces (`:clone <new-namespace> [24h]`)** *(experimental)*. Copies the Deployments, StatefulSets, CronJobs, Services, ConfigMaps and
 Secrets of the current namespace into a new one labelled with its origin and an expiry time. Load balancers become ClusterIP services;
 Ingresses and volumes are not copied. `:clones` lists them (expired ones are highlighted) and `D` deletes one; kubesage only deletes
 namespaces it created. Refused on production-like contexts.
@@ -656,8 +662,9 @@ your config). `enter` shows the exact command it will run and installs it on con
   applied. **A** opens a chat about the namespace. `ai.local_only_contexts` applies here too.
 - **Select several rows** (`x`/space or the checkboxes) to restart or delete them together (type the number of objects to confirm), or
   pick two and **Compare** their YAML.
-- **Port-forward:** *Forward* opens the service or pod in a new browser tab through kubesage itself (`/fwd/<id>/`), so it works for
-  people opening kubesage from another machine too. Active forwards show in the top bar with a stop button.
+- **Port-forward:** *Forward* opens the service or pod in a new browser tab. kubesage serves each forward on **its own port**
+  (a separate origin, behind a one-time key), so the forwarded app can never act on kubesage with your session; it works
+  for people on other machines as long as they can reach that port. Active forwards show in the top bar with a stop button.
 - **Health check, What changed?, SLOs, Snapshots** in the sidebar (see below).
 - **Keys:** `j`/`k`, `enter`, `esc`, `/` filter, `1`–`9`, `x` select, `d y e t w l m a` panel tabs, `H` health, `C` what changed,
   `A` AI chat, `r` refresh, `Ctrl+K` go to anything, `?` all keys. Dialogs keep keyboard focus inside them, everything has screen-reader
@@ -665,7 +672,7 @@ your config). `enter` shows the exact command it will run and installs it on con
 - **Links:** the address bar always describes the view, so a link opens the same view (the session token is never part of it).
 - **The terminal UI** is still at `/term`.
 
-**Sign-in and per-person permissions.** Without sign-in, the random token in the printed link is the key and everyone acts with *your*
+**Sign-in and per-person permissions** *(experimental)*. Without sign-in, the random token in the printed link is the key and everyone acts with *your*
 credentials, which is fine on your own machine. To share kubesage with a team, turn on OpenID Connect sign-in (Entra ID, Google, Okta,
 Keycloak, Dex, …) and impersonation:
 ```yaml
@@ -678,7 +685,7 @@ serve:
     allowed_domains: [example.com]
   impersonate: true    # each person acts with THEIR Kubernetes permissions
 ```
-Sign-in uses the authorization-code flow with PKCE, checks the ID token's signature and nonce, and keeps a signed, HttpOnly session
+`serve.contexts: '-dev$|staging'` limits which clusters the web UI offers. Sign-in uses the authorization-code flow with PKCE, checks the ID token's signature and nonce, and keeps a signed, HttpOnly session
 (8 hours by default; a restart signs everyone out). With `impersonate: true`, kubesage asks the API server to act as the signed-in
 email and groups, so RBAC applies per person and the audit log shows who did what (`web:alice@example.com`). The credentials kubesage
 runs with need permission to impersonate:
@@ -693,7 +700,8 @@ rules:
 ```
 Run it behind HTTPS (a reverse proxy or ingress), for example on a jump host that can reach private clusters.
 
-Safety in every mode: **read-only unless you pass `--allow-changes`**, listens on 127.0.0.1:7777 unless you pass `--lan`/`--addr`,
+Without sign-in, the token in the printed link is swapped for an HttpOnly cookie on the first visit and disappears from the
+address bar. Safety in every mode: **read-only unless you pass `--allow-changes`**, listens on 127.0.0.1:7777 unless you pass `--lan`/`--addr`,
 changes on production-like contexts need the object's name typed, and every change is in the audit log. Shells, `$EDITOR` and plugins
 are disabled in the browser because they would run on the server's machine.
 ```bash
@@ -711,7 +719,7 @@ a time window, newest first: Deployment rollouts (with images), StatefulSet/Daem
 values), scaling and autoscaler events, Helm upgrades and rollbacks, Argo CD syncs and Flux reconciliations. The fastest answer to "it
 broke at 14:02, what happened just before?". `enter` opens the object's timeline.
 
-**SLOs (`:slo`, *SLOs* in the browser).** Service level objectives from Prometheus: availability over the window, error budget left, and
+**SLOs (`:slo`, *SLOs* in the browser)** *(experimental)*. Service level objectives from Prometheus: availability over the window, error budget left, and
 the burn rate over the last hour (above 14.4× pages in the classic multi-window scheme). Define good and total event counters with
 `{{window}}` where the range goes:
 ```yaml
@@ -731,7 +739,7 @@ added, removed and changed objects with a diff of each. From cron, `kubesage sna
 
 ## Chat bot and ownership
 
-**Bot (`kubesage bot`).** A small read-only server for a Slack slash command (`POST /slack`) and a Microsoft Teams outgoing webhook
+**Bot (`kubesage bot`)** *(experimental)*. A small read-only server for a Slack slash command (`POST /slack`) and a Microsoft Teams outgoing webhook
 (`POST /teams`): `status`, `issues <namespace>`, `changes <namespace> [2h]`, `owner <namespace>/<name>`, `help`. Requests are verified
 (Slack signing secret with replay protection; Teams HMAC), and nothing can change the cluster.
 ```yaml
@@ -752,6 +760,14 @@ owners:
   - {team: payments, namespaces: '^pay-', contact: '#payments-oncall', webhook_env: PAYMENTS_WEBHOOK}
   - {team: checkout, label: 'app.kubernetes.io/part-of=checkout', contact: checkout@example.com}
 ```
+
+## Your data and security
+
+kubesage has **no telemetry**. It talks to your clusters with your kubeconfig, to the AI provider you choose (or a local
+model), to GitHub for the update check (`KUBESAGE_NO_UPDATE_CHECK=1` turns it off) and to webhooks you configure. Secret
+values and secret-looking environment variables are redacted before anything goes to an AI, and AI commands that could
+read Secrets always need your approval. [SECURITY.md](SECURITY.md) explains the protections, the known limitations and
+how to report a vulnerability. Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Workspace tabs
 
@@ -971,7 +987,7 @@ merges them in, marked `(history)`, so you can see what happened yesterday. Turn
 event_history: {off: false, days: 14}
 ```
 
-**Scale-to-zero schedules (`:schedules`).** Save money on dev and test clusters by scaling Deployments and StatefulSets to zero outside
+**Scale-to-zero schedules (`:schedules`)** *(experimental)*. Save money on dev and test clusters by scaling Deployments and StatefulSets to zero outside
 office hours. kubesage remembers the replica count in the `kubesage.io/scaled-down-replicas` annotation and restores it in the morning.
 Contexts matching `danger_contexts` are refused unless the schedule says `allow_danger: true`.
 ```yaml
@@ -988,7 +1004,7 @@ Run `kubesage schedule run` from cron (every 10 minutes is plenty) and `kubesage
 In the UI, `:schedules` shows whether each schedule is in step; `d` scales down now and `u` restores now (both ask first and go to the audit log).
 If a HorizontalPodAutoscaler manages the workload, its `minReplicas` will scale it back up; use KEDA or pause the HPA for those.
 
-**Chaos-light tests (`:chaos`, or space → chaos test).** On a Deployment, StatefulSet, ReplicaSet or pod: deletes **one** ready pod and
+**Chaos-light tests (`:chaos`, or space → chaos test)** *(experimental)*. On a Deployment, StatefulSet, ReplicaSet or pod: deletes **one** ready pod and
 measures how long the workload takes to be fully ready again (up to 5 minutes), with advice when recovery is slow. You type the name to
 confirm. It is refused on production-like contexts, in read-only mode and outside change windows, and recorded in the audit log.
 

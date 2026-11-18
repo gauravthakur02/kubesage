@@ -40,17 +40,14 @@ type Server struct {
 
 // WebApp is the browser UI mounted at / (the terminal UI then lives at /term).
 type WebApp struct {
-	API     http.Handler        // /api/*, only reached when signed in or with the session token
-	Assets  http.Handler        // /static/* (public files, no cluster data)
-	Index   func(string) []byte // the app page with the token filled in
-	Forward http.Handler        // /fwd/<id>/… proxies to port-forwards (optional)
+	API    http.Handler        // /api/*, only reached when signed in or with the session token
+	Assets http.Handler        // /static/* (public files, no cluster data)
+	Index  func(string) []byte // the app page
 	// Auth signs people in with OIDC; without it the random token in the link is the only key.
 	Auth *web.OIDC
 	// PublicURL is the address people open when Auth is on (from the OIDC redirect URL).
 	PublicURL string
 }
-
-const fwdCookie = "kubesage_fwd"
 
 // authorize says whether a request may use the app, and attaches the signed-in user.
 func (s *Server) authorize(r *http.Request) (*http.Request, bool) {
@@ -64,16 +61,34 @@ func (s *Server) authorize(r *http.Request) (*http.Request, bool) {
 	if s.ok(r) || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Kubesage-Token")), []byte(s.Token)) == 1 {
 		return r, true
 	}
-	if c, err := r.Cookie(fwdCookie); err == nil && strings.HasPrefix(r.URL.Path, "/fwd/") && subtle.ConstantTimeCompare([]byte(c.Value), []byte(s.Token)) == 1 {
+	if c, err := r.Cookie(tokenCookie); err == nil && subtle.ConstantTimeCompare([]byte(c.Value), []byte(s.Token)) == 1 {
 		return r, true
 	}
 	return r, false
 }
 
+// tokenCookie carries the link's token after the first visit, so the token leaves the address bar, history and
+// Referer headers. HttpOnly and SameSite=Strict: page scripts cannot read it and other sites cannot send it.
+const tokenCookie = "kubesage_token"
+
+// swapTokenForCookie turns ?t=<token> into a cookie and redirects to the same page without the token.
+func (s *Server) swapTokenForCookie(w http.ResponseWriter, r *http.Request) bool {
+	if s.app != nil && s.app.Auth != nil || !s.ok(r) {
+		return false
+	}
+	http.SetCookie(w, &http.Cookie{Name: tokenCookie, Value: s.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil})
+	q := r.URL.Query()
+	q.Del("t")
+	u := *r.URL
+	u.RawQuery = q.Encode()
+	http.Redirect(w, r, u.RequestURI(), http.StatusFound)
+	return true
+}
+
 func securityHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 }
@@ -114,6 +129,9 @@ func StartApp(addr string, readOnly bool, newModel NewModel, app *WebApp) (*Serv
 				http.NotFound(w, r)
 				return
 			}
+			if s.swapTokenForCookie(w, r) {
+				return
+			}
 			if _, ok := s.authorize(r); !ok {
 				if app.Auth != nil {
 					http.Redirect(w, r, "/auth/login?back=/", http.StatusFound)
@@ -123,11 +141,7 @@ func StartApp(addr string, readOnly bool, newModel NewModel, app *WebApp) (*Serv
 				return
 			}
 			securityHeaders(w)
-			token := s.Token
-			if app.Auth != nil {
-				token = "" // the session cookie authenticates
-			}
-			_, _ = w.Write(app.Index(token))
+			_, _ = w.Write(app.Index("")) // the cookie authenticates; no token in the page
 		})
 		mux.Handle("/static/", app.Assets)
 		mux.Handle("/api/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -143,19 +157,6 @@ func StartApp(addr string, readOnly bool, newModel NewModel, app *WebApp) (*Serv
 			}
 			app.API.ServeHTTP(w, r2)
 		}))
-		if app.Forward != nil {
-			mux.Handle("/fwd/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				r2, ok := s.authorize(r)
-				if !ok {
-					http.Error(w, "forbidden", http.StatusForbidden)
-					return
-				}
-				if s.ok(r) && app.Auth == nil { // remember the token for the forwarded app's own requests
-					http.SetCookie(w, &http.Cookie{Name: fwdCookie, Value: s.Token, Path: "/fwd/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
-				}
-				app.Forward.ServeHTTP(w, r2)
-			}))
-		}
 		mux.HandleFunc("/term", func(w http.ResponseWriter, r *http.Request) { s.page(w, r) })
 	} else {
 		mux.HandleFunc("/", s.page)
@@ -212,6 +213,9 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if s.swapTokenForCookie(w, r) {
+		return
+	}
 	if _, ok := s.authorize(r); !ok {
 		if s.app != nil && s.app.Auth != nil {
 			http.Redirect(w, r, "/auth/login?back=/term", http.StatusFound)
@@ -222,14 +226,15 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self'")
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'")
+	w.Header().Set("Referrer-Policy", "no-referrer")
 	mode := "read-only"
 	if !s.ReadOnly {
 		mode = "changes allowed"
 	}
 	token := s.Token
-	if s.app != nil && s.app.Auth != nil {
-		token = "" // signed in: the session cookie authenticates, the token is never handed out
+	if _, err := r.Cookie(tokenCookie); err == nil || (s.app != nil && s.app.Auth != nil) {
+		token = "" // a cookie authenticates; the token is not handed out again
 	}
 	fmt.Fprint(w, strings.NewReplacer("{{TOKEN}}", token, "{{MODE}}", mode).Replace(pageHTML))
 }
@@ -312,12 +317,12 @@ func (s *Server) session(ws *websocket.Conn, newModel func() (tea.Model, error))
 
 const pageHTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>kubesage</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" integrity="sha384-8Xk9wy/gzEDUKrXtrmCFa2bBuK3BpjpDuL/p0SeKQX19Khl/M+lHOgD/CyYf7efP" crossorigin="anonymous">
 <style>html,body{margin:0;height:100%;background:#1a1b26}#bar{font:12px system-ui,sans-serif;color:#7aa2f7;padding:4px 10px;border-bottom:1px solid #2f334d}
 #t{position:absolute;top:24px;left:0;right:0;bottom:0;padding:4px}</style></head>
 <body><div id="bar">kubesage · {{MODE}} · this tab is its own session</div><div id="t"></div>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js" integrity="sha384-M169f14mRZOXm3hD/v2Ti0ThIT/RnAQagXA9nlE15yHAtrW19gdePJh/HaTzUOe/" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js" integrity="sha384-iF+jqbuti4XlB64clWgFWYEscb+UnSRv3VgVikGYZu+otNFnSHr7y7NcKfBnGizn" crossorigin="anonymous"></script>
 <script>
 const term=new Terminal({fontFamily:'ui-monospace,Menlo,Consolas,monospace',fontSize:14,cursorBlink:false,allowProposedApi:true,
  theme:{background:'#1a1b26',foreground:'#c0caf5'}});

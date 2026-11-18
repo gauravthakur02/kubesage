@@ -311,6 +311,8 @@ type Bot struct {
 // Serve configures the web UI.
 type Serve struct {
 	OIDC OIDC `yaml:"oidc,omitempty"`
+	// Contexts is a regex of the kube-contexts the web UI offers (default: all in the kubeconfig).
+	Contexts string `yaml:"contexts,omitempty"`
 	// Impersonate makes every signed-in person act with their own Kubernetes permissions (the server's credentials
 	// need RBAC permission to impersonate users and groups).
 	Impersonate bool `yaml:"impersonate,omitempty"`

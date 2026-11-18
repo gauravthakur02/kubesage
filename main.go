@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -898,6 +899,14 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 		app.Danger, _ = regexp.Compile(cfg.DangerContexts)
 	}
 	app.LogLines = cfg.AI.LogLines
+	if cfg.Serve.Contexts != "" {
+		re, err := regexp.Compile(cfg.Serve.Contexts)
+		exitIf(err)
+		app.Contexts = re
+		if def := strings.Split(kctx, ",")[0]; def != "" && !re.MatchString(def) {
+			exitIf(fmt.Errorf("--context %s is not allowed by serve.contexts", def))
+		}
+	}
 	app.AI = func(kctx string) (ai.Provider, error) {
 		p, ok := cfg.AI.Profiles[cfg.AI.Active]
 		if !ok {
@@ -919,7 +928,13 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 	app.PromToken = cfg.Prometheus.BearerTokenCommand
 	app.Owners, app.SLOs = cfg.Owners, cfg.SLOs
 	app.SnapshotBase = filepath.Join(filepath.Dir(cfgPathOrDefault(cfgPath)), "snapshots")
-	wa := &serve.WebApp{API: app.Handler(), Assets: web.Assets(), Index: web.Index, Forward: app.ForwardProxy()}
+	wa := &serve.WebApp{API: app.Handler(), Assets: web.Assets(), Index: web.Index}
+	if h, _, err := net.SplitHostPort(addr); err == nil {
+		if h == "" {
+			h = "0.0.0.0" // --addr :8080 listens on every interface; so do the port-forward proxies
+		}
+		app.ForwardBind = h
+	}
 	if o := cfg.Serve.OIDC; o.Issuer != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		auth, err := web.NewOIDC(ctx, web.OIDCConfig{Issuer: o.Issuer, ClientID: o.ClientID, ClientSecret: os.Getenv(o.ClientSecretEnv),

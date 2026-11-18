@@ -78,3 +78,41 @@ func TestFormatResults(t *testing.T) {
 		}
 	}
 }
+
+func TestSecretReadsNeedApproval(t *testing.T) {
+	for _, line := range []string{
+		"kubectl get secret db -oyaml", "kubectl get secrets.v1 -o json", "kubectl get secret.v1. db --output=jsonpath={.data}",
+		"kubectl get sa,secrets -ojson", "kubectl -n shop get secrets/db -o yaml", "kubectl describe secret db", "kubectl get --raw /api/v1/secrets",
+	} {
+		if c := Parse(line); c.Risk != Write {
+			t.Errorf("%q = %v, want approval", line, c.Risk)
+		}
+	}
+	for _, line := range []string{"kubectl get secrets", "kubectl get pods -o wide", "kubectl get secret-store-config -o yaml"} {
+		if c := Parse(line); c.Risk != Read {
+			t.Errorf("%q = %v, want read-only", line, c.Risk)
+		}
+	}
+}
+
+func TestRedactOutput(t *testing.T) {
+	yaml := "spec:\n  containers:\n  - env:\n    - name: DB_PASSWORD\n      value: hunter2\n    - name: LOG_LEVEL\n      value: debug\n"
+	out := RedactOutput(yaml)
+	if strings.Contains(out, "hunter2") || !strings.Contains(out, "debug") {
+		t.Fatalf("yaml env:\n%s", out)
+	}
+	js := `{"env":[{"name":"API_TOKEN","value":"abc\"def"},{"name":"MODE","value":"prod"}]}`
+	if out := RedactOutput(js); strings.Contains(out, "abc") || !strings.Contains(out, `"prod"`) {
+		t.Fatalf("json env: %s", out)
+	}
+	sec := "apiVersion: v1\ndata:\n  password: aHVudGVyMg==\n  user: YWRtaW4=\nkind: Secret\nmetadata:\n  name: db\n"
+	if out := RedactOutput(sec); strings.Contains(out, "aHVudGVyMg") || strings.Contains(out, "YWRtaW4") || !strings.Contains(out, "name: db") {
+		t.Fatalf("secret data:\n%s", out)
+	}
+	if out := RedactOutput("DATABASE_PASSWORD=s3cret\nPORT=8080"); strings.Contains(out, "s3cret") || !strings.Contains(out, "8080") {
+		t.Fatalf("kv: %s", out)
+	}
+	if !strings.Contains(FormatResults([]Result{{Command: Parse("kubectl get pods -o yaml"), Output: yaml}}), "<redacted>") {
+		t.Fatal("FormatResults does not redact")
+	}
+}
