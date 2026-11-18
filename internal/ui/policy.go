@@ -8,8 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"sigs.k8s.io/yaml"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 const policyRes = "policy"

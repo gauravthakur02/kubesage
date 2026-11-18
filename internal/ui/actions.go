@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 type rowActionItem struct {

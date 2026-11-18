@@ -8,8 +8,8 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/gauravthakur02/kubesage/internal/agent"
-	"github.com/gauravthakur02/kubesage/internal/ai"
+	"github.com/gauravthakur02/kubeweave/internal/agent"
+	"github.com/gauravthakur02/kubeweave/internal/ai"
 )
 
 // scriptedAI replies with the next scripted message on each call and records what it saw.

@@ -13,7 +13,7 @@ Set Theme "TokyoNight"
 Set TypingSpeed 60ms
 
 Hide
-Type "kubesage --context kind-demo -n default --readonly" Enter
+Type "kubeweave --context kind-demo -n default --readonly" Enter
 Sleep 3s
 Show
 Sleep 2s

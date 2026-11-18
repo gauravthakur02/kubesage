@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stesting "k8s.io/client-go/testing"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/config"
 )
 
 func allowPodsRead(cs interface {

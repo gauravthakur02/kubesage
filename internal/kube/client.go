@@ -1,4 +1,4 @@
-// Package kube wraps client-go with the operations kubesage needs.
+// Package kube wraps client-go with the operations kubeweave needs.
 package kube
 
 import (
@@ -136,7 +136,7 @@ func NewForTesting(cs kubernetes.Interface, context, namespace string, contexts 
 }
 
 // Impersonate returns a client that acts as another user (the API server checks that this client may
-// impersonate). Used by kubesage serve so each signed-in person works with their own permissions.
+// impersonate). Used by kubeweave serve so each signed-in person works with their own permissions.
 func (c *Client) Impersonate(user string, groups []string) (*Client, error) {
 	if c.Rest == nil {
 		return nil, fmt.Errorf("impersonation needs a live cluster connection")

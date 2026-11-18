@@ -41,7 +41,7 @@ func TestEventStoreRecordLoadPrune(t *testing.T) {
 	if len(got) != 1 || got[0].UID != "a" {
 		t.Fatalf("after prune = %+v", got)
 	}
-	// A fresh store (new kubesage run) must not re-store what is on disk.
+	// A fresh store (new kubeweave run) must not re-store what is on disk.
 	s2 := &EventStore{Dir: s.Dir}
 	if n, _ := s2.Record("ctx/with:odd chars", evs[:1]); n != 0 {
 		t.Fatalf("restart re-stored %d events", n)

@@ -10,7 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // editState is a safe-edit session: edit in $EDITOR → diff + server dry-run → apply on request.
@@ -97,7 +97,7 @@ func (a *App) handleEditLoaded(m editLoadedMsg) tea.Cmd {
 	if strings.HasPrefix(m.gitops, "managed by") {
 		a.setStatus("⚠ "+m.gitops+": a change made here will be reverted on the next sync; change it in Git instead", true)
 	}
-	f, err := os.CreateTemp("", "kubesage-"+strings.ToLower(e.res.Kind)+"-"+e.name+"-*.yaml")
+	f, err := os.CreateTemp("", "kubeweave-"+strings.ToLower(e.res.Kind)+"-"+e.name+"-*.yaml")
 	if err == nil {
 		_, err = f.WriteString(m.yaml)
 		f.Close()

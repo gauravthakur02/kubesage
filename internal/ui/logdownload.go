@@ -11,7 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 type logsDownloadedMsg struct {
@@ -64,7 +64,7 @@ func (a *App) downloadContainerLog() tea.Cmd {
 	if spec.previous {
 		suffix = "previous"
 	}
-	path, err := a.downloadPath("kubesage-logs", c.Context, spec.ns, pod, spec.container, suffix)
+	path, err := a.downloadPath("kubeweave-logs", c.Context, spec.ns, pod, spec.container, suffix)
 	if err != nil {
 		a.setStatus("download: "+err.Error(), true)
 		return nil
@@ -95,7 +95,7 @@ func (a *App) downloadBundle(r kube.Resource, ns, name string, pods []string, si
 	if label == "" {
 		label = fmt.Sprintf("%d-pods", len(pods))
 	}
-	path, err := a.downloadPath("kubesage-logs", c.Context, ns, label)
+	path, err := a.downloadPath("kubeweave-logs", c.Context, ns, label)
 	if err != nil {
 		a.setStatus("download: "+err.Error(), true)
 		return nil

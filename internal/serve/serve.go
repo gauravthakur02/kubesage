@@ -1,4 +1,4 @@
-// Package serve runs the kubesage UI in a web browser: each browser tab gets its own Bubble Tea program whose
+// Package serve runs the kubeweave UI in a web browser: each browser tab gets its own Bubble Tea program whose
 // terminal input and output travel over a WebSocket to xterm.js. No pseudo-terminal is needed, so it works on
 // every OS.
 package serve
@@ -20,7 +20,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/net/websocket"
 
-	"github.com/gauravthakur02/kubesage/internal/web"
+	"github.com/gauravthakur02/kubeweave/internal/web"
 )
 
 // NewModel builds a fresh UI for one browser session; r carries the signed-in user (web.UserFrom), if any.
@@ -58,7 +58,7 @@ func (s *Server) authorize(r *http.Request) (*http.Request, bool) {
 		}
 		return web.WithUser(r, u), true
 	}
-	if s.ok(r) || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Kubesage-Token")), []byte(s.Token)) == 1 {
+	if s.ok(r) || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Kubeweave-Token")), []byte(s.Token)) == 1 {
 		return r, true
 	}
 	if c, err := r.Cookie(tokenCookie); err == nil && subtle.ConstantTimeCompare([]byte(c.Value), []byte(s.Token)) == 1 {
@@ -69,7 +69,7 @@ func (s *Server) authorize(r *http.Request) (*http.Request, bool) {
 
 // tokenCookie carries the link's token after the first visit, so the token leaves the address bar, history and
 // Referer headers. HttpOnly and SameSite=Strict: page scripts cannot read it and other sites cannot send it.
-const tokenCookie = "kubesage_token"
+const tokenCookie = "kubeweave_token"
 
 // swapTokenForCookie turns ?t=<token> into a cookie and redirects to the same page without the token.
 func (s *Server) swapTokenForCookie(w http.ResponseWriter, r *http.Request) bool {
@@ -137,7 +137,7 @@ func StartApp(addr string, readOnly bool, newModel NewModel, app *WebApp) (*Serv
 					http.Redirect(w, r, "/auth/login?back=/", http.StatusFound)
 					return
 				}
-				http.Error(w, "forbidden: open the link printed by kubesage serve", http.StatusForbidden)
+				http.Error(w, "forbidden: open the link printed by kubeweave serve", http.StatusForbidden)
 				return
 			}
 			securityHeaders(w)
@@ -151,8 +151,8 @@ func StartApp(addr string, readOnly bool, newModel NewModel, app *WebApp) (*Serv
 				http.Error(w, `{"error":"forbidden: sign in again"}`, http.StatusForbidden)
 				return
 			}
-			if r.Method != http.MethodGet && r.Header.Get("X-Kubesage-Token") == "" && r.Header.Get("X-Kubesage") == "" {
-				http.Error(w, `{"error":"missing X-Kubesage header"}`, http.StatusForbidden) // blocks cross-site form posts
+			if r.Method != http.MethodGet && r.Header.Get("X-Kubeweave-Token") == "" && r.Header.Get("X-Kubeweave") == "" {
+				http.Error(w, `{"error":"missing X-Kubeweave header"}`, http.StatusForbidden) // blocks cross-site form posts
 				return
 			}
 			app.API.ServeHTTP(w, r2)
@@ -221,7 +221,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/auth/login?back=/term", http.StatusFound)
 			return
 		}
-		http.Error(w, "forbidden: open the link printed by kubesage serve", http.StatusForbidden)
+		http.Error(w, "forbidden: open the link printed by kubeweave serve", http.StatusForbidden)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -265,7 +265,7 @@ func (s *Server) session(ws *websocket.Conn, newModel func() (tea.Model, error))
 	ws.PayloadType = websocket.BinaryFrame
 	m, err := newModel()
 	if err != nil {
-		_ = websocket.Message.Send(ws, []byte("\r\nkubesage: "+err.Error()+"\r\n"))
+		_ = websocket.Message.Send(ws, []byte("\r\nkubeweave: "+err.Error()+"\r\n"))
 		return
 	}
 	s.mu.Lock()
@@ -312,15 +312,15 @@ func (s *Server) session(ws *websocket.Conn, newModel func() (tea.Model, error))
 		}
 	}()
 	_, _ = p.Run()
-	_ = websocket.Message.Send(ws, []byte("\r\n\x1b[2mkubesage session ended · reload the page to start a new one\x1b[0m\r\n"))
+	_ = websocket.Message.Send(ws, []byte("\r\n\x1b[2mkubeweave session ended · reload the page to start a new one\x1b[0m\r\n"))
 }
 
 const pageHTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>kubesage</title>
+<title>kubeweave</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" integrity="sha384-8Xk9wy/gzEDUKrXtrmCFa2bBuK3BpjpDuL/p0SeKQX19Khl/M+lHOgD/CyYf7efP" crossorigin="anonymous">
 <style>html,body{margin:0;height:100%;background:#1a1b26}#bar{font:12px system-ui,sans-serif;color:#7aa2f7;padding:4px 10px;border-bottom:1px solid #2f334d}
 #t{position:absolute;top:24px;left:0;right:0;bottom:0;padding:4px}</style></head>
-<body><div id="bar">kubesage · {{MODE}} · this tab is its own session</div><div id="t"></div>
+<body><div id="bar">kubeweave · {{MODE}} · this tab is its own session</div><div id="t"></div>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js" integrity="sha384-M169f14mRZOXm3hD/v2Ti0ThIT/RnAQagXA9nlE15yHAtrW19gdePJh/HaTzUOe/" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js" integrity="sha384-iF+jqbuti4XlB64clWgFWYEscb+UnSRv3VgVikGYZu+otNFnSHr7y7NcKfBnGizn" crossorigin="anonymous"></script>
 <script>

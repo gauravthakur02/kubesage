@@ -7,7 +7,7 @@ import (
 
 	"github.com/zalando/go-keyring"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/config"
 )
 
 // Tests never touch the real keychain or the real config file.

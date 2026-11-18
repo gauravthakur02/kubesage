@@ -13,8 +13,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/gauravthakur02/kubesage/internal/agent"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/agent"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 var testContexts = map[string]string{"aks-staging": "staging-cl", "aks-prod": "prod-cl", "kind-dev": "kind"}

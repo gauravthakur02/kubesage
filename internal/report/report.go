@@ -1,4 +1,4 @@
-// Package report builds the cluster summary posted by `kubesage report` (Slack or Teams webhook).
+// Package report builds the cluster summary posted by `kubeweave report` (Slack or Teams webhook).
 package report
 
 import (
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // Options tune the report.
@@ -29,7 +29,7 @@ func Build(ctx context.Context, clients []*kube.Client, o Options, now time.Time
 		o.MaxIssues = 10
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "*kubesage report* · %s\n", now.Format("Mon 2 Jan 2006 15:04"))
+	fmt.Fprintf(&b, "*kubeweave report* · %s\n", now.Format("Mon 2 Jan 2006 15:04"))
 	for _, c := range clients {
 		fmt.Fprintf(&b, "\n*%s* (namespace %s)\n", c.Context, c.NamespaceLabel())
 		s, err := c.Fleet(ctx)

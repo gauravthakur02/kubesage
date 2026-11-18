@@ -13,7 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/net/websocket"
 
-	"github.com/gauravthakur02/kubesage/internal/web"
+	"github.com/gauravthakur02/kubeweave/internal/web"
 )
 
 // echoModel shows the last key and the window size.
@@ -105,10 +105,10 @@ func TestStartAppRoutes(t *testing.T) {
 	if c, _ := status("/api/meta", nil); c != 403 {
 		t.Fatalf("api without token = %d", c)
 	}
-	if c, _ := status("/api/meta", map[string]string{"X-Kubesage-Token": "wrong"}); c != 403 {
+	if c, _ := status("/api/meta", map[string]string{"X-Kubeweave-Token": "wrong"}); c != 403 {
 		t.Fatalf("api with wrong token = %d", c)
 	}
-	if c, b := status("/api/meta", map[string]string{"X-Kubesage-Token": s.Token}); c != 200 || !strings.Contains(b, "ok") {
+	if c, b := status("/api/meta", map[string]string{"X-Kubeweave-Token": s.Token}); c != 200 || !strings.Contains(b, "ok") {
 		t.Fatalf("api with token = %d %s", c, b)
 	}
 	// the link's token becomes an HttpOnly cookie and leaves the URL
@@ -161,7 +161,7 @@ func TestSignInRequired(t *testing.T) {
 			"token_endpoint": idp.URL + "/token", "jwks_uri": idp.URL + "/jwks", "id_token_signing_alg_values_supported": []string{"RS256"}})
 	}))
 	defer idp.Close()
-	auth, err := web.NewOIDC(context.Background(), web.OIDCConfig{Issuer: idp.URL, ClientID: "kubesage", RedirectURL: "http://127.0.0.1/auth/callback"})
+	auth, err := web.NewOIDC(context.Background(), web.OIDCConfig{Issuer: idp.URL, ClientID: "kubeweave", RedirectURL: "http://127.0.0.1/auth/callback"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestSignInRequired(t *testing.T) {
 		}
 	}
 	req, _ := http.NewRequest("GET", base+"/api/meta", nil)
-	req.Header.Set("X-Kubesage-Token", s.Token)
+	req.Header.Set("X-Kubeweave-Token", s.Token)
 	if r, _ := cl.Do(req); r.StatusCode != 403 {
 		t.Fatalf("token accepted although sign-in is on: %d", r.StatusCode)
 	}

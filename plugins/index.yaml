@@ -1,6 +1,6 @@
-# kubesage plugin catalogue (:plugins). Add yours with a pull request.
+# kubeweave plugin catalogue (:plugins). Add yours with a pull request.
 # Each plugin binds a key on selected rows; variables: $NAME $NAMESPACE $CONTEXT $KIND $RESOURCE $KUBECONFIG.
-# kubesage always shows the exact command before installing it.
+# kubeweave always shows the exact command before installing it.
 # With sh -c, pass values as positional arguments ("$1") instead of writing $NAME inside the script, so a value
 # can never be read as shell code.
 plugins:

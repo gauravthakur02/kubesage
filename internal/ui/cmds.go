@@ -12,8 +12,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/gauravthakur02/kubesage/internal/ai"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/ai"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // ---------- messages ----------
@@ -168,11 +168,11 @@ func runAction(desc string, fn func(ctx context.Context) error) tea.Cmd {
 	}
 }
 
-// WebMode is set by `kubesage serve`: programs that take over the terminal (shells, $EDITOR, kubectl
+// WebMode is set by `kubeweave serve`: programs that take over the terminal (shells, $EDITOR, kubectl
 // hand-offs, terminal plugins) would run on the server's terminal, so they are refused.
 var WebMode bool
 
-var errWeb = fmt.Errorf("not available in the web UI (it would open on the server's terminal); use kubesage in a terminal")
+var errWeb = fmt.Errorf("not available in the web UI (it would open on the server's terminal); use kubeweave in a terminal")
 
 func kubectlExec(c *kube.Client, args ...string) tea.Cmd {
 	if WebMode {
@@ -194,7 +194,7 @@ func startLogStream(c *kube.Client, ns, pod string, opts kube.LogOptions) (chan 
 		defer close(ch)
 		rc, err := c.Logs(ctx, ns, pod, opts)
 		if err != nil {
-			ch <- "[kubesage] error: " + err.Error()
+			ch <- "[kubeweave] error: " + err.Error()
 			return
 		}
 		defer rc.Close()
@@ -208,7 +208,7 @@ func startLogStream(c *kube.Client, ns, pod string, opts kube.LogOptions) (chan 
 			}
 		}
 		if err := sc.Err(); err != nil && ctx.Err() == nil {
-			ch <- "[kubesage] stream ended: " + err.Error()
+			ch <- "[kubeweave] stream ended: " + err.Error()
 		}
 	}()
 	return ch, cancel

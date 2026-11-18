@@ -1,5 +1,5 @@
-// Package audit is kubesage's change log: JSON lines, each entry chained to the previous one by a SHA-256
-// hash so that edited or deleted lines are detected (`kubesage audit verify`).
+// Package audit is kubeweave's change log: JSON lines, each entry chained to the previous one by a SHA-256
+// hash so that edited or deleted lines are detected (`kubeweave audit verify`).
 package audit
 
 import (
@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-// Entry is one change made through kubesage (never secret values: only action names and targets).
+// Entry is one change made through kubeweave (never secret values: only action names and targets).
 type Entry struct {
 	Time    time.Time `json:"time"`
 	Context string    `json:"context"`
@@ -137,7 +137,7 @@ func ExportLoki(ctx context.Context, url string, entries []Entry, since time.Tim
 		}
 		s := byCtx[e.Context]
 		if s == nil {
-			s = &stream{Stream: map[string]string{"app": "kubesage", "kind": "audit", "context": e.Context}}
+			s = &stream{Stream: map[string]string{"app": "kubeweave", "kind": "audit", "context": e.Context}}
 			byCtx[e.Context] = s
 		}
 		line, _ := json.Marshal(e)

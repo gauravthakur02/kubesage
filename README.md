@@ -1,13 +1,13 @@
 <p align="center">
-  <img src="assets/logo-animated.svg" alt="kubesage: Kubernetes IDE for your terminal with an AI copilot" width="640">
+  <img src="assets/logo-animated.svg" alt="kubeweave: Kubernetes IDE for your terminal with an AI copilot" width="640">
 </p>
 
-# kubesage
+# kubeweave
 
-> **Public beta.** kubesage is young and moves fast. The core (browsing, logs, shells, port-forwards, Helm, health
+> **Public beta.** kubeweave is young and moves fast. The core (browsing, logs, shells, port-forwards, Helm, health
 > checks, AI analysis) is used daily; features marked *experimental* below have been tested against fake clusters and
 > services but not yet widely in the field. Try new things with `--readonly` or on a non-production cluster first, and
-> please [report problems](https://github.com/gauravthakur02/kubesage/issues). Security issues:
+> please [report problems](https://github.com/gauravthakur02/kubeweave/issues). Security issues:
 > [SECURITY.md](SECURITY.md).
 
 A Kubernetes IDE for the terminal, in the spirit of k9s and Lens, with an AI copilot that
@@ -22,71 +22,71 @@ reads your cluster's manifests, events and logs and tells you what is wrong and 
 
 **macOS: Homebrew** (builds from source on your Mac, so there is no "Apple could not verify" warning):
 ```bash
-brew tap gauravthakur02/kubesage https://github.com/gauravthakur02/kubesage
-brew trust gauravthakur02/kubesage   # once: Homebrew 7 asks you to trust third-party taps
-brew install kubesage                # later: brew upgrade kubesage
+brew tap gauravthakur02/kubeweave https://github.com/gauravthakur02/kubeweave
+brew trust gauravthakur02/kubeweave   # once: Homebrew 7 asks you to trust third-party taps
+brew install kubeweave                # later: brew upgrade kubeweave
 ```
 
 **macOS and Linux: install script** (amd64, arm64; Linux also armv7). Downloads the latest release, checks it against
 `checksums.txt` and installs to `/usr/local/bin`, or `~/.local/bin` when that is not writable. `curl` does not mark files as
 quarantined, so macOS runs it without a warning:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubeweave/main/install.sh | sh
 ```
 
-**Windows** (amd64, arm64) in PowerShell. Installs to `%LOCALAPPDATA%\Programs\kubesage` and adds it to your user PATH:
+**Windows** (amd64, arm64) in PowerShell. Installs to `%LOCALAPPDATA%\Programs\kubeweave` and adds it to your user PATH:
 ```powershell
-irm https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/gauravthakur02/kubeweave/main/install.ps1 | iex
 ```
-Both scripts take `KUBESAGE_VERSION` (e.g. `0.2.0`) and `KUBESAGE_INSTALL_DIR`; `install.sh` also takes `KUBESAGE_DOWNLOAD_URL` for a mirror.
+Both scripts take `KUBEWEAVE_VERSION` (e.g. `0.2.0`) and `KUBEWEAVE_INSTALL_DIR`; `install.sh` also takes `KUBEWEAVE_DOWNLOAD_URL` for a mirror.
 
 **With Go** (any OS; no warning on macOS either):
 ```bash
-go install github.com/gauravthakur02/kubesage@latest
+go install github.com/gauravthakur02/kubeweave@latest
 ```
 
-**Linux packages** from the [release page](https://github.com/gauravthakur02/kubesage/releases):
+**Linux packages** from the [release page](https://github.com/gauravthakur02/kubeweave/releases):
 ```bash
-sudo apt install ./kubesage_<version>_amd64.deb          # Debian, Ubuntu
-sudo dnf install ./kubesage-<version>-1.x86_64.rpm       # RHEL, Fedora, SUSE (zypper)
-sudo apk add --allow-untrusted ./kubesage_<version>_x86_64.apk   # Alpine
+sudo apt install ./kubeweave_<version>_amd64.deb          # Debian, Ubuntu
+sudo dnf install ./kubeweave-<version>-1.x86_64.rpm       # RHEL, Fedora, SUSE (zypper)
+sudo apk add --allow-untrusted ./kubeweave_<version>_x86_64.apk   # Alpine
 ```
 
 **Scoop** (Windows, once the bucket repository is set up):
 ```bash
-scoop bucket add kubesage https://github.com/gauravthakur02/scoop-bucket && scoop install kubesage
+scoop bucket add kubeweave https://github.com/gauravthakur02/scoop-bucket && scoop install kubeweave
 ```
 
 **After installing:**
 ```bash
-kubesage update                       # download, verify and install the newest release (--check only looks)
-source <(kubesage completion bash)    # or zsh / fish / powershell; packages and Homebrew install these for you
-man kubesage                          # from packages; otherwise: kubesage man > kubesage.1
+kubeweave update                       # download, verify and install the newest release (--check only looks)
+source <(kubeweave completion bash)    # or zsh / fish / powershell; packages and Homebrew install these for you
+man kubeweave                          # from packages; otherwise: kubeweave man > kubeweave.1
 ```
 The first start shows a one-minute tour (`:tour` shows it again).
 
-**Manual download:** every [release](https://github.com/gauravthakur02/kubesage/releases) has `.tar.gz` (macOS, Linux) and `.zip` (Windows)
-archives plus `checksums.txt`. Unpack and put `kubesage` on your PATH.
+**Manual download:** every [release](https://github.com/gauravthakur02/kubeweave/releases) has `.tar.gz` (macOS, Linux) and `.zip` (Windows)
+archives plus `checksums.txt`. Unpack and put `kubeweave` on your PATH.
 
-> **macOS: "Apple could not verify kubesage is free of malware".** The release binaries are not notarized by Apple, so macOS
+> **macOS: "Apple could not verify kubeweave is free of malware".** The release binaries are not notarized by Apple, so macOS
 > Gatekeeper blocks them when they are **downloaded with a web browser** (the browser marks them as quarantined). Homebrew, the
 > install script and `go install` never trigger this; use one of them. If you downloaded the archive by hand, check it against `checksums.txt`, then clear the quarantine flag on that
 > one file (this changes nothing else on your Mac):
 > ```bash
-> shasum -a 256 kubesage_*_darwin_*.tar.gz      # compare with checksums.txt
-> xattr -d com.apple.quarantine ./kubesage
+> shasum -a 256 kubeweave_*_darwin_*.tar.gz      # compare with checksums.txt
+> xattr -d com.apple.quarantine ./kubeweave
 > ```
-> Or: try to open it once, then **System Settings → Privacy & Security → "kubesage" was blocked → Open Anyway**.
+> Or: try to open it once, then **System Settings → Privacy & Security → "kubeweave" was blocked → Open Anyway**.
 
 **With Go:**
 ```bash
-go install github.com/gauravthakur02/kubesage@latest
+go install github.com/gauravthakur02/kubeweave@latest
 ```
 
 **From source:**
 ```bash
-make build        # → bin/kubesage
-make install      # → $GOPATH/bin/kubesage
+make build        # → bin/kubeweave
+make install      # → $GOPATH/bin/kubeweave
 make snapshot     # every package and archive into dist/ via GoReleaser, nothing published
 ```
 
@@ -95,13 +95,13 @@ Requires the Go version listed in `go.mod`. `kubectl` is optional. It is used fo
 ## Use
 
 ```bash
-kubesage                          # current context & namespace
-kubesage --context my-aks -n shop # pick context / namespace
-kubesage -A -r deploy             # all namespaces, open deployments
-kubesage --readonly               # disable delete/scale/restart/edit
-kubesage scan                     # CI-friendly issue report (exit 2 on errors)
-kubesage ask "why is checkout-api not ready?"   # one-shot AI answer to stdout
-kubesage config init              # write a starter config
+kubeweave                          # current context & namespace
+kubeweave --context my-aks -n shop # pick context / namespace
+kubeweave -A -r deploy             # all namespaces, open deployments
+kubeweave --readonly               # disable delete/scale/restart/edit
+kubeweave scan                     # CI-friendly issue report (exit 2 on errors)
+kubeweave ask "why is checkout-api not ready?"   # one-shot AI answer to stdout
+kubeweave config init              # write a starter config
 ```
 
 ### Finding any resource
@@ -138,7 +138,7 @@ Describe, YAML, edit, delete and AI analysis work on every type. The header's ta
 | `:rightsize` `:certs` `:images` `:storage` `:gitops` | right-sizing & cost, TLS expiry, images (Trivy), PVC usage, Argo CD/Flux apps; also under **Insights** in `0` |
 | `:diff @<context> [all]` | compare the selected object (or the whole namespace) with another cluster |
 | `:export csv\|json\|md [file]` | save the visible table |
-| `:audit` | log of every change kubesage made, by you or the AI |
+| `:audit` | log of every change kubeweave made, by you or the AI |
 | `:upgrade [1.36]` | **upgrade readiness**: deprecated/removed APIs, node version skew, available AKS versions |
 | `:rbac` · `:whocan <verb> <resource>` · `:why` | your permissions here · who has access · why the last action was forbidden |
 | `:pin` · `:pin ns` · `:alerts` | **watch list**: alert (bell + desktop notification) on new problems and expiring certificates |
@@ -234,10 +234,10 @@ With more than one container you pick one; init containers are left out because 
 - The app hands the terminal over to a full interactive shell, with colours, tab completion and window resizing, and the IDE comes back when you `exit` or press Ctrl-D.
   A banner shows the pod, the container and the cluster you are in.
 - It picks the best shell in the image: `bash`, then `ash`, then `sh`.
-- kubesage connects to the API itself, so **kubectl is not needed**, and it works the same in bash, zsh, PowerShell and Windows Terminal.
+- kubeweave connects to the API itself, so **kubectl is not needed**, and it works the same in bash, zsh, PowerShell and Windows Terminal.
   It uses the WebSocket protocol (Kubernetes 1.30+) and falls back to SPDY. Some RBAC setups allow `pods/exec` only over WebSocket (GET).
 - On production-like contexts it asks before opening the shell.
-- **Images without a shell** (distroless or scratch): kubesage offers to attach an ephemeral `busybox` debug container that shares the container's processes
+- **Images without a shell** (distroless or scratch): kubeweave offers to attach an ephemeral `busybox` debug container that shares the container's processes
   (`kubectl debug --target`). The image is `busybox:1.36` by default; set `debug_image` in the config (or `:debug` on a pod) to use one from your own registry, e.g. `myacr.azurecr.io/tools/netshoot:1.0`. It asks first, because this permanently adds an ephemeral container to the pod, and it is unavailable in `--readonly` mode.
 - For a single command without an interactive shell, use `!exec <pod> -- <cmd>`. It goes through the same approval as other changes.
 
@@ -260,7 +260,7 @@ Files go to `~/Downloads` (or `downloads_dir:` in the config). Each container lo
 
 ### Resource trends
 
-kubesage keeps about 15 minutes of CPU and memory samples per pod in memory (one every 10 s, from the pods table and health reports).
+kubeweave keeps about 15 minutes of CPU and memory samples per pod in memory (one every 10 s, from the pods table and health reports).
 The pods table gains a **`MEM 15m`** sparkline column once it has data and there is room. The **health report** (`h`) shows CPU and memory trend lines with start → now, minimum and maximum, so a pod creeping toward its memory limit stands out.
 
 ### Rollout history and rollback
@@ -274,7 +274,7 @@ The pods table gains a **`MEM 15m`** sparkline column once it has data and there
 ### Safe edit
 
 `e` opens any object in your editor (`$KUBE_EDITOR`, `$EDITOR`, `$VISUAL`, or `vi` / `notepad`), with `managedFields` and `status` stripped. When you save and close:
-1. kubesage shows a coloured **diff** against the live object.
+1. kubeweave shows a coloured **diff** against the live object.
 2. It runs a **server-side dry-run**: the API server validates the change, including admission webhooks and policies, **without persisting it**.
    Rejections are shown with the reason, and policy **warnings** are listed (they are captured instead of being printed over the screen).
 3. `A` applies the change after confirmation, `e` reopens the editor with your changes, and `esc` discards them.
@@ -291,14 +291,14 @@ If someone changed the object in the meantime, apply fails safely and your edits
 | info | service-account token mounted · missing readiness/liveness probes |
 
 `enter` opens the workload YAML, `e` safe-edits it, and **`a` asks the AI for the smallest patch** that fixes all findings of that workload. The AI is told not to apply anything and to explain findings that should stay.
-Filter with `/` (e.g. `root`, `limits`). From the command line, `kubesage scan --policy` exits with code 2 when there are errors, which suits CI.
+Filter with `/` (e.g. `root`, `limits`). From the command line, `kubeweave scan --policy` exits with code 2 when there are errors, which suits CI.
 ```yaml
 policy:
   allowed_registries: ['^[a-z0-9-]+\.azurecr\.io/']   # optional; empty = registry check off
   skip_namespaces: [kube-system, kube-public, kube-node-lease, gatekeeper-system, calico-system, tigera-operator, azure-workload-identity-system]
 ```
 
-**Your own rules (policy as code).** Add checks to the config; they show up in `V` / `:policy` and in `kubesage scan --policy` (so CI fails on them too):
+**Your own rules (policy as code).** Add checks to the config; they show up in `V` / `:policy` and in `kubeweave scan --policy` (so CI fails on them too):
 
 ```yaml
 rules:
@@ -333,7 +333,7 @@ container terminations with exit codes, HPA scaling and pod starts, merged and g
 rollouts of the last two hours, then asks the AI to group symptoms into incidents, name the root cause, gather missing evidence with
 read-only commands and propose fixes. Every change still needs your approval (and is blocked in `--readonly`).
 
-**Right-sizing (`:rightsize`)** compares each workload's requests with its peak usage (metrics-server now, plus what kubesage has seen in the
+**Right-sizing (`:rightsize`)** compares each workload's requests with its peak usage (metrics-server now, plus what kubeweave has seen in the
 last 15 minutes) and suggests CPU = peak × 1.5 and memory = peak × 1.3. It flags over- and under-provisioned workloads and missing requests, totals the
 reclaimable CPU and memory and, with `cost` in the config, the monthly waste. `enter` shows the `kubectl set resources` command, `e` safe-edits the workload.
 
@@ -351,12 +351,12 @@ node pool and, on AKS with the `az` CLI signed in, the versions the cluster can 
 groups and service accounts that have that permission and through which binding. After a "forbidden" error, `:why` explains it and who holds the permission.
 `p` on a service account shows its bindings and rules.
 
-**Watch list and alerts.** `:pin` watches the selected workload, `:pin ns` the whole namespace, on any cluster. Every 30 s kubesage checks them in the background
+**Watch list and alerts.** `:pin` watches the selected workload, `:pin ns` the whole namespace, on any cluster. Every 30 s kubeweave checks them in the background
 (also for TLS certificates expiring within 14 days) and announces new problems with the terminal bell, a desktop notification (macOS, Linux) and a 🔔 counter in the header.
-`:alerts` lists active and resolved problems; `enter` opens the object, `a` asks the AI. Problems that already exist when kubesage starts do not ring.
+`:alerts` lists active and resolved problems; `enter` opens the object, `a` asks the AI. Problems that already exist when kubeweave starts do not ring.
 
 **Prometheus.** With a Prometheus-compatible endpoint, right-sizing uses peaks over 7 days instead of 15 minutes, and `:prom <PromQL>` shows the top series with sparklines.
-kubesage looks for common in-cluster services (`prometheus-operated`, `prometheus-server`, … in `monitoring`) and reaches them through the API server proxy, or set:
+kubeweave looks for common in-cluster services (`prometheus-operated`, `prometheus-server`, … in `monitoring`) and reaches them through the API server proxy, or set:
 
 ```yaml
 prometheus:
@@ -374,7 +374,7 @@ and namespace Pod Security levels; `:backups` lists Velero schedules and backups
 
 ### Day-2 helpers
 
-**Restart needed (`:restart-needed`).** Environment variables and `subPath` mounts never update in a running pod. kubesage compares when each ConfigMap and Secret
+**Restart needed (`:restart-needed`).** Environment variables and `subPath` mounts never update in a running pod. kubeweave compares when each ConfigMap and Secret
 a pod uses last changed (from managed fields) with when the pod started, and lists the workloads that still run the old values. `R` does a rollout restart.
 Plain volume mounts are listed as "updated in place" because the file changes but the app may not reload it.
 
@@ -385,7 +385,7 @@ risky probes: liveness without a startup probe on a slow app, 1-second liveness 
 VPAs (recommendations). VPA recommendations also appear as a column in `:rightsize`.
 
 **Kubeconfig (`:kubeconfig`)** lists contexts with server and auth plugin. `p` checks one, `r` renames, `D` deletes (with unused cluster and user entries), and `a`
-adds an AKS cluster: pick a subscription and a cluster from `az`, and kubesage runs `az aks get-credentials`. Every change writes a backup next to the kubeconfig first.
+adds an AKS cluster: pick a subscription and a cluster from `az`, and kubeweave runs `az aks get-credentials`. Every change writes a backup next to the kubeconfig first.
 
 **Runbooks.** Point `runbooks: {dir: ~/runbooks}` at a folder (or a git clone; `:runbooks pull` updates it). Each Markdown file can declare what it is for:
 
@@ -437,7 +437,7 @@ Blocked changes include the AI's commands. **Port-forward profiles:** start the 
 
 ### Command palette, export, plugins and audit log
 
-- **`ctrl+p`** opens a fuzzy palette over kubesage's screens, every resource type, saved views, plugins and kubeconfig contexts.
+- **`ctrl+p`** opens a fuzzy palette over kubeweave's screens, every resource type, saved views, plugins and kubeconfig contexts.
 - **`:export csv|json|md [file]`** writes the visible (filtered) rows of any table, handy for incident reports.
 - **Custom columns** add fields to any table:
 
@@ -515,7 +515,7 @@ When a watch is not allowed (for example `:pods all` with namespace-scoped RBAC)
 ### Port-forwarding
 
 Press `F` on a row and enter the ports as `local:remote`. It is pre-filled; ports below 1024 map to 8000+port locally, and `:80` picks a random local port.
-Once the tunnel is up, kubesage **opens `http://localhost:<port>` in your default browser** (`https` for remote port 443/8443).
+Once the tunnel is up, kubeweave **opens `http://localhost:<port>` in your default browser** (`https` for remote port 443/8443).
 This works on macOS, Linux (`xdg-open`, or `wslview` under WSL) and Windows. Set `open_browser: false` to turn it off.
 
 Rows that are being forwarded are marked in the tables:
@@ -532,7 +532,7 @@ Forwards keep running in the background while you browse, even if you switch con
 `⇄ svc/grafana :8080 in nsco-monitoring  f`. With several forwards it shows `⇄ 3 forwards · 2 elsewhere  f`. Press **`f`** (or `:pf`) for the list.
 Each entry shows the object, its URL, its context and namespace if they differ from your view, and how long it has been up. Pick one to:
 - **Open** it in the browser again
-- **Go to** it: kubesage switches resource, namespace and context as needed and puts the cursor on the forwarded row
+- **Go to** it: kubeweave switches resource, namespace and context as needed and puts the cursor on the forwarded row
 - **Stop** it (or *Stop all* from the list)
 
 The Pulse screen (`H`) lists active forwards as well.
@@ -542,7 +542,7 @@ All forwards stop when you quit. If a forward dies, for example because its pod 
 
 When `allow_commands` is on, the AI can investigate on its own and propose fixes:
 
-1. It writes the commands it wants to run in a ```` ```run ```` block. kubesage parses them and checks each one.
+1. It writes the commands it wants to run in a ```` ```run ```` block. kubeweave parses them and checks each one.
 2. **Read-only** commands (`get`, `describe`, `logs`, `top`, `events`, `rollout status/history`, `auth can-i`, any `--dry-run`)
    run immediately. Their output goes back to the model, and it carries on until it reaches a conclusion. Each question gets at most `max_steps` rounds.
 3. **Changing** commands (`apply`, `patch`, `scale`, `rollout restart/undo`, `delete`, `set`, `label`, `cordon`, `drain`, `exec`, …)
@@ -554,7 +554,7 @@ When `allow_commands` is on, the AI can investigate on its own and propose fixes
 6. In `--readonly` mode, changing commands are refused without asking, and the AI is told they were not run.
 
 In the AI chat, `ctrl+r` lets you pick any `kubectl` command from the last reply (including ```` ```bash ```` suggestions) and run it through the same checks.
-`kubesage ask` uses the same loop in a plain terminal and asks `[y/N]` for each change.
+`kubeweave ask` uses the same loop in a plain terminal and asks `[y/N]` for each change.
 
 > Small local models (e.g. codellama) often ignore the `run` protocol and only suggest commands. Instruction-following models
 > such as Claude, GPT-4o, `llama3.1`, or `qwen2.5` work well.
@@ -573,7 +573,7 @@ In the AI chat, `ctrl+r` lets you pick any `kubectl` command from the last reply
 ## AI fixes, narratives and plain-English search
 
 **AI fix with preview (`:fix`, or space → AI fix).** The AI writes the *smallest* patch for the selected object, never a whole manifest.
-kubesage merges it into the live object on your computer (strategic merge, so containers match by name), then shows exactly what a
+kubeweave merges it into the live object on your computer (strategic merge, so containers match by name), then shows exactly what a
 safe edit shows: the server-side dry-run verdict (validation, admission webhooks, policies), warnings and the diff, with the AI's reasons
 on top. Nothing changes until you press `A` and confirm; the change is audited as `ai-fix.apply`. Patches that touch a `<redacted>` value
 are refused, so masked secrets can never overwrite real ones, and Secrets are never sent.
@@ -594,25 +594,25 @@ ai:
 
 ## Teams: approvals, shared settings and a tamper-evident audit log
 
-**Two-person rule** *(experimental)*. Changes on matching contexts need a teammate's approval. Instead of applying, kubesage stores a request
-(a ConfigMap in `kubesage-approvals`, which you create once and restrict with RBAC) and, if `reports.webhook_env` is set, posts it to
-Slack/Teams. A teammate approves in `:approvals` (`y` approve, `n` reject) or with `kubesage approve <id>`; the requester can never
-approve their own request. Your kubesage notices the approval within 15 seconds, and `enter` on it runs the change after one last
+**Two-person rule** *(experimental)*. Changes on matching contexts need a teammate's approval. Instead of applying, kubeweave stores a request
+(a ConfigMap in `kubeweave-approvals`, which you create once and restrict with RBAC) and, if `reports.webhook_env` is set, posts it to
+Slack/Teams. A teammate approves in `:approvals` (`y` approve, `n` reject) or with `kubeweave approve <id>`; the requester can never
+approve their own request. Your kubeweave notices the approval within 15 seconds, and `enter` on it runs the change after one last
 confirmation. Requests expire after an hour and can run once.
 ```yaml
-approvals: {contexts: '(prod|-p$)', namespace: kubesage-approvals, expire_minutes: 60}
+approvals: {contexts: '(prod|-p$)', namespace: kubeweave-approvals, expire_minutes: 60}
 ```
 
-**Shared team settings.** Point kubesage at a git repository with a `kubesage.yaml`; at startup it is cloned or updated and its policy
+**Shared team settings.** Point kubeweave at a git repository with a `kubeweave.yaml`; at startup it is cloned or updated and its policy
 rules, schedules, fleet list, change windows, freezes, allowed registries, danger contexts, approval rule and runbooks are added to
 yours (your own scalar settings win, and nothing from the team file is written into your config). Plugins in the team file run
 commands on your computer, so they are only loaded with `allow_plugins: true`. `:team` shows what was loaded.
 ```yaml
-team: {repo: https://github.com/acme/platform-kubesage.git, ref: main, path: kubesage.yaml}
+team: {repo: https://github.com/acme/platform-kubeweave.git, ref: main, path: kubeweave.yaml}
 ```
 
-**Tamper-evident audit log.** Every entry carries a SHA-256 hash of itself and the previous entry. `kubesage audit verify` reports a
-changed or deleted line; `kubesage audit export --since 24h` pushes entries to Grafana Loki (`audit_loki_url`, token in `$KUBESAGE_LOKI_TOKEN`).
+**Tamper-evident audit log.** Every entry carries a SHA-256 hash of itself and the previous entry. `kubeweave audit verify` reports a
+changed or deleted line; `kubeweave audit export --since 24h` pushes entries to Grafana Loki (`audit_loki_url`, token in `$KUBEWEAVE_LOKI_TOKEN`).
 
 ## Logs, traces, node pools and operators
 
@@ -637,17 +637,17 @@ namespace every time you save, reporting what changed. Refused on production-lik
 
 **Preview namespaces (`:clone <new-namespace> [24h]`)** *(experimental)*. Copies the Deployments, StatefulSets, CronJobs, Services, ConfigMaps and
 Secrets of the current namespace into a new one labelled with its origin and an expiry time. Load balancers become ClusterIP services;
-Ingresses and volumes are not copied. `:clones` lists them (expired ones are highlighted) and `D` deletes one; kubesage only deletes
+Ingresses and volumes are not copied. `:clones` lists them (expired ones are highlighted) and `D` deletes one; kubeweave only deletes
 namespaces it created. Refused on production-like contexts.
 
 **Plugin catalogue (`:plugins`).** Lists plugins from [`plugins/index.yaml`](plugins/index.yaml) in this repository (or `plugin_index:` in
 your config). `enter` shows the exact command it will run and installs it on confirmation; `D` removes it. Pull requests with new plugins are welcome.
 
-**Start with a command (`--cmd`).** `kubesage --cmd ":apply ./k8s"` or `--cmd ":dev ./k8s"` opens straight into that command.
+**Start with a command (`--cmd`).** `kubeweave --cmd ":apply ./k8s"` or `--cmd ":dev ./k8s"` opens straight into that command.
 
 ## In the browser and in VS Code
 
-**Web UI (`kubesage serve`).** A browser app for the same clusters, built for mouse *and* keyboard:
+**Web UI (`kubeweave serve`).** A browser app for the same clusters, built for mouse *and* keyboard:
 
 - **Navigate:** a sidebar with every resource type (built-in and CRDs), cluster and namespace pickers, and a live table (refreshes every
   5 seconds) with health dots, CPU sparklines for pods, sort on any column, and a filter. Filtering, sorting and paging happen on the
@@ -662,8 +662,8 @@ your config). `enter` shows the exact command it will run and installs it on con
   applied. **A** opens a chat about the namespace. `ai.local_only_contexts` applies here too.
 - **Select several rows** (`x`/space or the checkboxes) to restart or delete them together (type the number of objects to confirm), or
   pick two and **Compare** their YAML.
-- **Port-forward:** *Forward* opens the service or pod in a new browser tab. kubesage serves each forward on **its own port**
-  (a separate origin, behind a one-time key), so the forwarded app can never act on kubesage with your session; it works
+- **Port-forward:** *Forward* opens the service or pod in a new browser tab. kubeweave serves each forward on **its own port**
+  (a separate origin, behind a one-time key), so the forwarded app can never act on kubeweave with your session; it works
   for people on other machines as long as they can reach that port. Active forwards show in the top bar with a stop button.
 - **Health check, What changed?, SLOs, Snapshots** in the sidebar (see below).
 - **Keys:** `j`/`k`, `enter`, `esc`, `/` filter, `1`–`9`, `x` select, `d y e t w l m a` panel tabs, `H` health, `C` what changed,
@@ -673,26 +673,26 @@ your config). `enter` shows the exact command it will run and installs it on con
 - **The terminal UI** is still at `/term`.
 
 **Sign-in and per-person permissions** *(experimental)*. Without sign-in, the random token in the printed link is the key and everyone acts with *your*
-credentials, which is fine on your own machine. To share kubesage with a team, turn on OpenID Connect sign-in (Entra ID, Google, Okta,
+credentials, which is fine on your own machine. To share kubeweave with a team, turn on OpenID Connect sign-in (Entra ID, Google, Okta,
 Keycloak, Dex, …) and impersonation:
 ```yaml
 serve:
   oidc:
     issuer: https://login.microsoftonline.com/<tenant-id>/v2.0
     client_id: <app-registration-client-id>
-    client_secret_env: KUBESAGE_OIDC_SECRET      # export KUBESAGE_OIDC_SECRET=…
-    redirect_url: https://kubesage.example.com/auth/callback
+    client_secret_env: KUBEWEAVE_OIDC_SECRET      # export KUBEWEAVE_OIDC_SECRET=…
+    redirect_url: https://kubeweave.example.com/auth/callback
     allowed_domains: [example.com]
   impersonate: true    # each person acts with THEIR Kubernetes permissions
 ```
 `serve.contexts: '-dev$|staging'` limits which clusters the web UI offers. Sign-in uses the authorization-code flow with PKCE, checks the ID token's signature and nonce, and keeps a signed, HttpOnly session
-(8 hours by default; a restart signs everyone out). With `impersonate: true`, kubesage asks the API server to act as the signed-in
-email and groups, so RBAC applies per person and the audit log shows who did what (`web:alice@example.com`). The credentials kubesage
+(8 hours by default; a restart signs everyone out). With `impersonate: true`, kubeweave asks the API server to act as the signed-in
+email and groups, so RBAC applies per person and the audit log shows who did what (`web:alice@example.com`). The credentials kubeweave
 runs with need permission to impersonate:
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
-metadata: {name: kubesage-impersonator}
+metadata: {name: kubeweave-impersonator}
 rules:
   - apiGroups: [""]
     resources: [users, groups]
@@ -705,11 +705,11 @@ address bar. Safety in every mode: **read-only unless you pass `--allow-changes`
 changes on production-like contexts need the object's name typed, and every change is in the audit log. Shells, `$EDITOR` and plugins
 are disabled in the browser because they would run on the server's machine.
 ```bash
-kubesage serve --context staging              # opens http://127.0.0.1:7777/?t=…
-kubesage serve --addr :8080 --allow-changes   # behind your HTTPS proxy, with serve.oidc configured
+kubeweave serve --context staging              # opens http://127.0.0.1:7777/?t=…
+kubeweave serve --addr :8080 --allow-changes   # behind your HTTPS proxy, with serve.oidc configured
 ```
 
-**VS Code.** [`editors/vscode`](editors/vscode) is a small extension: open kubesage in an editor tab (`Cmd/Ctrl+Alt+K`), pick a cluster,
+**VS Code.** [`editors/vscode`](editors/vscode) is a small extension: open kubeweave in an editor tab (`Cmd/Ctrl+Alt+K`), pick a cluster,
 open read-only, or right-click a YAML file (diff and apply) or folder (dev loop). Build it with `npx @vscode/vsce package`.
 
 ## What changed, SLOs and snapshots
@@ -732,14 +732,14 @@ slos:
     window: 30d
 ```
 
-**Snapshots (`:snapshot [name]`, `:snapshots`, *Snapshots* in the browser, `kubesage snapshot save|list|diff -n <ns>`).** Save the
+**Snapshots (`:snapshot [name]`, `:snapshots`, *Snapshots* in the browser, `kubeweave snapshot save|list|diff -n <ns>`).** Save the
 state of a namespace (workloads, services, config, RBAC; Secret values only as hashes) to this computer, and compare it with now later:
-added, removed and changed objects with a diff of each. From cron, `kubesage snapshot save` every night and `kubesage snapshot diff <name>`
+added, removed and changed objects with a diff of each. From cron, `kubeweave snapshot save` every night and `kubeweave snapshot diff <name>`
 (exit code 3 when something changed) catch drift.
 
 ## Chat bot and ownership
 
-**Bot (`kubesage bot`)** *(experimental)*. A small read-only server for a Slack slash command (`POST /slack`) and a Microsoft Teams outgoing webhook
+**Bot (`kubeweave bot`)** *(experimental)*. A small read-only server for a Slack slash command (`POST /slack`) and a Microsoft Teams outgoing webhook
 (`POST /teams`): `status`, `issues <namespace>`, `changes <namespace> [2h]`, `owner <namespace>/<name>`, `help`. Requests are verified
 (Slack signing secret with replay protection; Teams HMAC), and nothing can change the cluster.
 ```yaml
@@ -749,10 +749,10 @@ bot:
   teams_token_env: TEAMS_WEBHOOK_TOKEN     # the base64 token Teams shows when you create the outgoing webhook
 ```
 ```bash
-SLACK_SIGNING_SECRET=… kubesage bot --addr :8090   # point the slash command's Request URL at https://<host>/slack
+SLACK_SIGNING_SECRET=… kubeweave bot --addr :8090   # point the slash command's Request URL at https://<host>/slack
 ```
 
-**Owners.** kubesage works out who owns a workload: from your rules first (by namespace or label), then from the `owner`, `team` or
+**Owners.** kubeweave works out who owns a workload: from your rules first (by namespace or label), then from the `owner`, `team` or
 `app.kubernetes.io/part-of` labels or annotations. The owner shows in the browser panel and in the bot, and new watch-list alerts are
 posted to the owning team's webhook:
 ```yaml
@@ -763,8 +763,8 @@ owners:
 
 ## Your data and security
 
-kubesage has **no telemetry**. It talks to your clusters with your kubeconfig, to the AI provider you choose (or a local
-model), to GitHub for the update check (`KUBESAGE_NO_UPDATE_CHECK=1` turns it off) and to webhooks you configure. Secret
+kubeweave has **no telemetry**. It talks to your clusters with your kubeconfig, to the AI provider you choose (or a local
+model), to GitHub for the update check (`KUBEWEAVE_NO_UPDATE_CHECK=1` turns it off) and to webhooks you configure. Secret
 values and secret-looking environment variables are redacted before anything goes to an AI, and AI commands that could
 read Secrets always need your approval. [SECURITY.md](SECURITY.md) explains the protections, the known limitations and
 how to report a vulnerability. Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -790,8 +790,8 @@ each context signs in once and is shared by every tab and pane that uses it.
 
 There are two ways to choose clusters:
 
-- **On the command line:** `kubesage --context staging` or `kubesage --context staging,prod-eu,kind-dev` (each in its own tab).
-- **In the app:** start plain `kubesage` and a **cluster chooser** lists every kubeconfig context. The cursor starts on your
+- **On the command line:** `kubeweave --context staging` or `kubeweave --context staging,prod-eu,kind-dev` (each in its own tab).
+- **In the app:** start plain `kubeweave` and a **cluster chooser** lists every kubeconfig context. The cursor starts on your
   current context. `enter` opens it, `space` ticks several and `enter` opens them all (one tab each), `/` filters, `q` quits.
   No cluster is contacted until you choose, so nothing triggers a sign-in. If the connection fails, you stay in the chooser with the error.
   The chooser is skipped when the kubeconfig has only one context. To turn it off, set `choose_context_on_start: false`, which starts on the current context.
@@ -810,17 +810,17 @@ Unconnected clusters are only contacted when you open them or press `p`, because
 
 ## MCP server for AI agents
 
-`kubesage mcp` serves kubesage's read-only insights over the Model Context Protocol (stdio), so Claude Code and other agents can use them:
+`kubeweave mcp` serves kubeweave's read-only insights over the Model Context Protocol (stdio), so Claude Code and other agents can use them:
 `incident_report`, `find_issues`, `relationships`, `timeline`, `pod_logs`, `list_resources`, `helm_releases`, `upgrade_readiness`, `right_sizing`, `my_access`, `search`, `list_contexts`.
 No tool changes the cluster.
 
 ```bash
-claude mcp add kubesage -- kubesage mcp --context my-staging
+claude mcp add kubeweave -- kubeweave mcp --context my-staging
 ```
 
 ## Configure AI
 
-Run `kubesage config init`. The file goes to `~/.config/kubesage/config.yaml` on macOS and Linux, and to `%AppData%\kubesage\config.yaml` on Windows.
+Run `kubeweave config init`. The file goes to `~/.config/kubeweave/config.yaml` on macOS and Linux, and to `%AppData%\kubeweave\config.yaml` on Windows.
 
 ```yaml
 theme: tokyonight            # tokyonight, dracula, nord, catppuccin, gruvbox, solarized-light
@@ -879,21 +879,21 @@ ai:
 
 ### Adding API keys
 
-**Quickest: let kubesage store the key in your OS keychain** (macOS Keychain, Windows Credential Manager or Linux Secret Service).
-The key is never written to the config file. If no keychain is available, for example on a headless Linux server, kubesage falls back to the config file (`0600`) and says so.
+**Quickest: let kubeweave store the key in your OS keychain** (macOS Keychain, Windows Credential Manager or Linux Secret Service).
+The key is never written to the config file. If no keychain is available, for example on a headless Linux server, kubeweave falls back to the config file (`0600`) and says so.
 
 From the command line:
 ```bash
-kubesage ai add claude --provider anthropic --model claude-opus-5-5 --use   # prompts for the key (hidden)
-kubesage ai set-key openai                     # add or replace a key for an existing profile (hidden prompt)
-op read op://Private/OpenAI/key | kubesage ai set-key openai   # or pipe it in, e.g. from a password manager
-kubesage ai add groq --provider openai-compatible --base-url https://api.groq.com/openai/v1 --model llama-3.3-70b-versatile
-kubesage ai add azure-gpt --provider azure --base-url https://myres.openai.azure.com --model gpt4o-deploy
-kubesage ai use claude          # default profile
-kubesage ai                     # list profiles and where each key comes from (never prints keys)
-kubesage ai test claude         # one-line test call
-kubesage ai delete-key openai   # forget a stored key
-kubesage ai remove groq         # delete a profile and its key
+kubeweave ai add claude --provider anthropic --model claude-opus-5-5 --use   # prompts for the key (hidden)
+kubeweave ai set-key openai                     # add or replace a key for an existing profile (hidden prompt)
+op read op://Private/OpenAI/key | kubeweave ai set-key openai   # or pipe it in, e.g. from a password manager
+kubeweave ai add groq --provider openai-compatible --base-url https://api.groq.com/openai/v1 --model llama-3.3-70b-versatile
+kubeweave ai add azure-gpt --provider azure --base-url https://myres.openai.azure.com --model gpt4o-deploy
+kubeweave ai use claude          # default profile
+kubeweave ai                     # list profiles and where each key comes from (never prints keys)
+kubeweave ai test claude         # one-line test call
+kubeweave ai delete-key openai   # forget a stored key
+kubeweave ai remove groq         # delete a profile and its key
 ```
 
 Inside the app:
@@ -903,7 +903,7 @@ Inside the app:
 - **`:ai-rm <profile>`** removes a profile and its stored key.
 
 Each profile finds its key in this order: the **environment variable** named in `api_key_env`, then **`api_key_cmd`**, then the **OS keychain**, then a literal **`api_key`**.
-An environment variable that is set therefore overrides a stored key. `kubesage ai` shows which source is used.
+An environment variable that is set therefore overrides a stored key. `kubeweave ai` shows which source is used.
 
 ```bash
 # 1. Environment variable (add to ~/.zshrc or ~/.bashrc to keep it)
@@ -922,11 +922,11 @@ $env:ANTHROPIC_API_KEY = "sk-ant-..."
     claude:
       provider: anthropic
       model: claude-opus-5-5
-      api_key_cmd: security find-generic-password -s kubesage-anthropic -w
+      api_key_cmd: security find-generic-password -s kubeweave-anthropic -w
       # api_key_cmd: op read op://Private/Anthropic/credential
       # api_key_cmd: az keyvault secret show --vault-name my-kv -n openai-key --query value -o tsv
 ```
-(Store a key in the macOS Keychain once with `security add-generic-password -s kubesage-anthropic -a $USER -w`; it prompts for the value.)
+(Store a key in the macOS Keychain once with `security add-generic-password -s kubeweave-anthropic -a $USER -w`; it prompts for the value.)
 
 To add another provider or model, add a profile. You can have any number, including several per provider:
 ```yaml
@@ -938,9 +938,9 @@ To add another provider or model, add a profile. You can have any number, includ
 
 Check them and switch:
 ```bash
-kubesage ai              # every profile with provider, model and whether its key was found (never prints keys)
-kubesage ai test claude  # sends a one-line prompt to confirm the key and model work
-kubesage --ai claude     # start with that profile
+kubeweave ai              # every profile with provider, model and whether its key was found (never prints keys)
+kubeweave ai test claude  # sends a one-line prompt to confirm the key and model work
+kubeweave --ai claude     # start with that profile
 ```
 In the app, **`ctrl+o`** in the AI chat (or `:profile`) lists the profiles with the same key status. `★` marks the active one. `:save` makes your choice the default. The Anthropic profile uses the official Go SDK
 and turns on server-side refusal fallback, so if a request is declined it is retried on a fallback model.
@@ -966,10 +966,10 @@ internal/ui             Bubble Tea app: split panes, themes, table, text/log vie
 
 The animation is plain CSS inside the SVG, with no scripts. It plays wherever SVG is shown, including GitHub READMEs and browsers, and it stops for people who have
 turned on "reduce motion" in their OS.
-The helm wheel stands for Kubernetes, the sage leaf in its hub for the copilot, and the sparkle for AI. Inside the terminal the same mark appears in the header,
-the cluster chooser, the help screen, the AI chat and `kubesage version`. It is animated there too: a light sweeps around the wheel,
+The helm wheel stands for Kubernetes, the leaf in its hub for the copilot, and the sparkle for AI. Inside the terminal the same mark appears in the header,
+the cluster chooser, the help screen, the AI chat and `kubeweave version`. It is animated there too: a light sweeps around the wheel,
 the leaf breathes and the sparkle twinkles. The animation only changes colours, so it never shifts the layout. Set `animations: false` in the config for a static logo,
-and `NO_COLOR=1 kubesage version` prints it without animation.
+and `NO_COLOR=1 kubeweave version` prints it without animation.
 
 ## Fleet, event history, schedules, chaos tests and sharing
 
@@ -980,7 +980,7 @@ ones you care about (regular expressions) to always include them:
 fleet: ['^aks-.*-dev$', 'staging']
 ```
 
-**Event history (`:history`).** Kubernetes forgets events after about an hour. While kubesage runs it saves the events of every cluster
+**Event history (`:history`).** Kubernetes forgets events after about an hour. While kubeweave runs it saves the events of every cluster
 shown in a pane once a minute (in `events/` next to the config file, kept 7 days). `:history` lists them, and the timeline (`t`)
 merges them in, marked `(history)`, so you can see what happened yesterday. Turn it off or change the retention:
 ```yaml
@@ -988,7 +988,7 @@ event_history: {off: false, days: 14}
 ```
 
 **Scale-to-zero schedules (`:schedules`)** *(experimental)*. Save money on dev and test clusters by scaling Deployments and StatefulSets to zero outside
-office hours. kubesage remembers the replica count in the `kubesage.io/scaled-down-replicas` annotation and restores it in the morning.
+office hours. kubeweave remembers the replica count in the `kubeweave.io/scaled-down-replicas` annotation and restores it in the morning.
 Contexts matching `danger_contexts` are refused unless the schedule says `allow_danger: true`.
 ```yaml
 schedules:
@@ -1000,7 +1000,7 @@ schedules:
     up: "07:00"
     days: [mon, tue, wed, thu, fri]   # other days: down all day
 ```
-Run `kubesage schedule run` from cron (every 10 minutes is plenty) and `kubesage schedule status` (or `run --dry-run`) to see what it would do.
+Run `kubeweave schedule run` from cron (every 10 minutes is plenty) and `kubeweave schedule status` (or `run --dry-run`) to see what it would do.
 In the UI, `:schedules` shows whether each schedule is in step; `d` scales down now and `u` restores now (both ask first and go to the audit log).
 If a HorizontalPodAutoscaler manages the workload, its `minReplicas` will scale it back up; use KEDA or pause the HPA for those.
 
@@ -1008,45 +1008,45 @@ If a HorizontalPodAutoscaler manages the workload, its `minReplicas` will scale 
 measures how long the workload takes to be fully ready again (up to 5 minutes), with advice when recovery is slow. You type the name to
 confirm. It is refused on production-like contexts, in read-only mode and outside change windows, and recorded in the audit log.
 
-**Daily report (`kubesage report`).** A short summary of each cluster: health, top issues and certificates expiring within 14 days.
+**Daily report (`kubeweave report`).** A short summary of each cluster: health, top issues and certificates expiring within 14 days.
 Without flags it prints to the terminal; `--post` sends it to a Slack or Microsoft Teams incoming webhook. Keep the URL out of the config:
 ```yaml
 reports:
-  webhook_env: KUBESAGE_WEBHOOK   # export KUBESAGE_WEBHOOK=https://hooks.slack.com/services/…
+  webhook_env: KUBEWEAVE_WEBHOOK   # export KUBEWEAVE_WEBHOOK=https://hooks.slack.com/services/…
   contexts: ['-dev$', 'staging']   # default: the current context
 ```
 ```bash
 # crontab: every weekday at 08:30
-30 8 * * 1-5  KUBESAGE_WEBHOOK=https://hooks.slack.com/services/… kubesage report --post
+30 8 * * 1-5  KUBEWEAVE_WEBHOOK=https://hooks.slack.com/services/… kubeweave report --post
 ```
 In the UI, `:daily-report` shows the same summary for the focused cluster and `:daily-report post` sends it (after asking).
 
-**Share your screen read-only (`:share`).** Starts a small web server that shows exactly what your kubesage window shows, refreshed every
+**Share your screen read-only (`:share`).** Starts a small web server that shows exactly what your kubeweave window shows, refreshed every
 second, for pairing during an incident. Viewers cannot type or change anything. `:share` listens on this computer only; `:share lan [port]`
 listens on your network so colleagues can open the link. The link contains a random token; anyone with the link can watch until
 `:share stop`. The shared view pauses while a secret is revealed.
 
-**Performance on big clusters.** kubesage's own report screens (certificates, images, right-sizing, storage, fleet …) query a lot, so they
+**Performance on big clusters.** kubeweave's own report screens (certificates, images, right-sizing, storage, fleet …) query a lot, so they
 refresh every 30 seconds instead of every 3 (`r` refreshes now; the status bar shows the interval). Change it with `slow_refresh_seconds`.
 
 ## Tests
 
 ```bash
 make test
-KUBESAGE_LIVE_OLLAMA=1 go test ./internal/ai -run Live -v       # hits a local Ollama
-KUBESAGE_SNAPSHOT_DIR=/tmp/snap go test ./internal/ui -run Snapshot  # dumps ANSI screens
+KUBEWEAVE_LIVE_OLLAMA=1 go test ./internal/ai -run Live -v       # hits a local Ollama
+KUBEWEAVE_SNAPSHOT_DIR=/tmp/snap go test ./internal/ui -run Snapshot  # dumps ANSI screens
 ```
 
 End-to-end tests run exec, port-forward, apply, scale schedules, a chaos test and a drain plan against a real
 [kind](https://kind.sigs.k8s.io) cluster (CI does this on every push). They skip unless the current context starts with `kind-`:
 ```bash
-kind create cluster --name kubesage-e2e
+kind create cluster --name kubeweave-e2e
 go test -tags e2e -v ./e2e/
 ```
 
 ## Documentation site and demo
 
-The [documentation site](https://gauravthakur02.github.io/kubesage/) is built from this README by `docs/build.py` (one page per
+The [documentation site](https://gauravthakur02.github.io/kubeweave/) is built from this README by `docs/build.py` (one page per
 section) and published by the `docs` workflow. Preview it locally with `pip install mkdocs-material && python docs/build.py && mkdocs serve`.
 `docs/demo.tape` records the demo GIF with [VHS](https://github.com/charmbracelet/vhs) against a throwaway kind cluster.
 
@@ -1059,8 +1059,8 @@ Windows (amd64, arm64), `.deb`/`.rpm`/`.apk` packages and `checksums.txt`, with 
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-After the release, the workflow points the Homebrew formula (`Formula/kubesage.rb`, built from source) at the new tag and commits it,
-so `brew upgrade kubesage` picks it up. A Scoop manifest is published once a `scoop-bucket` repository exists and the
+After the release, the workflow points the Homebrew formula (`Formula/kubeweave.rb`, built from source) at the new tag and commits it,
+so `brew upgrade kubeweave` picks it up. A Scoop manifest is published once a `scoop-bucket` repository exists and the
 `SCOOP_BUCKET_GITHUB_TOKEN` secret is set. CI runs the tests on Linux, macOS and Windows for every push and pull request.
 
 **Optional: signed and notarized macOS archives.** Only needed if you want browser downloads to open without a warning; Homebrew,

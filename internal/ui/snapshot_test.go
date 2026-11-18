@@ -15,14 +15,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
-// KUBESAGE_SNAPSHOT_DIR=/tmp/x go test ./internal/ui -run Snapshot writes ANSI screens for visual review.
+// KUBEWEAVE_SNAPSHOT_DIR=/tmp/x go test ./internal/ui -run Snapshot writes ANSI screens for visual review.
 func TestSnapshot(t *testing.T) {
-	dir := os.Getenv("KUBESAGE_SNAPSHOT_DIR")
+	dir := os.Getenv("KUBEWEAVE_SNAPSHOT_DIR")
 	if dir == "" {
-		t.Skip("set KUBESAGE_SNAPSHOT_DIR")
+		t.Skip("set KUBEWEAVE_SNAPSHOT_DIR")
 	}
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	ago := func(d time.Duration) metav1.Time { return metav1.NewTime(time.Now().Add(-d)) }

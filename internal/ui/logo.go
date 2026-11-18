@@ -10,7 +10,7 @@ import (
 )
 
 // The terminal version of assets/icon.svg: a helm wheel (Kubernetes) with a sage leaf
-// in the hub (the copilot) and an AI sparkle, beside the two-tone "kube"+"sage" wordmark.
+// in the hub (the copilot) and an AI sparkle, beside the two-tone "kube"+"weave" wordmark.
 var logoWheel = []string{
 	" ●   ●   ● ",
 	"  ╲  │  ╱  ",
@@ -55,7 +55,7 @@ func LogoFrame(s Styles, extra string, n int) []string {
 	leaf := lipgloss.NewStyle().Foreground(leafColor).Bold(true)
 	right := []string{
 		lipgloss.NewStyle().Foreground(t.Accent2).Render(sparkle),
-		lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render("kube") + lipgloss.NewStyle().Foreground(t.OK).Bold(true).Render("sage"),
+		lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render("kube") + lipgloss.NewStyle().Foreground(t.OK).Bold(true).Render("weave"),
 		s.Muted.Render("Kubernetes IDE for your terminal · AI copilot"),
 		s.Muted.Render(extra),
 		"",
@@ -89,11 +89,11 @@ func LogoFrame(s Styles, extra string, n int) []string {
 	return out
 }
 
-// LogoMark is the compact two-tone "⎈ kubesage" used in the header pill.
+// LogoMark is the compact two-tone "⎈ kubeweave" used in the header pill.
 func LogoMark(s Styles) string {
 	t := s.T
 	return lipgloss.NewStyle().Background(t.Accent).Foreground(t.Bg).Bold(true).Padding(0, 0, 0, 1).Render("⎈ kube") +
-		lipgloss.NewStyle().Background(t.OK).Foreground(t.Bg).Bold(true).Padding(0, 1, 0, 0).Render("sage")
+		lipgloss.NewStyle().Background(t.OK).Foreground(t.Bg).Bold(true).Padding(0, 1, 0, 0).Render("weave")
 }
 
 // PrintableLogo is the static logo for the command line.

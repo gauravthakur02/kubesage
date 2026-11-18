@@ -7,11 +7,11 @@ import (
 	"testing"
 )
 
-// KUBESAGE_LIVE_CONTEXT=ctx go test ./internal/agent -run Live -v  (read-only)
+// KUBEWEAVE_LIVE_CONTEXT=ctx go test ./internal/agent -run Live -v  (read-only)
 func TestLiveRunner(t *testing.T) {
-	kctx := os.Getenv("KUBESAGE_LIVE_CONTEXT")
+	kctx := os.Getenv("KUBEWEAVE_LIVE_CONTEXT")
 	if kctx == "" {
-		t.Skip("set KUBESAGE_LIVE_CONTEXT")
+		t.Skip("set KUBEWEAVE_LIVE_CONTEXT")
 	}
 	r := Runner{BaseArgs: []string{"--context", kctx}}
 	// The model tries to target another context; it must be stripped.

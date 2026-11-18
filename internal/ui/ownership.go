@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
-	"github.com/gauravthakur02/kubesage/internal/owners"
-	"github.com/gauravthakur02/kubesage/internal/report"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/owners"
+	"github.com/gauravthakur02/kubeweave/internal/report"
 )
 
 // routeAlerts posts new problems to the webhook of the team that owns them (owners: rules with webhook_env).
@@ -37,7 +37,7 @@ func (a *App) routeAlerts(fresh []kube.Issue, ctxs []string) {
 			if url == "" {
 				continue
 			}
-			text := fmt.Sprintf("kubesage alert for %s: %s %s/%s %s: %s", o.Team, ctxs[i], is.Namespace, is.Name, is.Reason, is.Message)
+			text := fmt.Sprintf("kubeweave alert for %s: %s %s/%s %s: %s", o.Team, ctxs[i], is.Namespace, is.Name, is.Reason, is.Message)
 			_ = report.Post(ctx, url, text)
 		}
 	}()

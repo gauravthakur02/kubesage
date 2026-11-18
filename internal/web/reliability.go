@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // changes lists what changed recently in a namespace (rollouts, config, scaling, Helm, GitOps).

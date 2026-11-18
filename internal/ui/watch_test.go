@@ -17,7 +17,7 @@ import (
 
 	"strings"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 func TestWatchTriggersRefresh(t *testing.T) {

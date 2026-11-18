@@ -36,7 +36,7 @@ func UserFrom(r *http.Request) *User {
 	return u
 }
 
-// OIDCConfig configures sign-in for kubesage serve.
+// OIDCConfig configures sign-in for kubeweave serve.
 type OIDCConfig struct {
 	Issuer, ClientID, ClientSecret, RedirectURL string
 	AllowedDomains, AllowedEmails               []string
@@ -54,8 +54,8 @@ type OIDC struct {
 }
 
 const (
-	sessionCookie = "kubesage_session"
-	flowCookie    = "kubesage_oidc"
+	sessionCookie = "kubeweave_session"
+	flowCookie    = "kubeweave_oidc"
 )
 
 // NewOIDC discovers the provider and prepares sign-in.
@@ -216,7 +216,7 @@ func (o *OIDC) userFromClaims(claims map[string]any) (*User, error) {
 		}
 	}
 	if !allowed {
-		return nil, fmt.Errorf("%s is not allowed to use this kubesage", email)
+		return nil, fmt.Errorf("%s is not allowed to use this kubeweave", email)
 	}
 	u := &User{Email: email}
 	if gs, ok := claims[o.cfg.GroupsClaim].([]any); ok {
@@ -237,5 +237,5 @@ func (o *OIDC) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	o.setCookie(w, sessionCookie, "", "/", -time.Second)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte("Signed out of kubesage. <a href=\"/\">Sign in again</a>"))
+	_, _ = w.Write([]byte("Signed out of kubeweave. <a href=\"/\">Sign in again</a>"))
 }

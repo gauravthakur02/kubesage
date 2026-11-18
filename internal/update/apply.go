@@ -20,9 +20,9 @@ import (
 )
 
 // DownloadBase is where release files live; {version} is replaced (tests point it at a local server).
-var DownloadBase = "https://github.com/gauravthakur02/kubesage/releases/download/v{version}"
+var DownloadBase = "https://github.com/gauravthakur02/kubeweave/releases/download/v{version}"
 
-// ArchiveName is the release archive for this platform, e.g. kubesage_0.2.0_darwin_arm64.tar.gz.
+// ArchiveName is the release archive for this platform, e.g. kubeweave_0.2.0_darwin_arm64.tar.gz.
 func ArchiveName(version, goos, goarch string) string {
 	arch := goarch
 	if goarch == "arm" {
@@ -32,7 +32,7 @@ func ArchiveName(version, goos, goarch string) string {
 	if goos == "windows" {
 		ext = ".zip"
 	}
-	return fmt.Sprintf("kubesage_%s_%s_%s%s", version, goos, arch, ext)
+	return fmt.Sprintf("kubeweave_%s_%s_%s%s", version, goos, arch, ext)
 }
 
 // ManagedBy says which package manager owns the binary at path ("" = installed by hand or the install script).
@@ -40,10 +40,10 @@ func ManagedBy(path string) string {
 	p := filepath.ToSlash(path)
 	switch {
 	case strings.Contains(p, "/Cellar/") || strings.Contains(p, "/Caskroom/") || strings.Contains(p, "/homebrew/"):
-		return "Homebrew (brew upgrade --cask kubesage)"
+		return "Homebrew (brew upgrade --cask kubeweave)"
 	case strings.Contains(strings.ToLower(p), "/scoop/"):
-		return "Scoop (scoop update kubesage)"
-	case p == "/usr/bin/kubesage":
+		return "Scoop (scoop update kubeweave)"
+	case p == "/usr/bin/kubeweave":
 		return "your Linux package manager (apt/dnf/apk)"
 	}
 	return ""
@@ -54,7 +54,7 @@ func get(ctx context.Context, url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "kubesage-update")
+	req.Header.Set("User-Agent", "kubeweave-update")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -104,9 +104,9 @@ func Apply(ctx context.Context, version, exe string) error {
 }
 
 func extract(archive []byte, isZip bool) ([]byte, error) {
-	want := "kubesage"
+	want := "kubeweave"
 	if isZip {
-		want = "kubesage.exe"
+		want = "kubeweave.exe"
 		zr, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
 		if err != nil {
 			return nil, err
@@ -141,7 +141,7 @@ func extract(archive []byte, isZip bool) ([]byte, error) {
 
 func replace(exe string, bin []byte) error {
 	dir := filepath.Dir(exe)
-	tmp, err := os.CreateTemp(dir, ".kubesage-new-*")
+	tmp, err := os.CreateTemp(dir, ".kubeweave-new-*")
 	if err != nil {
 		return fmt.Errorf("cannot write to %s (try with sudo, or reinstall with the install script): %w", dir, err)
 	}

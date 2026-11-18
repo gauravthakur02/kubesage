@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
-	"github.com/gauravthakur02/kubesage/internal/owners"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/owners"
 )
 
 // Bot holds what the answers need.
@@ -81,7 +81,7 @@ func (b *Bot) slack(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"response_type": "ephemeral", "text": b.Answer(ctx, text)})
 		return
 	}
-	_ = json.NewEncoder(w).Encode(map[string]string{"response_type": "ephemeral", "text": "⏳ kubesage is checking…"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"response_type": "ephemeral", "text": "⏳ kubeweave is checking…"})
 	go func() { // Slack wants an answer within 3 seconds; the real one goes to response_url
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
@@ -124,7 +124,7 @@ func (b *Bot) teams(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	answer := b.Answer(ctx, text)
 	if ctx.Err() != nil {
-		answer = "kubesage needed more than 5 seconds; ask about one namespace, e.g. `issues shop`."
+		answer = "kubeweave needed more than 5 seconds; ask about one namespace, e.g. `issues shop`."
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"type": "message", "text": strings.ReplaceAll(answer, "\n", "\n\n")})
@@ -132,7 +132,7 @@ func (b *Bot) teams(w http.ResponseWriter, r *http.Request) {
 
 // ---------- answers ----------
 
-const helpText = "kubesage (read-only):\n" +
+const helpText = "kubeweave (read-only):\n" +
 	"• `status` — health of every cluster\n" +
 	"• `issues <namespace> [@context]` — detected problems\n" +
 	"• `changes <namespace> [2h]` — what changed recently\n" +

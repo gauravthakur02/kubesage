@@ -1,5 +1,5 @@
 name: Feature request
-description: An idea to make kubesage more useful
+description: An idea to make kubeweave more useful
 labels: [enhancement]
 body:
   - type: textarea
@@ -12,7 +12,7 @@ body:
   - type: textarea
     id: idea
     attributes:
-      label: How could kubesage help?
+      label: How could kubeweave help?
   - type: textarea
     id: alternatives
     attributes:

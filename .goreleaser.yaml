@@ -1,7 +1,7 @@
 # Release with: git tag v0.2.0 && git push origin v0.2.0  (the release workflow runs GoReleaser)
 # Test locally:  goreleaser release --snapshot --clean   (everything lands in dist/)
 version: 2
-project_name: kubesage
+project_name: kubeweave
 
 before:
   hooks:
@@ -29,17 +29,17 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
-    # kubesage_0.2.0_linux_arm64.tar.gz · kubesage_0.2.0_darwin_arm64.tar.gz · kubesage_0.2.0_windows_amd64.zip
+    # kubeweave_0.2.0_linux_arm64.tar.gz · kubeweave_0.2.0_darwin_arm64.tar.gz · kubeweave_0.2.0_windows_amd64.zip
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}
     files: [LICENSE, README.md, completions/*, manpages/*]
 
 # Linux packages: .deb (Debian/Ubuntu), .rpm (RHEL/Fedora/SUSE) and .apk (Alpine).
 nfpms:
-  - package_name: kubesage
+  - package_name: kubeweave
     file_name_template: "{{ .ConventionalFileName }}"
-    vendor: kubesage
-    homepage: https://github.com/gauravthakur02/kubesage
+    vendor: kubeweave
+    homepage: https://github.com/gauravthakur02/kubeweave
     maintainer: Gaurav Thakur <https://github.com/gauravthakur02>
     description: Kubernetes IDE for your terminal with an AI copilot
     license: MIT
@@ -48,17 +48,17 @@ nfpms:
     section: utils
     contents:
       - src: LICENSE
-        dst: /usr/share/doc/kubesage/LICENSE
+        dst: /usr/share/doc/kubeweave/LICENSE
       - src: README.md
-        dst: /usr/share/doc/kubesage/README.md
-      - src: completions/kubesage.bash
-        dst: /usr/share/bash-completion/completions/kubesage
-      - src: completions/kubesage.zsh
-        dst: /usr/share/zsh/vendor-completions/_kubesage
-      - src: completions/kubesage.fish
-        dst: /usr/share/fish/vendor_completions.d/kubesage.fish
-      - src: manpages/kubesage.1.gz
-        dst: /usr/share/man/man1/kubesage.1.gz
+        dst: /usr/share/doc/kubeweave/README.md
+      - src: completions/kubeweave.bash
+        dst: /usr/share/bash-completion/completions/kubeweave
+      - src: completions/kubeweave.zsh
+        dst: /usr/share/zsh/vendor-completions/_kubeweave
+      - src: completions/kubeweave.fish
+        dst: /usr/share/fish/vendor_completions.d/kubeweave.fish
+      - src: manpages/kubeweave.1.gz
+        dst: /usr/share/man/man1/kubeweave.1.gz
     recommends: [kubectl]
 
 # macOS Gatekeeper blocks downloaded binaries that Apple has not notarized ("Apple could not verify…").
@@ -87,7 +87,7 @@ checksum:
 
 sboms:
   - artifacts: archive # an SPDX bill of materials per archive (needs syft on PATH)
-    disable: '{{ if index .Env "KUBESAGE_SBOM" }}false{{ else }}true{{ end }}'
+    disable: '{{ if index .Env "KUBEWEAVE_SBOM" }}false{{ else }}true{{ end }}'
 
 changelog:
   sort: asc
@@ -97,26 +97,26 @@ changelog:
 release:
   github:
     owner: gauravthakur02
-    name: kubesage
+    name: kubeweave
   footer: |
     ## Install
-    **macOS:** `brew tap gauravthakur02/kubesage https://github.com/gauravthakur02/kubesage && brew trust gauravthakur02/kubesage && brew install kubesage`, or the install script below
-    (downloading the macOS archives in a browser triggers "Apple could not verify…": run `xattr -d com.apple.quarantine kubesage` after unpacking)
-    **macOS / Linux:** `curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.sh | sh`
-    **Go:** `go install github.com/gauravthakur02/kubesage@v{{ .Version }}`
-    **Windows (PowerShell):** `irm https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.ps1 | iex`
-    **Debian/Ubuntu:** `sudo apt install ./kubesage_{{ .Version }}_amd64.deb` · **RHEL/Fedora:** `sudo dnf install ./kubesage-{{ .Version }}-1.x86_64.rpm`
+    **macOS:** `brew tap gauravthakur02/kubeweave https://github.com/gauravthakur02/kubeweave && brew trust gauravthakur02/kubeweave && brew install kubeweave`, or the install script below
+    (downloading the macOS archives in a browser triggers "Apple could not verify…": run `xattr -d com.apple.quarantine kubeweave` after unpacking)
+    **macOS / Linux:** `curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubeweave/main/install.sh | sh`
+    **Go:** `go install github.com/gauravthakur02/kubeweave@v{{ .Version }}`
+    **Windows (PowerShell):** `irm https://raw.githubusercontent.com/gauravthakur02/kubeweave/main/install.ps1 | iex`
+    **Debian/Ubuntu:** `sudo apt install ./kubeweave_{{ .Version }}_amd64.deb` · **RHEL/Fedora:** `sudo dnf install ./kubeweave-{{ .Version }}-1.x86_64.rpm`
     Verify downloads against `checksums.txt`.
 
-# Homebrew: Formula/kubesage.rb in this repository builds from source (no Apple notarization needed); the release
+# Homebrew: Formula/kubeweave.rb in this repository builds from source (no Apple notarization needed); the release
 # workflow updates it. Scoop publishes only when SCOOP_BUCKET_GITHUB_TOKEN is set and the bucket repo exists.
 scoops:
-  - name: kubesage
+  - name: kubeweave
     repository:
       owner: gauravthakur02
       name: scoop-bucket
       token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
     skip_upload: '{{ if index .Env "SCOOP_BUCKET_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
-    homepage: https://github.com/gauravthakur02/kubesage
+    homepage: https://github.com/gauravthakur02/kubeweave
     description: Kubernetes IDE for your terminal with an AI copilot
     license: MIT

@@ -1,7 +1,7 @@
 package ui
 
 import (
-	"github.com/gauravthakur02/kubesage/internal/diff"
+	"github.com/gauravthakur02/kubeweave/internal/diff"
 
 	"fmt"
 	"strings"

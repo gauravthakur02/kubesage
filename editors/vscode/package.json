@@ -1,11 +1,11 @@
 {
-  "name": "kubesage",
-  "displayName": "kubesage",
-  "description": "Open kubesage, the Kubernetes IDE for your terminal, inside VS Code",
+  "name": "kubeweave",
+  "displayName": "kubeweave",
+  "description": "Open kubeweave, the Kubernetes IDE for your terminal, inside VS Code",
   "version": "0.1.0",
   "publisher": "gauravthakur02",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/gauravthakur02/kubesage" },
+  "repository": { "type": "git", "url": "https://github.com/gauravthakur02/kubeweave" },
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],
   "keywords": ["kubernetes", "k8s", "kubectl", "tui", "ai"],
@@ -13,30 +13,30 @@
   "main": "./extension.js",
   "contributes": {
     "commands": [
-      { "command": "kubesage.open", "title": "kubesage: Open" },
-      { "command": "kubesage.openContext", "title": "kubesage: Open cluster…" },
-      { "command": "kubesage.openReadOnly", "title": "kubesage: Open read-only" },
-      { "command": "kubesage.applyFile", "title": "kubesage: Diff and apply this manifest" },
-      { "command": "kubesage.devFolder", "title": "kubesage: Dev loop on this folder" }
+      { "command": "kubeweave.open", "title": "kubeweave: Open" },
+      { "command": "kubeweave.openContext", "title": "kubeweave: Open cluster…" },
+      { "command": "kubeweave.openReadOnly", "title": "kubeweave: Open read-only" },
+      { "command": "kubeweave.applyFile", "title": "kubeweave: Diff and apply this manifest" },
+      { "command": "kubeweave.devFolder", "title": "kubeweave: Dev loop on this folder" }
     ],
     "menus": {
       "explorer/context": [
-        { "command": "kubesage.applyFile", "when": "resourceExtname =~ /\\.ya?ml$/", "group": "kubesage" },
-        { "command": "kubesage.devFolder", "when": "explorerResourceIsFolder", "group": "kubesage" }
+        { "command": "kubeweave.applyFile", "when": "resourceExtname =~ /\\.ya?ml$/", "group": "kubeweave" },
+        { "command": "kubeweave.devFolder", "when": "explorerResourceIsFolder", "group": "kubeweave" }
       ],
       "editor/title/context": [
-        { "command": "kubesage.applyFile", "when": "resourceExtname =~ /\\.ya?ml$/", "group": "kubesage" }
+        { "command": "kubeweave.applyFile", "when": "resourceExtname =~ /\\.ya?ml$/", "group": "kubeweave" }
       ]
     },
     "keybindings": [
-      { "command": "kubesage.open", "key": "ctrl+alt+k", "mac": "cmd+alt+k" }
+      { "command": "kubeweave.open", "key": "ctrl+alt+k", "mac": "cmd+alt+k" }
     ],
     "configuration": {
-      "title": "kubesage",
+      "title": "kubeweave",
       "properties": {
-        "kubesage.path": { "type": "string", "default": "kubesage", "description": "Path to the kubesage binary." },
-        "kubesage.readOnly": { "type": "boolean", "default": false, "description": "Always start with --readonly." },
-        "kubesage.extraArgs": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Extra arguments, e.g. [\"-n\", \"shop\"]." }
+        "kubeweave.path": { "type": "string", "default": "kubeweave", "description": "Path to the kubeweave binary." },
+        "kubeweave.readOnly": { "type": "boolean", "default": false, "description": "Always start with --readonly." },
+        "kubeweave.extraArgs": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Extra arguments, e.g. [\"-n\", \"shop\"]." }
       }
     }
   }

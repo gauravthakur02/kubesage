@@ -1,6 +1,6 @@
 # Security policy
 
-kubesage works with your Kubernetes credentials, so security problems matter. Thank you for reporting them responsibly.
+kubeweave works with your Kubernetes credentials, so security problems matter. Thank you for reporting them responsibly.
 
 ## Reporting a vulnerability
 
@@ -8,7 +8,7 @@ kubesage works with your Kubernetes credentials, so security problems matter. Th
 
 Use GitHub's private reporting: go to the repository's **Security** tab → **Report a vulnerability**. Include:
 
-- the kubesage version (`kubesage version`) and how you run it (terminal, `kubesage serve`, `kubesage bot`, MCP)
+- the kubeweave version (`kubeweave version`) and how you run it (terminal, `kubeweave serve`, `kubeweave bot`, MCP)
 - what an attacker needs (network access, a malicious object in the cluster, a crafted kubeconfig, …)
 - steps to reproduce, and what happens
 
@@ -17,10 +17,10 @@ the reporter unless you prefer otherwise.
 
 ## Supported versions
 
-kubesage is in public beta (0.x). Security fixes go into the latest release only; update with `kubesage update`,
-`brew upgrade kubesage` or the install script.
+kubeweave is in public beta (0.x). Security fixes go into the latest release only; update with `kubeweave update`,
+`brew upgrade kubeweave` or the install script.
 
-## How kubesage protects you
+## How kubeweave protects you
 
 **What leaves your computer**
 
@@ -31,7 +31,7 @@ kubesage is in public beta (0.x). Security fixes go into the latest release only
   the AI wants to run that could reveal Secrets (`get secret -o yaml`, `describe secret`, `--raw`) always need your
   approval. `ai.local_only_contexts` stops cloud AI for matching clusters entirely.
 - **Update check:** release builds ask GitHub for the latest version (no personal data;
-  `KUBESAGE_NO_UPDATE_CHECK=1` turns it off).
+  `KUBEWEAVE_NO_UPDATE_CHECK=1` turns it off).
 - **Alerts, reports and the bot** post only to webhooks you configure.
 
 There is no telemetry.
@@ -42,9 +42,9 @@ There is no telemetry.
 - Contexts matching `danger_contexts` need the object's name typed before destructive actions; chaos tests, the dev
   loop, namespace clones and scale-to-zero schedules refuse them.
 - Change windows, freezes, required reasons and the two-person approval rule are available for teams.
-- Every change is written to a hash-chained audit log; `kubesage audit verify` detects edited or deleted entries.
+- Every change is written to a hash-chained audit log; `kubeweave audit verify` detects edited or deleted entries.
 
-**Web UI (`kubesage serve`)**
+**Web UI (`kubeweave serve`)**
 
 - Read-only unless started with `--allow-changes`; listens on 127.0.0.1 unless told otherwise.
 - Without sign-in, a random 128-bit token in the printed link is the key. On the first visit it is swapped for an
@@ -55,8 +55,8 @@ There is no telemetry.
 - Requests that change anything need a custom header (blocks cross-site form posts); pages are served with a strict
   Content Security Policy (`script-src 'self'`), `frame-ancestors 'none'`, `nosniff` and `no-referrer`.
 - **Port-forwards opened from the browser run on their own port** (a separate origin) behind a one-time key, and
-  kubesage's cookies and headers are stripped before requests reach the forwarded app, so a malicious app inside the
-  cluster cannot act on kubesage with your session.
+  kubeweave's cookies and headers are stripped before requests reach the forwarded app, so a malicious app inside the
+  cluster cannot act on kubeweave with your session.
 - Shells, `$EDITOR` and plugins are disabled in the browser (they would run on the server's machine). Secret values
   stay masked and Secrets cannot be edited.
 - The terminal view at `/term` loads xterm.js from jsDelivr with Subresource Integrity hashes.
@@ -67,16 +67,16 @@ There is no telemetry.
 - Plugins run commands on your computer: they come from your own config, from a team repository only with
   `team.allow_plugins: true`, or from the catalogue after you see the exact command. Values are passed as separate
   arguments, never through a shell.
-- Downloads (`kubesage update`, the install scripts) are verified against the release's `checksums.txt`.
+- Downloads (`kubeweave update`, the install scripts) are verified against the release's `checksums.txt`.
 
 ## Known limitations
 
 - Anyone who can create ConfigMaps in the approvals namespace can forge an approval; restrict that namespace with RBAC.
-- Without `serve.oidc` + `serve.impersonate`, everyone with the web link acts with the credentials kubesage runs with.
+- Without `serve.oidc` + `serve.impersonate`, everyone with the web link acts with the credentials kubeweave runs with.
   Share the link only with people you would give your kubeconfig to.
 - Release binaries are not code-signed (macOS Gatekeeper and Windows SmartScreen warn on browser downloads); install
   with Homebrew, the install script or `go install`, and compare checksums.
-- AI answers can be wrong or manipulated by text in logs and objects (prompt injection). kubesage never runs a change
+- AI answers can be wrong or manipulated by text in logs and objects (prompt injection). kubeweave never runs a change
   the AI proposes without your approval, but read the command before you approve it.
 
 ## Security review log
@@ -86,7 +86,7 @@ handling and installers. Fixed:
 
 | Severity | Finding | Fix |
 |---|---|---|
-| High | Port-forwards were proxied under kubesage's own origin (`/fwd/…`): JavaScript in a forwarded in-cluster app could call the kubesage API with the user's session, and the first link's token could leak through Referer. | Each forward gets its own port (origin) and a one-time key that is swapped for a cookie; kubesage cookies and headers are stripped before proxying. |
+| High | Port-forwards were proxied under kubeweave's own origin (`/fwd/…`): JavaScript in a forwarded in-cluster app could call the kubeweave API with the user's session, and the first link's token could leak through Referer. | Each forward gets its own port (origin) and a one-time key that is swapped for a cookie; kubeweave cookies and headers are stripped before proxying. |
 | High | The AI agent auto-ran `kubectl get secret … -oyaml` (short flag form) and `get secrets.v1 -o yaml` as read-only, which could send Secret values to a cloud AI without approval. | Attached short flags and dotted resource names are recognised; such commands need approval. |
 | Medium | Output of auto-run AI commands was not redacted (e.g. environment variables in `get pods -o yaml`). | Secret-looking values in YAML, JSON and key=value output are redacted before they reach the AI. |
 | Medium | The session token stayed in the URL (address bar, history, downloads list, Referer) and the page needed an inline script. | Token swapped for an HttpOnly SameSite=Strict cookie on first visit; CSP `script-src 'self'`. |

@@ -11,8 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 const (
@@ -167,7 +167,7 @@ func (a *App) snapshotsResource() kube.Resource {
 		for _, s := range ss {
 			t.Rows = append(t.Rows, kube.Row{Name: s.Name, Health: kube.HealthNeutral, Cells: []string{s.Name, kube.Age(metav1.NewTime(s.Taken)) + " ago", s.Objects[""]}})
 		}
-		t.Note = fmt.Sprintf("%d snapshots of %s · :snapshot save [name] · kubesage snapshot save from cron", len(ss), ns)
+		t.Note = fmt.Sprintf("%d snapshots of %s · :snapshot save [name] · kubeweave snapshot save from cron", len(ss), ns)
 		return t
 	})
 }

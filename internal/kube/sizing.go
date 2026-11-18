@@ -23,7 +23,7 @@ type Sizing struct {
 	LongWindow          bool   // peaks include Prometheus history
 }
 
-// PeakFunc returns the highest usage seen for a pod (from kubesage's own history), if known.
+// PeakFunc returns the highest usage seen for a pod (from kubeweave's own history), if known.
 type PeakFunc func(ns, pod string) (cpu, mem int64, ok bool)
 
 // WorkloadPeaks maps namespace/workload-name to the highest per-pod [cpu millicores, memory bytes]

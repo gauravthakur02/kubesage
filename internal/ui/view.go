@@ -10,9 +10,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/gauravthakur02/kubesage/internal/agent"
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/agent"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // View renders the whole screen.
@@ -22,7 +22,7 @@ func (a *App) View() string {
 		shared := v
 		for _, p := range a.panes() {
 			if p.reveal {
-				shared = "kubesage: a secret is revealed on screen, so the shared view is paused until it is hidden again."
+				shared = "kubeweave: a secret is revealed on screen, so the shared view is paused until it is hidden again."
 			}
 		}
 		a.sharing.Update(shared)
@@ -32,7 +32,7 @@ func (a *App) View() string {
 
 func (a *App) view() string {
 	if a.w == 0 {
-		return "starting kubesage…"
+		return "starting kubeweave…"
 	}
 	header := a.viewHeader()
 	innerW, innerH := a.fullSize()
@@ -266,7 +266,7 @@ func (a *App) hints() string {
 				{"p", "health check"}, {"/", "filter"}, {"q", "quit"}}
 			break
 		}
-		if h := a.kubesageHints(); h != nil {
+		if h := a.kubeweaveHints(); h != nil {
 			list = h
 			break
 		}
@@ -307,7 +307,7 @@ func (a *App) hints() string {
 		list = []kv{{"0", "all resources"}, {"enter", "describe"}, {"h", "health"}, {"a", "AI analyze"}, {"l", "logs"}, {"s", "shell"}, {"y", "yaml"}, {"/", "filter"},
 			{"F", "port-fwd"}, {"f", "forwards"}, {"|/-", "split"}, {"!", "kubectl"}, {":", "cmd"}, {"n", "ns"}, {"c", "ctx"}, {"H", "pulse"}, {"?", "help"}}
 	}
-	if a.mode == modeTable && a.res.Watchable() && !a.isKubesageTable() {
+	if a.mode == modeTable && a.res.Watchable() && !a.isKubeweaveTable() {
 		extra := []kv{{"space", "actions"}}
 		if graphKinds[a.res.Kind] {
 			extra = append(extra, kv{"w", "relations"}, kv{"t", "timeline"})
@@ -344,7 +344,7 @@ func (a *App) tableTitle() string {
 	if ns, name, ok := isRollout(a.res); ok {
 		return fmt.Sprintf("Rollout history deployment %s/%s · %s", ns, name, a.table.Note)
 	}
-	if t := a.kubesageTitle(); t != "" {
+	if t := a.kubeweaveTitle(); t != "" {
 		if a.filter != "" {
 			t += " · /" + a.filter
 		}
@@ -660,7 +660,7 @@ func (a *App) renderText(gotoBottom bool) {
 				}
 			}
 			switch {
-			case strings.HasPrefix(l, "──") || strings.HasPrefix(l, "[kubesage]"):
+			case strings.HasPrefix(l, "──") || strings.HasPrefix(l, "[kubeweave]"):
 				l = s.Muted.Render(l)
 			case errWordRe.MatchString(l):
 				l = s.ErrText.Render(l)
@@ -740,7 +740,7 @@ func (a *App) renderChat() {
 			b.WriteString(s.UserLabel.Render("you") + "\n")
 			b.WriteString(lipgloss.NewStyle().Width(w).Foreground(s.T.Fg).Render(c.display) + "\n\n")
 		case "assistant":
-			b.WriteString(s.BotLabel.Render("kubesage") + "\n")
+			b.WriteString(s.BotLabel.Render("kubeweave") + "\n")
 			text := c.content
 			if text == "" && a.aiBusy && i == len(a.chat)-1 {
 				text = a.spin.View() + " thinking…"

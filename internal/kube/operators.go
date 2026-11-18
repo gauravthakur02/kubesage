@@ -104,7 +104,7 @@ func (c *Client) RolloutAction(ctx context.Context, ns, name, action string) err
 	default:
 		return fmt.Errorf("unknown rollout action %q", action)
 	}
-	opts := metav1.PatchOptions{FieldManager: "kubesage"}
+	opts := metav1.PatchOptions{FieldManager: "kubeweave"}
 	if spec != nil {
 		b, _ := json.Marshal(map[string]any{"spec": spec})
 		if _, err := ri.Patch(ctx, name, types.MergePatchType, b, opts); err != nil {

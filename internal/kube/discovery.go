@@ -107,7 +107,7 @@ func objectStatus(u *unstructured.Unstructured) (string, Health) {
 }
 
 // Discover lists custom resources (from CRDs, with printer columns) and every other listable
-// API resource the cluster serves that kubesage has no built-in view for.
+// API resource the cluster serves that kubeweave has no built-in view for.
 func (c *Client) Discover(ctx context.Context) ([]Resource, error) {
 	known := map[string]bool{}
 	for _, r := range registry {

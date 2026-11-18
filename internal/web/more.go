@@ -20,10 +20,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/yaml"
 
-	"github.com/gauravthakur02/kubesage/internal/ai"
-	"github.com/gauravthakur02/kubesage/internal/audit"
-	"github.com/gauravthakur02/kubesage/internal/diff"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/ai"
+	"github.com/gauravthakur02/kubeweave/internal/audit"
+	"github.com/gauravthakur02/kubeweave/internal/diff"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // AIFunc returns the AI provider allowed for a kube-context (nil error = allowed).
@@ -122,7 +122,7 @@ func (a *App) dryRun(w http.ResponseWriter, r *http.Request) {
 // applyYAML replaces the object after a passed dry-run. Read-only mode refuses; production-like contexts need the name typed.
 func (a *App) applyYAML(w http.ResponseWriter, r *http.Request) {
 	if a.ReadOnly {
-		fail(w, 403, fmt.Errorf("read-only: start kubesage serve with --allow-changes to make changes"))
+		fail(w, 403, fmt.Errorf("read-only: start kubeweave serve with --allow-changes to make changes"))
 		return
 	}
 	req, c, res, ok := a.decode(w, r)
@@ -337,8 +337,8 @@ func (a *App) aiFix(w http.ResponseWriter, r *http.Request) {
 
 // ---------- port-forward (each on its own origin) ----------
 
-// A forwarded app is untrusted: it is served from its own port (a different origin than kubesage), so its
-// JavaScript cannot call the kubesage API with your session, and kubesage's cookies and headers are stripped
+// A forwarded app is untrusted: it is served from its own port (a different origin than kubeweave), so its
+// JavaScript cannot call the kubeweave API with your session, and kubeweave's cookies and headers are stripped
 // before requests reach it.
 
 type webForward struct {
@@ -354,7 +354,7 @@ type webForward struct {
 
 var fwMu sync.Mutex
 
-const fwdKeyParam = "kubesage-fwd"
+const fwdKeyParam = "kubeweave-fwd"
 
 func randomKey() string {
 	b := make([]byte, 16)
@@ -362,7 +362,7 @@ func randomKey() string {
 	return hex.EncodeToString(b)
 }
 
-func (f *webForward) cookieName() string { return fmt.Sprintf("kubesage_fwd_%d", f.port) }
+func (f *webForward) cookieName() string { return fmt.Sprintf("kubeweave_fwd_%d", f.port) }
 
 // ServeHTTP admits the browser that holds the one-time key, then proxies.
 func (f *webForward) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -381,7 +381,7 @@ func (f *webForward) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := r.Cookie(f.cookieName())
 	if err != nil || subtle.ConstantTimeCompare([]byte(c.Value), []byte(f.key)) != 1 {
-		http.Error(w, "forbidden: open this port-forward from kubesage", http.StatusForbidden)
+		http.Error(w, "forbidden: open this port-forward from kubeweave", http.StatusForbidden)
 		return
 	}
 	f.proxy.ServeHTTP(w, r)
@@ -395,7 +395,7 @@ func newForwardProxy(local int) *httputil.ReverseProxy {
 		base(r)
 		var keep []string
 		for _, c := range r.Cookies() {
-			if !strings.HasPrefix(c.Name, "kubesage_") {
+			if !strings.HasPrefix(c.Name, "kubeweave_") {
 				keep = append(keep, c.Name+"="+c.Value)
 			}
 		}
@@ -404,7 +404,7 @@ func newForwardProxy(local int) *httputil.ReverseProxy {
 			r.Header.Set("Cookie", strings.Join(keep, "; "))
 		}
 		for k := range r.Header {
-			if strings.HasPrefix(strings.ToLower(k), "x-kubesage") {
+			if strings.HasPrefix(strings.ToLower(k), "x-kubeweave") {
 				r.Header.Del(k)
 			}
 		}
@@ -559,7 +559,7 @@ func (a *App) metrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ns, pod := q.Get("ns"), q.Get("pod")
-	out := map[string]any{"source": "kubesage (sampled while open)", "samples": a.trend(c.Context, ns, pod)}
+	out := map[string]any{"source": "kubeweave (sampled while open)", "samples": a.trend(c.Context, ns, pod)}
 	if a.PromURL != nil {
 		if u := a.PromURL(c.Context); u != "" {
 			ctx, cancel := reqCtx(r, 20*time.Second)

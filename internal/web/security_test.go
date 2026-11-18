@@ -25,20 +25,20 @@ func TestForwardIsolation(t *testing.T) {
 	if r, _ := cl.Get(srv.URL + "/x"); r.StatusCode != 403 {
 		t.Fatalf("no key = %d", r.StatusCode)
 	}
-	if r, _ := cl.Get(srv.URL + "/x?kubesage-fwd=wrong"); r.StatusCode != 403 {
+	if r, _ := cl.Get(srv.URL + "/x?kubeweave-fwd=wrong"); r.StatusCode != 403 {
 		t.Fatalf("wrong key = %d", r.StatusCode)
 	}
-	r, _ := cl.Get(srv.URL + "/x?a=1&kubesage-fwd=k3y")
+	r, _ := cl.Get(srv.URL + "/x?a=1&kubeweave-fwd=k3y")
 	if r.StatusCode != 302 || r.Header.Get("Location") != "/x?a=1" {
 		t.Fatalf("key = %d %s", r.StatusCode, r.Header.Get("Location"))
 	}
 	ck := r.Cookies()[0]
 	req, _ := http.NewRequest("GET", srv.URL+"/x?a=1", nil)
 	req.AddCookie(ck)
-	req.AddCookie(&http.Cookie{Name: "kubesage_session", Value: "secret-session"})
-	req.AddCookie(&http.Cookie{Name: "kubesage_token", Value: "secret-token"})
+	req.AddCookie(&http.Cookie{Name: "kubeweave_session", Value: "secret-session"})
+	req.AddCookie(&http.Cookie{Name: "kubeweave_token", Value: "secret-token"})
 	req.AddCookie(&http.Cookie{Name: "app", Value: "keep"})
-	req.Header.Set("X-Kubesage-Token", "secret-token")
+	req.Header.Set("X-Kubeweave-Token", "secret-token")
 	r, err := cl.Do(req)
 	if err != nil || r.StatusCode != 200 {
 		t.Fatalf("proxied = %v %v", r, err)
@@ -47,9 +47,9 @@ func TestForwardIsolation(t *testing.T) {
 	if string(b) != "app /x?a=1" {
 		t.Fatalf("body = %q", b)
 	}
-	all := strings.Join(seen.Values("Cookie"), ";") + seen.Get("X-Kubesage-Token")
-	if strings.Contains(all, "secret") || strings.Contains(all, "kubesage_fwd") || !strings.Contains(all, "app=keep") {
-		t.Fatalf("kubesage credentials reached the forwarded app: %v", seen)
+	all := strings.Join(seen.Values("Cookie"), ";") + seen.Get("X-Kubeweave-Token")
+	if strings.Contains(all, "secret") || strings.Contains(all, "kubeweave_fwd") || !strings.Contains(all, "app=keep") {
+		t.Fatalf("kubeweave credentials reached the forwarded app: %v", seen)
 	}
 }
 
@@ -64,7 +64,7 @@ func TestContextAllowList(t *testing.T) {
 
 func TestLoginBackAndLogout(t *testing.T) {
 	idp := newIdP(t)
-	o, err := NewOIDC(t.Context(), OIDCConfig{Issuer: idp.srv.URL, ClientID: "kubesage", RedirectURL: "http://127.0.0.1/auth/callback"})
+	o, err := NewOIDC(t.Context(), OIDCConfig{Issuer: idp.srv.URL, ClientID: "kubeweave", RedirectURL: "http://127.0.0.1/auth/callback"})
 	if err != nil {
 		t.Fatal(err)
 	}

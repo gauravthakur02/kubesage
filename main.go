@@ -1,4 +1,4 @@
-// kubesage is a terminal Kubernetes IDE with an AI troubleshooting copilot.
+// kubeweave is a terminal Kubernetes IDE with an AI troubleshooting copilot.
 package main
 
 import (
@@ -25,26 +25,26 @@ import (
 	"golang.org/x/term"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/gauravthakur02/kubesage/internal/agent"
-	"github.com/gauravthakur02/kubesage/internal/ai"
-	"github.com/gauravthakur02/kubesage/internal/audit"
-	"github.com/gauravthakur02/kubesage/internal/bot"
-	"github.com/gauravthakur02/kubesage/internal/cli"
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/diff"
-	"github.com/gauravthakur02/kubesage/internal/kube"
-	"github.com/gauravthakur02/kubesage/internal/mcp"
-	"github.com/gauravthakur02/kubesage/internal/report"
-	"github.com/gauravthakur02/kubesage/internal/serve"
-	"github.com/gauravthakur02/kubesage/internal/ui"
-	"github.com/gauravthakur02/kubesage/internal/update"
-	"github.com/gauravthakur02/kubesage/internal/web"
+	"github.com/gauravthakur02/kubeweave/internal/agent"
+	"github.com/gauravthakur02/kubeweave/internal/ai"
+	"github.com/gauravthakur02/kubeweave/internal/audit"
+	"github.com/gauravthakur02/kubeweave/internal/bot"
+	"github.com/gauravthakur02/kubeweave/internal/cli"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/diff"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/mcp"
+	"github.com/gauravthakur02/kubeweave/internal/report"
+	"github.com/gauravthakur02/kubeweave/internal/serve"
+	"github.com/gauravthakur02/kubeweave/internal/ui"
+	"github.com/gauravthakur02/kubeweave/internal/update"
+	"github.com/gauravthakur02/kubeweave/internal/web"
 )
 
 var version = "0.1.0-dev"
 
 // buildVersion is the version set by GoReleaser or Homebrew (-X main.version), else the module version that
-// `go install github.com/gauravthakur02/kubesage@v0.2.0` records, else the dev placeholder.
+// `go install github.com/gauravthakur02/kubeweave@v0.2.0` records, else the dev placeholder.
 func buildVersion() string {
 	if version != "0.1.0-dev" {
 		return version
@@ -55,47 +55,47 @@ func buildVersion() string {
 	return version
 }
 
-const usage = `kubesage — a Kubernetes IDE for your terminal, with an AI copilot
+const usage = `kubeweave — a Kubernetes IDE for your terminal, with an AI copilot
 
 Usage:
-  kubesage [flags]                 launch the interactive UI
-  kubesage scan [--policy] [flags] print detected issues (exit code 2 if errors found);
+  kubeweave [flags]                 launch the interactive UI
+  kubeweave scan [--policy] [flags] print detected issues (exit code 2 if errors found);
                                    --policy adds security/config checks of every workload
-  kubesage ask [flags] "question"  ask the AI about the cluster, answer streams to stdout
-  kubesage ai                      list AI profiles and whether their API key is found
-  kubesage ai test [profile]       send a tiny prompt to check a profile works
-  kubesage ai add <name> --provider anthropic|openai|azure|gemini|ollama|openai-compatible
+  kubeweave ask [flags] "question"  ask the AI about the cluster, answer streams to stdout
+  kubeweave ai                      list AI profiles and whether their API key is found
+  kubeweave ai test [profile]       send a tiny prompt to check a profile works
+  kubeweave ai add <name> --provider anthropic|openai|azure|gemini|ollama|openai-compatible
                   [--model m] [--base-url u] [--api-version v] [--key-env VAR] [--no-key]
                                    add a profile and (optionally) store its key
-  kubesage ai set-key <profile>    store an API key in the OS keychain (prompts, or reads stdin)
-  kubesage ai delete-key <profile> remove a stored key
-  kubesage ai use <profile>        make a profile the default
-  kubesage ai remove <profile>     delete a profile
-  kubesage config init             write a starter config file
-  kubesage config path             print the config file location
-  kubesage mcp [--context c] [-n ns]     serve read-only tools to AI agents over MCP (stdio)
-  kubesage report [--post]         cluster summary (issues, expiring certs); --post sends it to the
+  kubeweave ai set-key <profile>    store an API key in the OS keychain (prompts, or reads stdin)
+  kubeweave ai delete-key <profile> remove a stored key
+  kubeweave ai use <profile>        make a profile the default
+  kubeweave ai remove <profile>     delete a profile
+  kubeweave config init             write a starter config file
+  kubeweave config path             print the config file location
+  kubeweave mcp [--context c] [-n ns]     serve read-only tools to AI agents over MCP (stdio)
+  kubeweave report [--post]         cluster summary (issues, expiring certs); --post sends it to the
                                    Slack/Teams webhook in $<reports.webhook_env> (run it from cron)
-  kubesage schedule run [--dry-run]   apply scale-to-zero schedules now (run from cron every 10 min)
-  kubesage schedule status         show what each schedule wants right now
-  kubesage approve list | <id> [--reject]   two-person rule: list or decide pending changes
-  kubesage audit verify            check the audit log's hash chain (exit 1 if tampered)
-  kubesage audit export [--since 24h]       push the audit log to Grafana Loki (audit_loki_url)
-  kubesage serve [--addr 127.0.0.1:7777] [--lan] [--allow-changes]
+  kubeweave schedule run [--dry-run]   apply scale-to-zero schedules now (run from cron every 10 min)
+  kubeweave schedule status         show what each schedule wants right now
+  kubeweave approve list | <id> [--reject]   two-person rule: list or decide pending changes
+  kubeweave audit verify            check the audit log's hash chain (exit 1 if tampered)
+  kubeweave audit export [--since 24h]       push the audit log to Grafana Loki (audit_loki_url)
+  kubeweave serve [--addr 127.0.0.1:7777] [--lan] [--allow-changes]
                                    the full UI in a web browser (read-only unless --allow-changes)
-  kubesage snapshot save [name] | list | diff <name>   save a namespace (-n) and compare it later
-  kubesage bot [--addr :8090]      read-only Slack slash command (/slack) and Teams webhook (/teams)
-  kubesage update [--check]        download, verify and install the latest release
-  kubesage completion bash|zsh|fish|powershell   shell completion script
-  kubesage man                     print the man page (kubesage man > kubesage.1)
-  kubesage version
+  kubeweave snapshot save [name] | list | diff <name>   save a namespace (-n) and compare it later
+  kubeweave bot [--addr :8090]      read-only Slack slash command (/slack) and Teams webhook (/teams)
+  kubeweave update [--check]        download, verify and install the latest release
+  kubeweave completion bash|zsh|fish|powershell   shell completion script
+  kubeweave man                     print the man page (kubeweave man > kubeweave.1)
+  kubeweave version
 
 Flags:
 `
 
 func main() {
 	version = buildVersion()
-	fs := flag.NewFlagSet("kubesage", flag.ExitOnError)
+	fs := flag.NewFlagSet("kubeweave", flag.ExitOnError)
 	kubeconfig := fs.String("kubeconfig", "", "path to kubeconfig (default: $KUBECONFIG or ~/.kube/config)")
 	kctx := fs.String("context", "", "kube context(s); comma-separate to open each cluster in its own tab (default: current context)")
 	ns := fs.String("n", "", "namespace (default: from context); use \"all\" for all namespaces")
@@ -104,7 +104,7 @@ func main() {
 	readOnly := fs.Bool("readonly", false, "disable every change to the cluster (UI actions and AI commands)")
 	cfgPath := fs.String("config", "", "config file (default: "+config.DefaultPath()+")")
 	profile := fs.String("ai", "", "AI profile to use (overrides config ai.active)")
-	startCmd := fs.String("cmd", "", "kubesage command to run at startup, e.g. \":apply ./k8s\" or \":dev ./k8s\"")
+	startCmd := fs.String("cmd", "", "kubeweave command to run at startup, e.g. \":apply ./k8s\" or \":dev ./k8s\"")
 	theme := fs.String("theme", "", "colour theme: "+strings.Join(ui.ThemeNames(), ", "))
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, ui.PrintableLogo("version "+version))
@@ -131,11 +131,11 @@ func main() {
 		return
 	}
 	if sub != "" && sub != "__complete" && !cli.Known(sub) {
-		fmt.Fprintf(os.Stderr, "kubesage %s does not have a %q command.\n", version, sub)
+		fmt.Fprintf(os.Stderr, "kubeweave %s does not have a %q command.\n", version, sub)
 		if update.IsRelease(version) {
-			fmt.Fprintln(os.Stderr, "It may be newer than this version: update with `kubesage update` (or brew upgrade kubesage).")
+			fmt.Fprintln(os.Stderr, "It may be newer than this version: update with `kubeweave update` (or brew upgrade kubeweave).")
 		}
-		fmt.Fprintln(os.Stderr, "Run `kubesage help` for the commands this version has.")
+		fmt.Fprintln(os.Stderr, "Run `kubeweave help` for the commands this version has.")
 		os.Exit(1)
 	}
 	switch sub {
@@ -164,14 +164,14 @@ func main() {
 		} else {
 			fmt.Println(ui.PrintableLogo("version " + version))
 		}
-		if update.IsRelease(version) && os.Getenv("KUBESAGE_NO_UPDATE_CHECK") == "" {
+		if update.IsRelease(version) && os.Getenv("KUBEWEAVE_NO_UPDATE_CHECK") == "" {
 			if r, err := update.Latest(context.Background()); err == nil && update.Newer(version, r.Version) {
-				fmt.Printf("\nkubesage %s is available: %s\n", r.Version, r.URL)
+				fmt.Printf("\nkubeweave %s is available: %s\n", r.Version, r.URL)
 			}
 		}
 		return
 	}
-	// Global flags may appear anywhere, e.g. `kubesage ai add x --provider anthropic --config c.yaml`.
+	// Global flags may appear anywhere, e.g. `kubeweave ai add x --provider anthropic --config c.yaml`.
 	for _, a := range args {
 		if a == "-h" || a == "--help" || a == "-help" || a == "help" {
 			if sub == "" || sub == "help" {
@@ -301,7 +301,7 @@ func runScan(c *kube.Client) int {
 	red := lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e")).Bold(true)
 	yellow := lipgloss.NewStyle().Foreground(lipgloss.Color("#e0af68")).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("#737aa2"))
-	fmt.Printf("kubesage scan · context %s · namespace %s\n\n", c.Context, c.NamespaceLabel())
+	fmt.Printf("kubeweave scan · context %s · namespace %s\n\n", c.Context, c.NamespaceLabel())
 	if len(issues) == 0 {
 		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("#9ece6a")).Render("✓ no issues detected"))
 		return 0
@@ -326,7 +326,7 @@ func runScan(c *kube.Client) int {
 
 func runAsk(cfg *config.Config, c *kube.Client, q string, readOnly bool) {
 	if strings.TrimSpace(q) == "" {
-		exitIf(fmt.Errorf(`usage: kubesage ask "why is my pod crashing?"`))
+		exitIf(fmt.Errorf(`usage: kubeweave ask "why is my pod crashing?"`))
 	}
 	p, ok := cfg.AI.Profiles[cfg.AI.Active]
 	if !ok {
@@ -443,7 +443,7 @@ func runAI(cfg *config.Config, args []string) {
 			}
 			fmt.Printf("%s%-10s %-18s %-26s %s\n", mark, name, p.Provider, model, p.KeyStatus())
 		}
-		fmt.Println("\nSwitch with: kubesage --ai <profile>, ctrl+o in the AI chat, or `active:` in the config file.")
+		fmt.Println("\nSwitch with: kubeweave --ai <profile>, ctrl+o in the AI chat, or `active:` in the config file.")
 		return
 	}
 	switch args[0] {
@@ -453,13 +453,13 @@ func runAI(cfg *config.Config, args []string) {
 		return
 	case "set-key", "key":
 		if len(args) < 2 {
-			exitIf(fmt.Errorf("usage: kubesage ai set-key <profile>   (prompts; or pipe the key on stdin)"))
+			exitIf(fmt.Errorf("usage: kubeweave ai set-key <profile>   (prompts; or pipe the key on stdin)"))
 		}
 		aiSetKey(cfg, args[1])
 		return
 	case "delete-key", "rm-key":
 		if len(args) < 2 {
-			exitIf(fmt.Errorf("usage: kubesage ai delete-key <profile>"))
+			exitIf(fmt.Errorf("usage: kubeweave ai delete-key <profile>"))
 		}
 		exitIf(cfg.DeleteKey(args[1]))
 		exitIf(cfg.Save())
@@ -467,10 +467,10 @@ func runAI(cfg *config.Config, args []string) {
 		return
 	case "use":
 		if len(args) < 2 {
-			exitIf(fmt.Errorf("usage: kubesage ai use <profile>"))
+			exitIf(fmt.Errorf("usage: kubeweave ai use <profile>"))
 		}
 		if _, ok := cfg.AI.Profiles[args[1]]; !ok {
-			exitIf(fmt.Errorf("no AI profile %q (see `kubesage ai`)", args[1]))
+			exitIf(fmt.Errorf("no AI profile %q (see `kubeweave ai`)", args[1]))
 		}
 		cfg.AI.Active = args[1]
 		exitIf(cfg.Save())
@@ -478,14 +478,14 @@ func runAI(cfg *config.Config, args []string) {
 		return
 	case "remove", "rm":
 		if len(args) < 2 {
-			exitIf(fmt.Errorf("usage: kubesage ai remove <profile>"))
+			exitIf(fmt.Errorf("usage: kubeweave ai remove <profile>"))
 		}
 		exitIf(cfg.RemoveProfile(args[1]))
 		exitIf(cfg.Save())
 		fmt.Printf("✓ removed profile %s and its stored key\n", args[1])
 		return
 	default:
-		exitIf(fmt.Errorf("unknown command %q. Use: kubesage ai [list|add|set-key|delete-key|use|remove|test]", args[0]))
+		exitIf(fmt.Errorf("unknown command %q. Use: kubeweave ai [list|add|set-key|delete-key|use|remove|test]", args[0]))
 	}
 	name := cfg.AI.Active
 	if len(args) > 1 {
@@ -493,7 +493,7 @@ func runAI(cfg *config.Config, args []string) {
 	}
 	p, ok := cfg.AI.Profiles[name]
 	if !ok {
-		exitIf(fmt.Errorf("no AI profile %q (see `kubesage ai`)", name))
+		exitIf(fmt.Errorf("no AI profile %q (see `kubeweave ai`)", name))
 	}
 	prov, err := ai.New(name, p)
 	exitIf(err)
@@ -536,7 +536,7 @@ func readSecret(prompt string) string {
 
 func aiSetKey(cfg *config.Config, name string) {
 	if _, ok := cfg.AI.Profiles[name]; !ok {
-		exitIf(fmt.Errorf("no AI profile %q; create it first with `kubesage ai add %s --provider …`", name, name))
+		exitIf(fmt.Errorf("no AI profile %q; create it first with `kubeweave ai add %s --provider …`", name, name))
 	}
 	key := readSecret(fmt.Sprintf("API key for %s (input hidden): ", name))
 	where, err := cfg.SetKey(name, key)
@@ -547,12 +547,12 @@ func aiSetKey(cfg *config.Config, name string) {
 	if p.APIKeyEnv != "" && os.Getenv(p.APIKeyEnv) != "" {
 		fmt.Printf("  note: $%s is also set and takes precedence over the stored key\n", p.APIKeyEnv)
 	}
-	fmt.Printf("  check it with: kubesage ai test %s\n", name)
+	fmt.Printf("  check it with: kubeweave ai test %s\n", name)
 }
 
 func aiAdd(cfg *config.Config, args []string) {
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
-		exitIf(fmt.Errorf("usage: kubesage ai add <name> --provider <provider> [--model m] [--base-url u] [--key-env VAR] [--no-key]"))
+		exitIf(fmt.Errorf("usage: kubeweave ai add <name> --provider <provider> [--model m] [--base-url u] [--key-env VAR] [--no-key]"))
 	}
 	name := args[0]
 	fs := flag.NewFlagSet("ai add", flag.ExitOnError)
@@ -715,10 +715,10 @@ func runUpdate(args []string) {
 	r, err := update.Latest(context.Background())
 	exitIf(err)
 	if !update.Newer(version, r.Version) {
-		fmt.Printf("✓ kubesage %s is the latest version\n", version)
+		fmt.Printf("✓ kubeweave %s is the latest version\n", version)
 		return
 	}
-	fmt.Printf("kubesage %s is available (you have %s): %s\n", r.Version, version, r.URL)
+	fmt.Printf("kubeweave %s is available (you have %s): %s\n", r.Version, version, r.URL)
 	if checkOnly {
 		return
 	}
@@ -728,7 +728,7 @@ func runUpdate(args []string) {
 		exe = p
 	}
 	if by := update.ManagedBy(exe); by != "" {
-		exitIf(fmt.Errorf("this kubesage was installed by %s; update it there", by))
+		exitIf(fmt.Errorf("this kubeweave was installed by %s; update it there", by))
 	}
 	fmt.Printf("downloading and verifying %s…\n", update.ArchiveName(r.Version, runtime.GOOS, runtime.GOARCH))
 	exitIf(update.Apply(context.Background(), r.Version, exe))
@@ -768,7 +768,7 @@ func approvalsNS(cfg *config.Config) string {
 	if cfg.Approvals.Namespace != "" {
 		return cfg.Approvals.Namespace
 	}
-	return "kubesage-approvals"
+	return "kubeweave-approvals"
 }
 
 func runApprove(cfg *config.Config, c *kube.Client, args []string) {
@@ -834,7 +834,7 @@ func runAudit(cfg *config.Config, args []string) {
 		entries, err := audit.Read(path)
 		exitIf(err)
 		headers := map[string]string{}
-		if t := os.Getenv("KUBESAGE_LOKI_TOKEN"); t != "" {
+		if t := os.Getenv("KUBEWEAVE_LOKI_TOKEN"); t != "" {
 			headers["Authorization"] = "Bearer " + t
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -843,7 +843,7 @@ func runAudit(cfg *config.Config, args []string) {
 		exitIf(err)
 		fmt.Printf("✓ pushed %d audit entries to Loki\n", n)
 	default:
-		exitIf(fmt.Errorf("use: kubesage audit verify | export [--since 24h]"))
+		exitIf(fmt.Errorf("use: kubeweave audit verify | export [--since 24h]"))
 	}
 }
 
@@ -944,7 +944,7 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 		wa.Auth, wa.PublicURL = auth, strings.TrimSuffix(o.RedirectURL, "auth/callback")
 		app.Impersonate = cfg.Serve.Impersonate
 	} else if cfg.Serve.Impersonate {
-		exitIf(fmt.Errorf("serve.impersonate needs serve.oidc: kubesage must know who is signed in"))
+		exitIf(fmt.Errorf("serve.impersonate needs serve.oidc: kubeweave must know who is signed in"))
 	}
 	srv, err := serve.StartApp(addr, ro, newModel, wa)
 	exitIf(err)
@@ -953,14 +953,14 @@ func runServe(cfg *config.Config, cfgPath, kubeconfig, kctx, namespace string, r
 	if !ro {
 		mode = "CHANGES ALLOWED"
 	}
-	fmt.Printf("kubesage web UI (%s) · open:\n\n  %s\n\n", mode, srv.URL)
+	fmt.Printf("kubeweave web UI (%s) · open:\n\n  %s\n\n", mode, srv.URL)
 	switch {
 	case wa.Auth != nil && app.Impersonate:
 		fmt.Println("Sign-in is on: everyone acts with their own Kubernetes permissions (impersonation).")
 	case wa.Auth != nil:
 		fmt.Println("Sign-in is on, but without serve.impersonate everyone acts with YOUR cluster credentials.")
 	case !strings.HasPrefix(addr, "127.0.0.1") && !strings.HasPrefix(addr, "localhost"):
-		fmt.Println("⚠ listening on your network: anyone with this link can use kubesage with YOUR cluster credentials.")
+		fmt.Println("⚠ listening on your network: anyone with this link can use kubeweave with YOUR cluster credentials.")
 	}
 	fmt.Println("The terminal UI is at /term on the same link. Ctrl+C stops the server.")
 	if (strings.HasPrefix(addr, "127.0.0.1") || strings.HasPrefix(addr, "localhost")) && cfg.OpenBrowser && !noBrowser {
@@ -1018,7 +1018,7 @@ func runBot(cfg *config.Config, kubeconfig string, def *kube.Client, args []stri
 			}
 		}
 	}
-	fmt.Printf("kubesage bot (read-only) on %s · Slack: POST /slack · Teams: POST /teams · health: GET /healthz\n", addr)
+	fmt.Printf("kubeweave bot (read-only) on %s · Slack: POST /slack · Teams: POST /teams · health: GET /healthz\n", addr)
 	srv := &http.Server{Addr: addr, Handler: b.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	exitIf(srv.ListenAndServe())
 }
@@ -1054,7 +1054,7 @@ func runSnapshot(cfg *config.Config, cfgPath string, c *kube.Client, args []stri
 		}
 	case "diff":
 		if len(args) < 2 {
-			exitIf(fmt.Errorf("usage: kubesage snapshot diff <name> -n <namespace>"))
+			exitIf(fmt.Errorf("usage: kubeweave snapshot diff <name> -n <namespace>"))
 		}
 		old, err := kube.LoadSnapshot(base, c.Context, ns, args[1])
 		exitIf(err)
@@ -1076,6 +1076,6 @@ func runSnapshot(cfg *config.Config, cfgPath string, c *kube.Client, args []stri
 			os.Exit(3)
 		}
 	default:
-		exitIf(fmt.Errorf("use: kubesage snapshot save [name] | list | diff <name>"))
+		exitIf(fmt.Errorf("use: kubeweave snapshot save [name] | list | diff <name>"))
 	}
 }

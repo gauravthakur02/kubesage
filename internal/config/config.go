@@ -1,4 +1,4 @@
-// Package config loads and saves kubesage settings.
+// Package config loads and saves kubeweave settings.
 package config
 
 import (
@@ -16,7 +16,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/gauravthakur02/kubesage/internal/owners"
+	"github.com/gauravthakur02/kubeweave/internal/owners"
 )
 
 // AIProfile describes one LLM backend the user can switch between at runtime.
@@ -29,11 +29,11 @@ type AIProfile struct {
 	// APIKeyEnv names the environment variable holding the key (preferred over APIKey).
 	APIKeyEnv string `yaml:"api_key_env,omitempty"`
 	// APIKeyCmd is a command that prints the key, e.g. a macOS Keychain or 1Password lookup:
-	//   security find-generic-password -s kubesage-anthropic -w
+	//   security find-generic-password -s kubeweave-anthropic -w
 	//   op read op://Private/Anthropic/credential
 	APIKeyCmd string `yaml:"api_key_cmd,omitempty"`
-	// KeyInKeyring means `kubesage ai set-key` (or :ai-key) stored the key in the OS keychain
-	// (macOS Keychain, Windows Credential Manager, Linux Secret Service) under service "kubesage".
+	// KeyInKeyring means `kubeweave ai set-key` (or :ai-key) stored the key in the OS keychain
+	// (macOS Keychain, Windows Credential Manager, Linux Secret Service) under service "kubeweave".
 	KeyInKeyring bool `yaml:"key_in_keyring,omitempty"`
 	// PriceInPerMTok / PriceOutPerMTok (USD per million tokens) turn the token estimate into a cost hint.
 	PriceInPerMTok  float64 `yaml:"price_in_per_mtok,omitempty"`
@@ -144,7 +144,7 @@ type AIConfig struct {
 type Config struct {
 	Theme          string `yaml:"theme"`
 	RefreshSeconds int    `yaml:"refresh_seconds"`
-	// SlowRefreshSeconds is how often kubesage's own report tables (certs, images, sizing, …) re-query the cluster (default 30).
+	// SlowRefreshSeconds is how often kubeweave's own report tables (certs, images, sizing, …) re-query the cluster (default 30).
 	SlowRefreshSeconds int  `yaml:"slow_refresh_seconds,omitempty"`
 	ReadOnly           bool `yaml:"read_only"`
 	OpenBrowser        bool `yaml:"open_browser"` // open http://localhost:<port> after a port-forward starts
@@ -169,9 +169,9 @@ type Config struct {
 	Columns map[string][]Column `yaml:"columns,omitempty"`
 	// Plugins are your own commands bound to a key on selected resources.
 	Plugins []Plugin `yaml:"plugins,omitempty"`
-	// AuditLog records every change kubesage makes (default on); set false to disable.
+	// AuditLog records every change kubeweave makes (default on); set false to disable.
 	AuditLog *bool `yaml:"audit_log,omitempty"`
-	// UpdateCheck looks for a newer kubesage release at startup (default on for release builds).
+	// UpdateCheck looks for a newer kubeweave release at startup (default on for release builds).
 	UpdateCheck *bool `yaml:"update_check,omitempty"`
 	// Watchlist is what the background monitor watches for new problems (:pin / :unpin).
 	Watchlist []Pin `yaml:"watchlist,omitempty"`
@@ -207,11 +207,11 @@ type Config struct {
 	Fleet []string `yaml:"fleet,omitempty"`
 	// EventHistory keeps Kubernetes events on local disk so timelines go back days.
 	EventHistory EventHistory `yaml:"event_history,omitempty"`
-	// Rules are your own policy checks (policy as code), shown in V/:policy and `kubesage scan --policy`.
+	// Rules are your own policy checks (policy as code), shown in V/:policy and `kubeweave scan --policy`.
 	Rules []Rule `yaml:"rules,omitempty"`
-	// Schedules scale workloads to zero outside office hours (`kubesage schedule run` from cron, :schedules).
+	// Schedules scale workloads to zero outside office hours (`kubeweave schedule run` from cron, :schedules).
 	Schedules []Schedule `yaml:"schedules,omitempty"`
-	// PluginIndex is the plugin catalogue URL or file for :plugins (default: the one in the kubesage repository).
+	// PluginIndex is the plugin catalogue URL or file for :plugins (default: the one in the kubeweave repository).
 	PluginIndex string `yaml:"plugin_index,omitempty"`
 	// Loki is where logs are kept beyond the pods' lifetime (:loki).
 	Loki Loki `yaml:"loki,omitempty"`
@@ -221,17 +221,17 @@ type Config struct {
 	SLOs []SLO `yaml:"slos,omitempty"`
 	// Owners say which team owns what (namespaces or labels); alerts go to the owning team's webhook.
 	Owners []owners.Rule `yaml:"owners,omitempty"`
-	// Bot configures `kubesage bot` (Slack slash command and Teams outgoing webhook).
+	// Bot configures `kubeweave bot` (Slack slash command and Teams outgoing webhook).
 	Bot Bot `yaml:"bot,omitempty"`
-	// Serve configures `kubesage serve`: sign-in and per-person permissions.
+	// Serve configures `kubeweave serve`: sign-in and per-person permissions.
 	Serve Serve `yaml:"serve,omitempty"`
 	// Approvals require a second person to approve changes on matching contexts.
 	Approvals Approvals `yaml:"approvals,omitempty"`
 	// Team loads shared settings (rules, schedules, fleet, plugins, runbooks, windows) from a git repository.
 	Team Team `yaml:"team,omitempty"`
-	// AuditLoki is a Grafana Loki push URL for `kubesage audit export` (…/loki/api/v1/push).
+	// AuditLoki is a Grafana Loki push URL for `kubeweave audit export` (…/loki/api/v1/push).
 	AuditLoki string `yaml:"audit_loki_url,omitempty"`
-	// Reports configures `kubesage report` (summary posted to a Slack/Teams webhook).
+	// Reports configures `kubeweave report` (summary posted to a Slack/Teams webhook).
 	Reports Reports `yaml:"reports,omitempty"`
 
 	path        string
@@ -318,12 +318,12 @@ type Serve struct {
 	Impersonate bool `yaml:"impersonate,omitempty"`
 }
 
-// OIDC is the identity provider used to sign in to kubesage serve.
+// OIDC is the identity provider used to sign in to kubeweave serve.
 type OIDC struct {
 	Issuer          string   `yaml:"issuer,omitempty"` // e.g. https://login.microsoftonline.com/<tenant>/v2.0
 	ClientID        string   `yaml:"client_id,omitempty"`
 	ClientSecretEnv string   `yaml:"client_secret_env,omitempty"` // environment variable holding the client secret
-	RedirectURL     string   `yaml:"redirect_url,omitempty"`      // https://kubesage.example.com/auth/callback
+	RedirectURL     string   `yaml:"redirect_url,omitempty"`      // https://kubeweave.example.com/auth/callback
 	AllowedDomains  []string `yaml:"allowed_domains,omitempty"`
 	AllowedEmails   []string `yaml:"allowed_emails,omitempty"`
 	GroupsClaim     string   `yaml:"groups_claim,omitempty"` // default groups
@@ -334,22 +334,22 @@ type OIDC struct {
 type Approvals struct {
 	// Contexts is a regex of kube-contexts where every change needs another person's approval.
 	Contexts string `yaml:"contexts,omitempty"`
-	// Namespace holds the approval requests as ConfigMaps (default kubesage-approvals).
+	// Namespace holds the approval requests as ConfigMaps (default kubeweave-approvals).
 	Namespace string `yaml:"namespace,omitempty"`
 	// ExpireMinutes is how long a request stays valid (default 60).
 	ExpireMinutes int `yaml:"expire_minutes,omitempty"`
 }
 
-// Team points at a git repository with a shared kubesage.yaml.
+// Team points at a git repository with a shared kubeweave.yaml.
 type Team struct {
 	Repo string `yaml:"repo,omitempty"` // git URL
 	Ref  string `yaml:"ref,omitempty"`  // branch or tag (default: the repository default)
-	Path string `yaml:"path,omitempty"` // file in the repo (default kubesage.yaml)
+	Path string `yaml:"path,omitempty"` // file in the repo (default kubeweave.yaml)
 	// AllowPlugins also loads the team's plugins (they run commands on your computer).
 	AllowPlugins bool `yaml:"allow_plugins,omitempty"`
 }
 
-// Reports configures the summary posted by `kubesage report`.
+// Reports configures the summary posted by `kubeweave report`.
 type Reports struct {
 	// WebhookEnv names the environment variable holding a Slack or Teams incoming-webhook URL.
 	WebhookEnv string `yaml:"webhook_env,omitempty"`
@@ -368,7 +368,7 @@ type View struct {
 	B         *View   `yaml:"b,omitempty"`
 }
 
-// Policy configures the workload policy/security checks (V, :policy, kubesage scan --policy).
+// Policy configures the workload policy/security checks (V, :policy, kubeweave scan --policy).
 type Policy struct {
 	// AllowedRegistries are regular expressions images must match, e.g. '^[a-z0-9-]+\.azurecr\.io/'.
 	// Empty turns the registry check off.
@@ -411,12 +411,12 @@ func Default() *Config {
 	}
 }
 
-// DefaultPath is $XDG_CONFIG_HOME/kubesage/config.yaml (~/.config by default),
-// or %AppData%\kubesage\config.yaml on Windows.
+// DefaultPath is $XDG_CONFIG_HOME/kubeweave/config.yaml (~/.config by default),
+// or %AppData%\kubeweave\config.yaml on Windows.
 func DefaultPath() string {
 	if runtime.GOOS == "windows" {
 		if dir, err := os.UserConfigDir(); err == nil {
-			return filepath.Join(dir, "kubesage", "config.yaml")
+			return filepath.Join(dir, "kubeweave", "config.yaml")
 		}
 	}
 	dir := os.Getenv("XDG_CONFIG_HOME")
@@ -424,7 +424,7 @@ func DefaultPath() string {
 		home, _ := os.UserHomeDir()
 		dir = filepath.Join(home, ".config")
 	}
-	return filepath.Join(dir, "kubesage", "config.yaml")
+	return filepath.Join(dir, "kubeweave", "config.yaml")
 }
 
 // Load reads the config at path, falling back to defaults when it does not exist.

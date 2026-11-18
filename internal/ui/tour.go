@@ -12,7 +12,7 @@ var tourPages = []struct {
 	title string
 	lines [][2]string
 }{
-	{"Welcome to kubesage", [][2]string{{"", "A Kubernetes IDE for your terminal. This 60-second tour shows where things are."},
+	{"Welcome to kubeweave", [][2]string{{"", "A Kubernetes IDE for your terminal. This 60-second tour shows where things are."},
 		{"→ / enter", "next page"}, {"←", "previous page"}, {"esc", "skip the tour (reopen it any time with :tour)"}}},
 	{"Find anything", [][2]string{{"1-9", "favourite resources (pods, deployments, …)"}, {"0", "every resource type, including CRDs"},
 		{":pods kube-system", "jump to a resource in a namespace"}, {"/", "filter the table"}, {"n · c", "switch namespace · switch cluster"}}},
@@ -22,7 +22,7 @@ var tourPages = []struct {
 	{"Ask the AI", [][2]string{{"a", "analyze the selected object"}, {"A", "chat about the cluster"}, {"I", "triage everything unhealthy"},
 		{"", "The AI only runs a command after you approve it, and never in read-only mode."}}},
 	{"Stay safe", [][2]string{{"--readonly", "start with every change disabled"}, {"danger_contexts", "production-like clusters ask you to type the name"},
-		{":audit", "every change kubesage made, with who and why"}}},
+		{":audit", "every change kubeweave made, with who and why"}}},
 	{"Everything else", [][2]string{{"ctrl+p", "command palette: every screen and command, fuzzy search"}, {"?", "all keys"},
 		{":fleet · :history", "all clusters at a glance · events older than an hour"}, {"q", "quit"}}},
 }

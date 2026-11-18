@@ -26,7 +26,7 @@ func (c *Client) WriteLogs(ctx context.Context, w io.Writer, ns, pod string, o L
 	defer rc.Close()
 	n, err := io.Copy(w, io.LimitReader(rc, MaxLogBytes))
 	if n == MaxLogBytes {
-		fmt.Fprintf(w, "\n[kubesage] truncated at %d MiB\n", MaxLogBytes>>20)
+		fmt.Fprintf(w, "\n[kubeweave] truncated at %d MiB\n", MaxLogBytes>>20)
 	}
 	return n, err
 }
@@ -73,7 +73,7 @@ func (c *Client) writeBundle(ctx context.Context, w io.Writer, pods []corev1.Pod
 	sort.Slice(pods, func(i, j int) bool { return pods[i].Name < pods[j].Name })
 	zw := zip.NewWriter(w)
 	var summary strings.Builder
-	fmt.Fprintf(&summary, "kubesage log bundle\ncontext:   %s\nobject:    %s\ncollected: %s\nwindow:    %s\n\n",
+	fmt.Fprintf(&summary, "kubeweave log bundle\ncontext:   %s\nobject:    %s\ncollected: %s\nwindow:    %s\n\n",
 		c.Context, what, time.Now().UTC().Format(time.RFC3339), windowLabel(since))
 	add := func(path string, o LogOptions, pod string) {
 		f, err := zw.CreateHeader(&zip.FileHeader{Name: path, Method: zip.Deflate, Modified: time.Now()})
@@ -85,7 +85,7 @@ func (c *Client) writeBundle(ctx context.Context, w io.Writer, pods []corev1.Pod
 		res.Bytes += n
 		res.Files++
 		if err != nil {
-			fmt.Fprintf(f, "\n[kubesage] could not read this log: %v\n", err)
+			fmt.Fprintf(f, "\n[kubeweave] could not read this log: %v\n", err)
 			res.Skipped = append(res.Skipped, path+": "+firstLine(err.Error()))
 		}
 	}

@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // viewReadyMsg carries clients for every cluster a saved view needs.
@@ -177,7 +177,7 @@ func (a *App) buildView(v *config.View, clients map[string]*kube.Client) *layout
 	return n
 }
 
-// resourceByName restores built-in, discovered and kubesage's own tables (for the focused pane).
+// resourceByName restores built-in, discovered and kubeweave's own tables (for the focused pane).
 func (a *App) resourceByName(name string) kube.Resource {
 	switch {
 	case name == clustersRes:

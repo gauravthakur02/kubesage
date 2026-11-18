@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 var unsafeFileName = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
@@ -49,7 +49,7 @@ func (a *App) logsDownload(w http.ResponseWriter, r *http.Request) {
 	if o.Previous {
 		suffix = "previous"
 	}
-	attachment(w, "text/plain; charset=utf-8", "kubesage-logs", c.Context, ns, pod, ctr, suffix)
+	attachment(w, "text/plain; charset=utf-8", "kubeweave-logs", c.Context, ns, pod, ctr, suffix)
 	_, _ = c.WriteLogs(r.Context(), w, ns, pod, o)
 }
 
@@ -72,7 +72,7 @@ func (a *App) logsBundle(w http.ResponseWriter, r *http.Request) {
 		fail(w, 502, err)
 		return
 	}
-	attachment(w, "application/zip", "kubesage-logs", c.Context, ns, name)
+	attachment(w, "application/zip", "kubeweave-logs", c.Context, ns, name)
 	_, _ = c.WriteLogBundle(r.Context(), w, res, ns, name, kube.ParseSince(r.URL.Query().Get("since"), 0), true)
 }
 

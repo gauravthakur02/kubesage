@@ -121,7 +121,7 @@ type ApplyItem struct {
 	ri                    dynamic.ResourceInterface
 }
 
-// PlanApply server-side dry-runs every object (field manager "kubesage") and compares with what runs.
+// PlanApply server-side dry-runs every object (field manager "kubeweave") and compares with what runs.
 func (c *Client) PlanApply(ctx context.Context, objs []*unstructured.Unstructured, defaultNS string) ([]ApplyItem, error) {
 	if c.Dynamic == nil {
 		return nil, fmt.Errorf("dynamic client unavailable")
@@ -157,7 +157,7 @@ func (c *Client) PlanApply(ctx context.Context, objs []*unstructured.Unstructure
 		default:
 			it.Live = Comparable(live)
 		}
-		res, err := ri.Apply(ctx, o.GetName(), o, metav1.ApplyOptions{FieldManager: "kubesage", DryRun: []string{metav1.DryRunAll}})
+		res, err := ri.Apply(ctx, o.GetName(), o, metav1.ApplyOptions{FieldManager: "kubeweave", DryRun: []string{metav1.DryRunAll}})
 		if err != nil {
 			it.State, it.Err = "error", err
 			items = append(items, it)
@@ -194,7 +194,7 @@ func (c *Client) ExecuteApply(ctx context.Context, items []ApplyItem) (applied i
 		if it.State != "new" && it.State != "changed" {
 			continue
 		}
-		if _, err := it.ri.Apply(ctx, it.obj.GetName(), it.obj, metav1.ApplyOptions{FieldManager: "kubesage"}); err != nil {
+		if _, err := it.ri.Apply(ctx, it.obj.GetName(), it.obj, metav1.ApplyOptions{FieldManager: "kubeweave"}); err != nil {
 			errs = append(errs, fmt.Sprintf("%s/%s: %v", it.Kind, it.Name, err))
 			continue
 		}

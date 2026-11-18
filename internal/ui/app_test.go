@@ -15,8 +15,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/gauravthakur02/kubesage/internal/ai"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/ai"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 type fakeAI struct{}
@@ -85,7 +85,7 @@ func TestTableRendersAndFilters(t *testing.T) {
 	a := newTestApp(t)
 	run(a, fetchList(a.client, a.res, a.listGen), 0)
 	view := ansi.Strip(a.View())
-	for _, want := range []string{"kubesage", "ctx aks-prod", "⚠ PROD", "api-1", "Running", "Pods (1)"} {
+	for _, want := range []string{"kubeweave", "ctx aks-prod", "⚠ PROD", "api-1", "Running", "Pods (1)"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("view missing %q\n%s", want, view)
 		}

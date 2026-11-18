@@ -1,4 +1,4 @@
-module github.com/gauravthakur02/kubesage
+module github.com/gauravthakur02/kubeweave
 
 go 1.27.3
 

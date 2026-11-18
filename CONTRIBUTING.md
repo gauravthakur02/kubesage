@@ -1,4 +1,4 @@
-# Contributing to kubesage
+# Contributing to kubeweave
 
 Thanks for helping! Bug reports, ideas, docs fixes, plugins and code are all welcome.
 
@@ -14,14 +14,14 @@ Thanks for helping! Bug reports, ideas, docs fixes, plugins and code are all wel
 You need the Go version in `go.mod`. A kind cluster is handy for testing against a real API server.
 
 ```bash
-make build                      # → bin/kubesage
+make build                      # → bin/kubeweave
 make test                       # go vet + go test
 go test -race ./...             # what CI runs on Linux and macOS
-kind create cluster --name kubesage-e2e && go test -tags e2e -v ./e2e/   # real-cluster tests
+kind create cluster --name kubeweave-e2e && go test -tags e2e -v ./e2e/   # real-cluster tests
 ```
 
 Run the UI against a **non-production** context, ideally with `--readonly` until you test a change on purpose.
-`kubesage serve --no-browser` serves the web UI; the files in `internal/web/static` are plain JavaScript and CSS
+`kubeweave serve --no-browser` serves the web UI; the files in `internal/web/static` are plain JavaScript and CSS
 (no build step).
 
 ## Pull requests

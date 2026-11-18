@@ -10,8 +10,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 const schedulesRes = "schedules"
@@ -38,7 +38,7 @@ func scheduleBlocked(cfg *config.Config, s config.Schedule, kctx string) string 
 }
 
 // RunSchedules applies every schedule to matching contexts: scale to zero or restore, as the time says.
-// It is what `kubesage schedule run` does (run it from cron every 5–15 minutes).
+// It is what `kubeweave schedule run` does (run it from cron every 5–15 minutes).
 func RunSchedules(cfg *config.Config, kubeconfig string, now time.Time, dryRun bool, out io.Writer) error {
 	if len(cfg.Schedules) == 0 {
 		return fmt.Errorf("no schedules in the config (schedules:)")
@@ -145,7 +145,7 @@ func (a *App) schedulesResource() kube.Resource {
 				wl = fmt.Sprintf("%d running · %d scaled down", running, parked)
 				switch {
 				case want == "down" && running > 0:
-					status, h = "▲ should be down (run kubesage schedule run, or d)", kube.HealthWarn
+					status, h = "▲ should be down (run kubeweave schedule run, or d)", kube.HealthWarn
 				case want == "up" && parked > 0:
 					status, h = "▲ should be up (u restores)", kube.HealthWarn
 				default:
@@ -155,7 +155,7 @@ func (a *App) schedulesResource() kube.Resource {
 			t.Rows = append(t.Rows, kube.Row{Namespace: s.Namespace, Name: fmt.Sprint(i), Health: h,
 				Cells: []string{s.Name, s.Namespace, s.Selector, scheduleWindow(s), want, wl, status}})
 		}
-		t.Note = fmt.Sprintf("%d schedules for %s · applied by `kubesage schedule run` (cron)", n, c.Context)
+		t.Note = fmt.Sprintf("%d schedules for %s · applied by `kubeweave schedule run` (cron)", n, c.Context)
 		if n == 0 {
 			t.Note = "no schedules match " + c.Context + " · add schedules: to the config"
 		}

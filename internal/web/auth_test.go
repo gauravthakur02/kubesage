@@ -44,7 +44,7 @@ func newIdP(t *testing.T) *fakeIdP {
 			return
 		}
 		sig, _ := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: k}, (&jose.SignerOptions{}).WithHeader("kid", "k1"))
-		tok, _ := jwt.Signed(sig).Claims(map[string]any{"iss": p.srv.URL, "aud": "kubesage", "sub": "1", "email": p.email, "email_verified": true,
+		tok, _ := jwt.Signed(sig).Claims(map[string]any{"iss": p.srv.URL, "aud": "kubeweave", "sub": "1", "email": p.email, "email_verified": true,
 			"groups": []string{"sre"}, "nonce": p.nonce, "iat": time.Now().Unix(), "exp": time.Now().Add(time.Hour).Unix()}).Serialize()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "at", "token_type": "Bearer", "expires_in": 3600, "id_token": tok})
@@ -57,7 +57,7 @@ func TestOIDCSignIn(t *testing.T) {
 	idp := newIdP(t)
 	app := httptest.NewServer(nil)
 	defer app.Close()
-	o, err := NewOIDC(context.Background(), OIDCConfig{Issuer: idp.srv.URL, ClientID: "kubesage", RedirectURL: app.URL + "/auth/callback", AllowedDomains: []string{"example.com"}})
+	o, err := NewOIDC(context.Background(), OIDCConfig{Issuer: idp.srv.URL, ClientID: "kubeweave", RedirectURL: app.URL + "/auth/callback", AllowedDomains: []string{"example.com"}})
 	if err != nil {
 		t.Fatal(err)
 	}

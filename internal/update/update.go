@@ -1,4 +1,4 @@
-// Package update checks GitHub for a newer kubesage release.
+// Package update checks GitHub for a newer kubeweave release.
 package update
 
 import (
@@ -12,7 +12,7 @@ import (
 )
 
 // LatestURL is the GitHub API endpoint for the latest release.
-var LatestURL = "https://api.github.com/repos/gauravthakur02/kubesage/releases/latest"
+var LatestURL = "https://api.github.com/repos/gauravthakur02/kubeweave/releases/latest"
 
 // Release is the newest published version.
 type Release struct {
@@ -28,7 +28,7 @@ func Latest(ctx context.Context) (*Release, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "kubesage-update-check")
+	req.Header.Set("User-Agent", "kubeweave-update-check")
 	req.Header.Set("Accept", "application/vnd.github+json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

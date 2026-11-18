@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // Key handling of table panes.
@@ -205,7 +205,7 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 		a.cycleSort(true)
 		return nil
 	case " ", "space":
-		if !a.isKubesageTable() && a.res.Watchable() {
+		if !a.isKubeweaveTable() && a.res.Watchable() {
 			return a.openActions()
 		}
 	case "ctrl+p":
@@ -239,7 +239,7 @@ func (a *App) updateTable(k tea.KeyMsg) tea.Cmd {
 	if !ok {
 		return nil
 	}
-	if a.isKubesageTable() {
+	if a.isKubeweaveTable() {
 		return nil
 	}
 	if _, _, hh := isHelmHistory(a.res); hh || a.res.Name == helmRes || a.res.Name == chartsRes {

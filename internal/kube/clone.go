@@ -15,8 +15,8 @@ import (
 
 // Labels on namespaces created by CloneNamespace.
 const (
-	CloneOfLabel     = "kubesage.io/clone-of"
-	CloneExpiresAnno = "kubesage.io/expires"
+	CloneOfLabel     = "kubeweave.io/clone-of"
+	CloneExpiresAnno = "kubeweave.io/expires"
 )
 
 var cloneKinds = []struct {
@@ -100,9 +100,9 @@ func (c *Client) CloneNamespace(ctx context.Context, src, dst string, ttl time.D
 	if src == "" || dst == "" || src == dst {
 		return res, fmt.Errorf("give a source and a different target namespace")
 	}
-	nsObj := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: dst, Labels: map[string]string{CloneOfLabel: src, "app.kubernetes.io/managed-by": "kubesage"},
+	nsObj := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: dst, Labels: map[string]string{CloneOfLabel: src, "app.kubernetes.io/managed-by": "kubeweave"},
 		Annotations: map[string]string{CloneExpiresAnno: time.Now().Add(ttl).UTC().Format(time.RFC3339)}}}
-	if _, err := c.Clientset.CoreV1().Namespaces().Create(ctx, nsObj, metav1.CreateOptions{FieldManager: "kubesage"}); err != nil {
+	if _, err := c.Clientset.CoreV1().Namespaces().Create(ctx, nsObj, metav1.CreateOptions{FieldManager: "kubeweave"}); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			return res, fmt.Errorf("namespace %s already exists; pick a new name", dst)
 		}
@@ -119,7 +119,7 @@ func (c *Client) CloneNamespace(ctx context.Context, src, dst string, ttl time.D
 			if !cleanForCopy(u, dst) {
 				continue
 			}
-			if _, err := c.Dynamic.Resource(k.gvr).Namespace(dst).Create(ctx, u, metav1.CreateOptions{FieldManager: "kubesage"}); err != nil {
+			if _, err := c.Dynamic.Resource(k.gvr).Namespace(dst).Create(ctx, u, metav1.CreateOptions{FieldManager: "kubeweave"}); err != nil {
 				res.Skipped = append(res.Skipped, fmt.Sprintf("%s/%s: %s", k.name, u.GetName(), firstLine(err.Error())))
 				continue
 			}
@@ -157,7 +157,7 @@ func (c *Client) DeleteClone(ctx context.Context, name string) error {
 		return err
 	}
 	if n.Labels[CloneOfLabel] == "" {
-		return fmt.Errorf("%s was not created by kubesage :clone; refusing to delete it", name)
+		return fmt.Errorf("%s was not created by kubeweave :clone; refusing to delete it", name)
 	}
 	return c.Clientset.CoreV1().Namespaces().Delete(ctx, name, metav1.DeleteOptions{})
 }

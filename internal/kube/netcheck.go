@@ -57,7 +57,7 @@ func (c *Client) RunEphemeral(ctx context.Context, ns, pod, image, script string
 	if err != nil {
 		return "", err
 	}
-	name := fmt.Sprintf("kubesage-net-%d", time.Now().Unix()%100000)
+	name := fmt.Sprintf("kubeweave-net-%d", time.Now().Unix()%100000)
 	p.Spec.EphemeralContainers = append(p.Spec.EphemeralContainers, corev1.EphemeralContainer{EphemeralContainerCommon: corev1.EphemeralContainerCommon{
 		Name: name, Image: image, ImagePullPolicy: corev1.PullIfNotPresent, Command: []string{"sh", "-c", script},
 		TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError}})

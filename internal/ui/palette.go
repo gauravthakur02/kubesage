@@ -11,13 +11,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 func kubeStrip(s string) string { return ansi.Strip(s) }
 
-// paletteItems are the kubesage screens and commands reachable from ctrl+p.
+// paletteItems are the kubeweave screens and commands reachable from ctrl+p.
 var paletteItems = []struct{ label, cmd string }{
 	{"Helm releases", "helm"}, {"Helm charts in use", "charts"}, {"Pulse: cluster health", "pulse"},
 	{"Clusters overview", "clusters"}, {"Policy & security checks", "policy"}, {"AI incident triage", "incident"},
@@ -43,10 +43,10 @@ var paletteItems = []struct{ label, cmd string }{
 	{"Clone this namespace (preview env)", "clone "}, {"Namespace clones", "clones"}, {"Plugin catalogue", "plugins"},
 	{"What changed? (rollouts, config, Helm, GitOps)", "changes"}, {"SLOs and error budgets", "slo"},
 	{"Snapshot this namespace", "snapshot save"}, {"Snapshots: compare with now", "snapshots"},
-	{"Download logs (zip of all pods)", "download-logs"}, {"Tour of kubesage", "tour"}, {"Help", "help"},
+	{"Download logs (zip of all pods)", "download-logs"}, {"Tour of kubeweave", "tour"}, {"Help", "help"},
 }
 
-// openPalette fuzzy-searches resources, kubesage screens, saved views, contexts and plugins (ctrl+p).
+// openPalette fuzzy-searches resources, kubeweave screens, saved views, contexts and plugins (ctrl+p).
 func (a *App) openPalette() tea.Cmd {
 	type item struct {
 		label string

@@ -22,8 +22,8 @@ import (
 	dynfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
-	"github.com/gauravthakur02/kubesage/internal/owners"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/owners"
 )
 
 func testBot(t *testing.T) *Bot {
@@ -58,7 +58,7 @@ func TestSlackAndTeamsSignatures(t *testing.T) {
 	b.Now = func() time.Time { return now }
 	srv := httptest.NewServer(b.Handler())
 	defer srv.Close()
-	body := "command=%2Fkubesage&text=issues+shop"
+	body := "command=%2Fkubeweave&text=issues+shop"
 	ts := fmt.Sprint(now.Unix())
 	m := hmac.New(sha256.New, b.SlackSecret)
 	fmt.Fprintf(m, "v0:%s:%s", ts, body)
@@ -84,7 +84,7 @@ func TestSlackAndTeamsSignatures(t *testing.T) {
 	if code, _ := send("v0="+hex.EncodeToString(m.Sum(nil)), fmt.Sprint(now.Add(-time.Hour).Unix())); code != 401 {
 		t.Fatalf("replayed slack request = %d", code)
 	}
-	tb := []byte(`{"type":"message","text":"<at>kubesage</at> owner shop/web"}`)
+	tb := []byte(`{"type":"message","text":"<at>kubeweave</at> owner shop/web"}`)
 	tm := hmac.New(sha256.New, b.TeamsToken)
 	tm.Write(tb)
 	req, _ := http.NewRequest("POST", srv.URL+"/teams", strings.NewReader(string(tb)))

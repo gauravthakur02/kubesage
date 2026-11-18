@@ -1,19 +1,19 @@
 #!/bin/sh
-# Install kubesage on macOS or Linux from GitHub releases.
+# Install kubeweave on macOS or Linux from GitHub releases.
 #
-#   curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubesage/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubeweave/main/install.sh | sh
 #
 # Options (environment variables):
-#   KUBESAGE_VERSION=0.2.0          a specific version (default: the latest release)
-#   KUBESAGE_INSTALL_DIR=~/bin      where to put the binary (default: /usr/local/bin if writable, else ~/.local/bin)
-#   KUBESAGE_DOWNLOAD_URL=https://… a mirror holding the release files (default: the GitHub release)
+#   KUBEWEAVE_VERSION=0.2.0          a specific version (default: the latest release)
+#   KUBEWEAVE_INSTALL_DIR=~/bin      where to put the binary (default: /usr/local/bin if writable, else ~/.local/bin)
+#   KUBEWEAVE_DOWNLOAD_URL=https://… a mirror holding the release files (default: the GitHub release)
 set -eu
 
-REPO="gauravthakur02/kubesage"
-BIN="kubesage"
+REPO="gauravthakur02/kubeweave"
+BIN="kubeweave"
 
 say() { printf '%s\n' "$*" >&2; }
-fail() { say "kubesage install: $*"; exit 1; }
+fail() { say "kubeweave install: $*"; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || fail "$1 is required"; }
 
 fetch() { # fetch URL [output]
@@ -44,20 +44,20 @@ case "$arch" in
 esac
 [ "$os" = darwin ] && [ "$arch" = armv7 ] && fail "unsupported CPU $arch on macOS"
 
-version="${KUBESAGE_VERSION:-}"
+version="${KUBEWEAVE_VERSION:-}"
 if [ -z "$version" ]; then
   version=$(fetch "https://api.github.com/repos/$REPO/releases/latest" |
     sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' | head -n 1)
-  [ -n "$version" ] || fail "could not find the latest release (set KUBESAGE_VERSION)"
+  [ -n "$version" ] || fail "could not find the latest release (set KUBEWEAVE_VERSION)"
 fi
 version="${version#v}"
 
 archive="${BIN}_${version}_${os}_${arch}.tar.gz"
-base="${KUBESAGE_DOWNLOAD_URL:-https://github.com/$REPO/releases/download/v$version}"
+base="${KUBEWEAVE_DOWNLOAD_URL:-https://github.com/$REPO/releases/download/v$version}"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-say "Downloading kubesage $version for $os/$arch…"
+say "Downloading kubeweave $version for $os/$arch…"
 fetch "$base/$archive" "$tmp/$archive" || fail "download failed: $base/$archive"
 fetch "$base/checksums.txt" "$tmp/checksums.txt" || fail "download failed: checksums.txt"
 
@@ -74,7 +74,7 @@ fi
 
 tar -xzf "$tmp/$archive" -C "$tmp" "$BIN"
 
-dir="${KUBESAGE_INSTALL_DIR:-}"
+dir="${KUBEWEAVE_INSTALL_DIR:-}"
 if [ -z "$dir" ]; then
   if [ -w /usr/local/bin ]; then dir=/usr/local/bin; else dir="$HOME/.local/bin"; fi
 fi

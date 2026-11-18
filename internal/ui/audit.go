@@ -11,8 +11,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/audit"
-	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/audit"
+	"github.com/gauravthakur02/kubeweave/internal/config"
 )
 
 // auditEntry is one line of the audit log (JSON lines, hash-chained, next to config.yaml).
@@ -117,7 +117,7 @@ func (a *App) exportTable(arg string) tea.Cmd {
 		return nil
 	}
 	name := strings.NewReplacer("/", "-", ":", "-").Replace(a.res.Name)
-	path := fmt.Sprintf("kubesage-%s-%s.%s", name, time.Now().Format("20060102-150405"), format)
+	path := fmt.Sprintf("kubeweave-%s-%s.%s", name, time.Now().Format("20060102-150405"), format)
 	if len(fields) > 1 {
 		path = fields[1]
 	}

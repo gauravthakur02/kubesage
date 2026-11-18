@@ -1,5 +1,5 @@
-// Package web is kubesage's browser UI: a JSON API over the kube package plus a small app (HTML, CSS, JS)
-// embedded in the binary. kubesage serve mounts it; the terminal UI stays available at /term.
+// Package web is kubeweave's browser UI: a JSON API over the kube package plus a small app (HTML, CSS, JS)
+// embedded in the binary. kubeweave serve mounts it; the terminal UI stays available at /term.
 package web
 
 import (
@@ -20,9 +20,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
-	"github.com/gauravthakur02/kubesage/internal/owners"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/owners"
 )
 
 //go:embed static
@@ -66,7 +66,7 @@ type App struct {
 	users    map[string]*kube.Client // impersonated clients per context and user
 }
 
-// AssetVersion is added to script and style URLs (the kubesage version), so an upgrade never shows a cached old app.
+// AssetVersion is added to script and style URLs (the kubeweave version), so an upgrade never shows a cached old app.
 var AssetVersion = "dev"
 
 // Assets serves /static/. Browsers must revalidate, so a restarted server always delivers its own files.
@@ -100,7 +100,7 @@ func (a *App) client(name string) (*kube.Client, error) {
 		return c, nil
 	}
 	if name != "" && a.Contexts != nil && !a.Contexts.MatchString(name) {
-		return nil, fmt.Errorf("context %q is not offered by this kubesage (serve.contexts)", name)
+		return nil, fmt.Errorf("context %q is not offered by this kubeweave (serve.contexts)", name)
 	}
 	c, err := kube.New(a.Kubeconfig, name, a.DefaultNS)
 	if err != nil {
@@ -646,7 +646,7 @@ type actionReq struct {
 // the object's name typed as confirmation. Every attempt is written to the audit log.
 func (a *App) action(w http.ResponseWriter, r *http.Request) {
 	if a.ReadOnly {
-		fail(w, 403, fmt.Errorf("read-only: start kubesage serve with --allow-changes to make changes"))
+		fail(w, 403, fmt.Errorf("read-only: start kubeweave serve with --allow-changes to make changes"))
 		return
 	}
 	var req actionReq

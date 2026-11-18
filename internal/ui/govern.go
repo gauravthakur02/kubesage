@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // openUpgrade checks readiness for the next (or given) Kubernetes version (:upgrade [1.36]).
@@ -220,7 +220,7 @@ func (a *App) openWhy() tea.Cmd {
 			}
 			lines = append(lines, "", "Ask for one of these groups or roles, or a RoleBinding in "+ns+" granting "+verb+" on "+res+".")
 		} else {
-			lines = append(lines, "", "Your account cannot read the role bindings, so kubesage cannot list who has this permission.",
+			lines = append(lines, "", "Your account cannot read the role bindings, so kubeweave cannot list who has this permission.",
 				"Ask a cluster admin for a RoleBinding in "+ns+" that grants "+verb+" on "+res+".")
 		}
 		lines = append(lines, "", s.Muted.Render(":rbac shows everything you can do in this namespace"))

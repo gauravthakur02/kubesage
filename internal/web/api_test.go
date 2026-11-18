@@ -18,8 +18,8 @@ import (
 	dynfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/gauravthakur02/kubesage/internal/audit"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/audit"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 func testApp(t *testing.T, ctxName string, readOnly bool) (*App, *httptest.Server) {

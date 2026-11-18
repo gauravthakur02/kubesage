@@ -13,12 +13,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"gopkg.in/yaml.v3"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
-// DefaultPluginIndex is the community plugin catalogue in the kubesage repository.
-const DefaultPluginIndex = "https://raw.githubusercontent.com/gauravthakur02/kubesage/main/plugins/index.yaml"
+// DefaultPluginIndex is the community plugin catalogue in the kubeweave repository.
+const DefaultPluginIndex = "https://raw.githubusercontent.com/gauravthakur02/kubeweave/main/plugins/index.yaml"
 
 const catalogRes = "plugin-catalog"
 
@@ -41,7 +41,7 @@ func loadCatalog(ctx context.Context, src string) ([]catalogEntry, error) {
 	var err error
 	if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
 		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
-		req.Header.Set("User-Agent", "kubesage-plugins")
+		req.Header.Set("User-Agent", "kubeweave-plugins")
 		resp, rerr := http.DefaultClient.Do(req)
 		if rerr != nil {
 			return nil, rerr

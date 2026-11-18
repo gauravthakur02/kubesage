@@ -12,11 +12,11 @@ import (
 
 // Read-only smoke test against a real cluster:
 //
-//	KUBESAGE_LIVE_CONTEXT=my-ctx go test ./internal/kube -run Live -v
+//	KUBEWEAVE_LIVE_CONTEXT=my-ctx go test ./internal/kube -run Live -v
 func TestLiveReadOnly(t *testing.T) {
-	kctx := os.Getenv("KUBESAGE_LIVE_CONTEXT")
+	kctx := os.Getenv("KUBEWEAVE_LIVE_CONTEXT")
 	if kctx == "" {
-		t.Skip("set KUBESAGE_LIVE_CONTEXT")
+		t.Skip("set KUBEWEAVE_LIVE_CONTEXT")
 	}
 	c, err := New("", kctx, "")
 	if err != nil {
@@ -55,11 +55,11 @@ func TestLiveReadOnly(t *testing.T) {
 	}
 }
 
-// KUBESAGE_LIVE_CONTEXT=ctx KUBESAGE_LIVE_PF=ns/svc go test ./internal/kube -run LivePortForward -v
+// KUBEWEAVE_LIVE_CONTEXT=ctx KUBEWEAVE_LIVE_PF=ns/svc go test ./internal/kube -run LivePortForward -v
 func TestLivePortForward(t *testing.T) {
-	kctx, target := os.Getenv("KUBESAGE_LIVE_CONTEXT"), os.Getenv("KUBESAGE_LIVE_PF")
+	kctx, target := os.Getenv("KUBEWEAVE_LIVE_CONTEXT"), os.Getenv("KUBEWEAVE_LIVE_PF")
 	if kctx == "" || target == "" {
-		t.Skip("set KUBESAGE_LIVE_CONTEXT and KUBESAGE_LIVE_PF=namespace/service")
+		t.Skip("set KUBEWEAVE_LIVE_CONTEXT and KUBEWEAVE_LIVE_PF=namespace/service")
 	}
 	ns, name, _ := strings.Cut(target, "/")
 	c, err := New("", kctx, ns)

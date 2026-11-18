@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in kubesage does not work as expected
+description: Something in kubeweave does not work as expected
 labels: [bug]
 body:
   - type: markdown
@@ -10,15 +10,15 @@ body:
   - type: input
     id: version
     attributes:
-      label: kubesage version
-      description: Output of `kubesage version`
+      label: kubeweave version
+      description: Output of `kubeweave version`
     validations:
       required: true
   - type: dropdown
     id: where
     attributes:
       label: Where does it happen?
-      options: [Terminal UI, Web UI (kubesage serve), Command line (scan, report, …), Bot, MCP server, Install / update]
+      options: [Terminal UI, Web UI (kubeweave serve), Command line (scan, report, …), Bot, MCP server, Install / update]
     validations:
       required: true
   - type: input

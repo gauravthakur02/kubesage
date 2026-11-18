@@ -225,7 +225,7 @@ func (a *App) colsCommand(arg string) tea.Cmd {
 
 // ---------- key remapping ----------
 
-// remapKey translates a user-chosen key into kubesage's built-in key (keys: {w: g} → pressing g acts as w).
+// remapKey translates a user-chosen key into kubeweave's built-in key (keys: {w: g} → pressing g acts as w).
 func (a *App) remapKey(k tea.KeyMsg) tea.KeyMsg {
 	if len(a.cfg.Keys) == 0 || a.ov != ovNone || a.mode == modeAI {
 		return k

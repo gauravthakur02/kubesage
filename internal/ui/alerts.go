@@ -11,8 +11,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 const alertsRes = "alerts"
@@ -230,7 +230,7 @@ func (a *App) handleAlerts(m alertsMsg) {
 		fmt.Fprint(os.Stderr, "\a")
 	}
 	if a.cfg.Alerts.Desktop == nil || *a.cfg.Alerts.Desktop {
-		go notifyDesktop("kubesage", text)
+		go notifyDesktop("kubeweave", text)
 	}
 }
 

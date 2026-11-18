@@ -3,11 +3,11 @@ package ui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
-// screen describes one of kubesage's own table screens. New screens register here instead of
-// adding cases to isKubesageTable, kubesageTitle, kubesageHints and extraRowAction.
+// screen describes one of kubeweave's own table screens. New screens register here instead of
+// adding cases to isKubeweaveTable, kubeweaveTitle, kubeweaveHints and extraRowAction.
 type screenDef struct {
 	title  func(a *App) string
 	hints  []kv

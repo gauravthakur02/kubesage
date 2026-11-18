@@ -11,7 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 	cronRunsPrefix = "cronruns:"
 )
 
-// openVirtual switches to a kubesage table and remembers where esc goes back to.
+// openVirtual switches to a kubeweave table and remembers where esc goes back to.
 func (a *App) openVirtual(r kube.Resource, status string) tea.Cmd {
 	back := a.res
 	cmd := a.switchResource(r)
@@ -444,9 +444,9 @@ func (a *App) openNetPol(ns, pod string) tea.Cmd {
 	})
 }
 
-// isKubesageTable reports whether the table is one of kubesage's own lists, where the
+// isKubeweaveTable reports whether the table is one of kubeweave's own lists, where the
 // generic resource actions (delete, scale, …) do not apply.
-func (a *App) isKubesageTable() bool {
+func (a *App) isKubeweaveTable() bool {
 	if _, ok := a.currentScreen(); ok {
 		return true
 	}
@@ -546,8 +546,8 @@ func (a *App) extraRowAction(key string, row kube.Row) (tea.Cmd, bool) {
 	return nil, false
 }
 
-// kubesageTitle is the table title of the newer screens ("" when not one of them).
-func (a *App) kubesageTitle() string {
+// kubeweaveTitle is the table title of the newer screens ("" when not one of them).
+func (a *App) kubeweaveTitle() string {
 	note := a.table.Note
 	if sc, ok := a.currentScreen(); ok && sc.title != nil {
 		return sc.title(a)
@@ -593,8 +593,8 @@ func (a *App) kubesageTitle() string {
 	return ""
 }
 
-// kubesageHints are the footer hints of the newer screens.
-func (a *App) kubesageHints() []kv {
+// kubeweaveHints are the footer hints of the newer screens.
+func (a *App) kubeweaveHints() []kv {
 	if sc, ok := a.currentScreen(); ok {
 		return sc.hints
 	}

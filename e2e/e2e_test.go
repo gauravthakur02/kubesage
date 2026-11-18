@@ -1,8 +1,8 @@
 //go:build e2e
 
-// Package e2e runs kubesage's cluster operations against a real, throwaway cluster.
+// Package e2e runs kubeweave's cluster operations against a real, throwaway cluster.
 //
-//	kind create cluster --name kubesage-e2e
+//	kind create cluster --name kubeweave-e2e
 //	go test -tags e2e ./e2e/ -v
 //
 // It refuses to run unless the current context starts with "kind-", so it can never touch a real cluster.
@@ -27,11 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
-	"github.com/gauravthakur02/kubesage/internal/web"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/web"
 )
 
-const ns = "kubesage-e2e"
+const ns = "kubeweave-e2e"
 
 func client(t *testing.T) *kube.Client {
 	t.Helper()

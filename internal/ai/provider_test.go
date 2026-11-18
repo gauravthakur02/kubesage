@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/config"
 )
 
 func collect(t *testing.T, p Provider) string {

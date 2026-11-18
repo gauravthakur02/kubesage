@@ -10,8 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 const (
@@ -136,7 +136,7 @@ func (a *App) historyResource() kube.Resource {
 				Cells: []string{kube.Age(metav1.NewTime(e.Last)) + " ago", e.Type, e.Namespace, e.Kind + "/" + e.Name, e.Reason,
 					fmt.Sprint(e.Count), e.Message}})
 		}
-		t.Note = fmt.Sprintf("%d events kept locally (last %d days) · %d warnings · recorded every minute while kubesage runs", len(t.Rows), days, warn)
+		t.Note = fmt.Sprintf("%d events kept locally (last %d days) · %d warnings · recorded every minute while kubeweave runs", len(t.Rows), days, warn)
 		return t
 	})
 }

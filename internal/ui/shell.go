@@ -13,7 +13,7 @@ import (
 	"golang.org/x/term"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // shellExec implements tea.ExecCommand: Bubble Tea hands over the terminal, we run an
@@ -138,7 +138,7 @@ func (a *App) handleShellAllowed(m shellAllowedMsg) tea.Cmd {
 func (a *App) startShell(ns, pod, container string) tea.Cmd {
 	start := func() tea.Cmd {
 		s := &shellExec{client: a.client, ns: ns, pod: pod, container: container, command: kube.ShellCommand,
-			banner: fmt.Sprintf("\r\n\x1b[1;36m⎈ kubesage\x1b[0m shell in \x1b[1m%s/%s\x1b[0m [%s] on %s · type \x1b[1mexit\x1b[0m or Ctrl-D to return to the IDE\r\n\r\n",
+			banner: fmt.Sprintf("\r\n\x1b[1;36m⎈ kubeweave\x1b[0m shell in \x1b[1m%s/%s\x1b[0m [%s] on %s · type \x1b[1mexit\x1b[0m or Ctrl-D to return to the IDE\r\n\r\n",
 				ns, pod, container, a.client.Context)}
 		a.setStatus(fmt.Sprintf("opening shell in %s/%s [%s]…", ns, pod, container), false)
 		return execShellFn(s, func(err error) tea.Msg { return shellDoneMsg{ns: ns, pod: pod, container: container, err: err} })

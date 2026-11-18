@@ -29,7 +29,7 @@ jobs:
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
   formula:
-    # Points Formula/kubesage.rb (the Homebrew formula that builds from source) at the new tag.
+    # Points Formula/kubeweave.rb (the Homebrew formula that builds from source) at the new tag.
     needs: goreleaser
     if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
@@ -44,10 +44,10 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           URL="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
           SHA=$(curl -fsSL "$URL" | sha256sum | cut -d' ' -f1)
-          sed -i -E "s|^  url \".*\"$|  url \"${URL}\"|; s|^  sha256 \".*\"$|  sha256 \"${SHA}\"|" Formula/kubesage.rb
+          sed -i -E "s|^  url \".*\"$|  url \"${URL}\"|; s|^  sha256 \".*\"$|  sha256 \"${SHA}\"|" Formula/kubeweave.rb
           git diff --stat
           if git diff --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "Formula: kubesage ${TAG#v}"
+          git commit -am "Formula: kubeweave ${TAG#v}"
           git push origin main

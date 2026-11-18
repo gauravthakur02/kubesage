@@ -33,7 +33,7 @@ func TestNewer(t *testing.T) {
 
 func TestLatest(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("User-Agent") != "kubesage-update-check" {
+		if r.Header.Get("User-Agent") != "kubeweave-update-check" {
 			t.Errorf("unexpected user agent %q", r.Header.Get("User-Agent"))
 		}
 		w.Write([]byte(`{"tag_name":"v0.3.1","html_url":"https://example.com/r"}`))
@@ -54,7 +54,7 @@ func TestApplyVerifiesAndReplaces(t *testing.T) {
 	gz := gzip.NewWriter(&tgz)
 	tw := tar.NewWriter(gz)
 	body := []byte("#!/bin/sh\necho new\n")
-	_ = tw.WriteHeader(&tar.Header{Name: "kubesage", Mode: 0o755, Size: int64(len(body)), Typeflag: tar.TypeReg})
+	_ = tw.WriteHeader(&tar.Header{Name: "kubeweave", Mode: 0o755, Size: int64(len(body)), Typeflag: tar.TypeReg})
 	_, _ = tw.Write(body)
 	tw.Close()
 	gz.Close()
@@ -73,7 +73,7 @@ func TestApplyVerifiesAndReplaces(t *testing.T) {
 	}))
 	defer srv.Close()
 	DownloadBase = srv.URL + "/v{version}"
-	exe := filepath.Join(t.TempDir(), "kubesage")
+	exe := filepath.Join(t.TempDir(), "kubeweave")
 	os.WriteFile(exe, []byte("old"), 0o755)
 	if err := Apply(context.Background(), "v9.9.9", exe); err != nil {
 		t.Fatal(err)
@@ -85,7 +85,7 @@ func TestApplyVerifiesAndReplaces(t *testing.T) {
 	if err := Apply(context.Background(), "9.9.9", exe); err == nil || !strings.Contains(err.Error(), "checksum") {
 		t.Fatalf("tampered archive accepted: %v", err)
 	}
-	if ManagedBy("/opt/homebrew/Caskroom/kubesage/0.2.0/kubesage") == "" || ManagedBy("/usr/bin/kubesage") == "" || ManagedBy(exe) != "" {
+	if ManagedBy("/opt/homebrew/Caskroom/kubeweave/0.2.0/kubeweave") == "" || ManagedBy("/usr/bin/kubeweave") == "" || ManagedBy(exe) != "" {
 		t.Fatal("package-manager detection wrong")
 	}
 }

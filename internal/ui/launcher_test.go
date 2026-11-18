@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 func newLauncherApp(t *testing.T) (*App, *fake.Clientset) {

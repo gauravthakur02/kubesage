@@ -142,7 +142,7 @@ func (a *App) logsKey(k string) (tea.Cmd, bool) {
 		if len(a.logSpec.pods) > 0 {
 			name = a.logSpec.pods[0]
 		}
-		path := fmt.Sprintf("kubesage-logs-%s-%s.log", name, time.Now().Format("20060102-150405"))
+		path := fmt.Sprintf("kubeweave-logs-%s-%s.log", name, time.Now().Format("20060102-150405"))
 		var b strings.Builder
 		n := 0
 		for _, l := range a.textLines {

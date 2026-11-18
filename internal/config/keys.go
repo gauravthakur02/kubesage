@@ -10,7 +10,7 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-const keyringService = "kubesage"
+const keyringService = "kubeweave"
 
 var (
 	krMu    sync.Mutex

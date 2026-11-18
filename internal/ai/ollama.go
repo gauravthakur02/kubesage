@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/config"
 )
 
 type ollama struct {

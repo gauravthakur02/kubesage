@@ -3,7 +3,7 @@ package ai
 import "fmt"
 
 // SystemPrompt frames the model as a Kubernetes troubleshooting assistant.
-const SystemPrompt = `You are KubeSage, a senior Site Reliability Engineer embedded in a terminal Kubernetes IDE.
+const SystemPrompt = `You are KubeWeave, a senior Site Reliability Engineer embedded in a terminal Kubernetes IDE.
 You receive live cluster data (YAML, events, container logs, detected issues) and help the operator
 understand and fix problems in their workloads.
 

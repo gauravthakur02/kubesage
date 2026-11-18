@@ -22,7 +22,7 @@ func TestTeamSyncMergeAndSave(t *testing.T) {
 		}
 	}
 	git("init", "-q")
-	os.WriteFile(filepath.Join(repo, "kubesage.yaml"), []byte(`
+	os.WriteFile(filepath.Join(repo, "kubeweave.yaml"), []byte(`
 rules: [{name: owner label, require_labels: [owner]}]
 fleet: ['-dev$']
 danger_contexts: 'team-prod'

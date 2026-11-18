@@ -4,13 +4,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/config"
 )
 
-// Run with KUBESAGE_LIVE_OLLAMA=1 go test ./internal/ai -run Live -v
+// Run with KUBEWEAVE_LIVE_OLLAMA=1 go test ./internal/ai -run Live -v
 func TestLiveOllama(t *testing.T) {
-	if os.Getenv("KUBESAGE_LIVE_OLLAMA") == "" {
-		t.Skip("set KUBESAGE_LIVE_OLLAMA=1 to run against a local Ollama")
+	if os.Getenv("KUBEWEAVE_LIVE_OLLAMA") == "" {
+		t.Skip("set KUBEWEAVE_LIVE_OLLAMA=1 to run against a local Ollama")
 	}
 	p, _ := New("local", config.AIProfile{Provider: "ollama"})
 	out := collect(t, p)

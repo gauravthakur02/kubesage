@@ -32,7 +32,7 @@ func (a *App) openIncident() tea.Cmd {
 			return aiPromptMsg{err: fmt.Errorf("✓ nothing unhealthy found in %s: no failing pods, warning events, failed Helm releases, pending PVCs or node problems", rep.Scope)}
 		}
 		prompt := fmt.Sprintf(`Incident triage. Cluster (kube-context): %s, scope: %s.
-Everything unhealthy kubesage found:
+Everything unhealthy kubeweave found:
 
 %s
 Work like an on-call SRE:

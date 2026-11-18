@@ -66,26 +66,26 @@ func TestApprovalsTwoPersonRule(t *testing.T) {
 	})
 	c := NewForTesting(cs, "prod", "shop", map[string]string{"prod": "prod"})
 	ctx := context.Background()
-	ap, err := c.RequestApproval(ctx, "kubesage-approvals", Approval{Context: "prod", Action: "scale web to 0"})
+	ap, err := c.RequestApproval(ctx, "kubeweave-approvals", Approval{Context: "prod", Action: "scale web to 0"})
 	if err != nil || ap.Requester != "alice" || ap.Status != "pending" {
 		t.Fatalf("request = %+v, %v", ap, err)
 	}
-	if _, err := c.DecideApproval(ctx, "kubesage-approvals", ap.ID, true, time.Hour); err == nil || !strings.Contains(err.Error(), "someone else") {
+	if _, err := c.DecideApproval(ctx, "kubeweave-approvals", ap.ID, true, time.Hour); err == nil || !strings.Contains(err.Error(), "someone else") {
 		t.Fatalf("self-approval allowed: %v", err)
 	}
 	user = "bob"
-	got, err := c.DecideApproval(ctx, "kubesage-approvals", ap.ID, true, time.Hour)
+	got, err := c.DecideApproval(ctx, "kubeweave-approvals", ap.ID, true, time.Hour)
 	if err != nil || got.Status != "approved" || got.Approver != "bob" {
 		t.Fatalf("approve = %+v, %v", got, err)
 	}
-	if _, err := c.DecideApproval(ctx, "kubesage-approvals", ap.ID, false, time.Hour); err == nil {
+	if _, err := c.DecideApproval(ctx, "kubeweave-approvals", ap.ID, false, time.Hour); err == nil {
 		t.Fatal("decided twice")
 	}
-	list, _ := c.Approvals(ctx, "kubesage-approvals", time.Hour)
+	list, _ := c.Approvals(ctx, "kubeweave-approvals", time.Hour)
 	if len(list) != 1 || list[0].Status != "approved" {
 		t.Fatalf("list = %+v", list)
 	}
-	if err := c.CloseApproval(ctx, "kubesage-approvals", ap.ID, "run"); err != nil {
+	if err := c.CloseApproval(ctx, "kubeweave-approvals", ap.ID, "run"); err != nil {
 		t.Fatal(err)
 	}
 }

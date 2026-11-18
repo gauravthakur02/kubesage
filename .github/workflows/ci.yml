@@ -44,5 +44,5 @@ jobs:
           go-version-file: go.mod
       - uses: helm/kind-action@v1
         with:
-          cluster_name: kubesage-e2e
+          cluster_name: kubeweave-e2e
       - run: go test -tags e2e -v -count=1 ./e2e/

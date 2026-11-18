@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 const sizingRes = "rightsizing"
@@ -114,7 +114,7 @@ func (a *App) openSizing() tea.Cmd {
 	if back.Name != sizingRes {
 		a.backTo = &back
 	}
-	a.setStatus("enter: suggested change · e: safe edit the workload · y: YAML · peaks improve the longer kubesage watches pods", false)
+	a.setStatus("enter: suggested change · e: safe edit the workload · y: YAML · peaks improve the longer kubeweave watches pods", false)
 	return cmd
 }
 
@@ -137,7 +137,7 @@ func (a *App) sizingRowAction(key string, row kube.Row) (tea.Cmd, bool) {
 			vpaLine(cells[9]),
 			"",
 			a.st.Muted.Render("Suggestion: CPU = peak × 1.5, memory = peak × 1.3 (memory is not compressible: keep headroom)."),
-			a.st.Muted.Render("Peaks come from metrics-server now plus what kubesage has seen in the last 15 minutes; check a busy period before lowering."),
+			a.st.Muted.Render("Peaks come from metrics-server now plus what kubeweave has seen in the last 15 minutes; check a busy period before lowering."),
 			"",
 			"Apply with:",
 			"  " + a.st.Code.Render(cmd),

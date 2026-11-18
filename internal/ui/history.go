@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // History keeps ~15 minutes of CPU/memory samples per pod (one sample per 10 s at most),

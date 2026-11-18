@@ -10,8 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
-	"github.com/gauravthakur02/kubesage/internal/report"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/report"
 )
 
 const approvalsRes = "approvals"
@@ -20,7 +20,7 @@ func (a *App) approvalsNS() string {
 	if a.cfg.Approvals.Namespace != "" {
 		return a.cfg.Approvals.Namespace
 	}
-	return "kubesage-approvals"
+	return "kubeweave-approvals"
 }
 
 func (a *App) approvalExpiry() time.Duration {
@@ -63,7 +63,7 @@ func (a *App) requestApproval(question string, fn func() tea.Cmd) {
 			defer cancel()
 			ap, err := c.RequestApproval(ctx, approvalsNS, kube.Approval{Context: c.Context, Namespace: ns, Target: target, Action: question, Reason: reason})
 			if err == nil && hook != "" {
-				_ = report.Post(ctx, hook, fmt.Sprintf("kubesage: %s asks to %q on %s. Approve in kubesage (:approvals) or run: kubesage approve %s --context %s",
+				_ = report.Post(ctx, hook, fmt.Sprintf("kubeweave: %s asks to %q on %s. Approve in kubeweave (:approvals) or run: kubeweave approve %s --context %s",
 					ap.Requester, question, c.Context, ap.ID, c.Context))
 			}
 			if err == nil {
@@ -87,7 +87,7 @@ func (a *App) handleApprovalRequested(m approvalRequestedMsg) tea.Cmd {
 	a.awaitingFn[m.ap.ID] = a.pendingFn
 	a.pendingFn = nil
 	a.audit("approval requested: "+m.ap.Action, m.ap.Context, m.ap.Namespace, m.ap.ID, nil)
-	a.setStatus("⏳ approval requested ("+m.ap.ID+"): a teammate approves in :approvals or with `kubesage approve`", false)
+	a.setStatus("⏳ approval requested ("+m.ap.ID+"): a teammate approves in :approvals or with `kubeweave approve`", false)
 	return nil
 }
 

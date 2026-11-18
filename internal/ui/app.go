@@ -1,4 +1,4 @@
-// Package ui is the Bubble Tea terminal interface of kubesage.
+// Package ui is the Bubble Tea terminal interface of kubeweave.
 package ui
 
 import (
@@ -13,11 +13,11 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/agent"
-	"github.com/gauravthakur02/kubesage/internal/ai"
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
-	"github.com/gauravthakur02/kubesage/internal/share"
+	"github.com/gauravthakur02/kubeweave/internal/agent"
+	"github.com/gauravthakur02/kubeweave/internal/ai"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/share"
 )
 
 type mode int
@@ -666,7 +666,7 @@ func (a *App) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case updateMsg:
 		a.newVersion = msg.version
-		a.setStatus(fmt.Sprintf("⬆ kubesage %s is available (you have %s): %s", msg.version, a.opts.Version, msg.url), false)
+		a.setStatus(fmt.Sprintf("⬆ kubeweave %s is available (you have %s): %s", msg.version, a.opts.Version, msg.url), false)
 		return a, nil
 
 	case watchEventMsg:

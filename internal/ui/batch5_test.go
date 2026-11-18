@@ -14,8 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	dynfake "k8s.io/client-go/dynamic/fake"
 
-	"github.com/gauravthakur02/kubesage/internal/ai"
-	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/ai"
+	"github.com/gauravthakur02/kubeweave/internal/config"
 )
 
 // scriptAI answers every prompt with a fixed reply.
@@ -46,7 +46,7 @@ func TestTourShowsOnceAndSaves(t *testing.T) {
 	if a.ov != ovTour {
 		t.Fatal("tour not shown")
 	}
-	mustContain(t, screen(a), "Welcome to kubesage", "1/")
+	mustContain(t, screen(a), "Welcome to kubeweave", "1/")
 	press(a, "enter")
 	mustContain(t, screen(a), "Find anything")
 	press(a, "esc")
@@ -134,7 +134,7 @@ func TestApprovalRuleInterceptsChanges(t *testing.T) {
 		t.Fatalf("no approval request: %q", a.confirm)
 	}
 	press(a, "y")
-	cms, _ := cs.CoreV1().ConfigMaps("kubesage-approvals").List(context.Background(), metav1.ListOptions{})
+	cms, _ := cs.CoreV1().ConfigMaps("kubeweave-approvals").List(context.Background(), metav1.ListOptions{})
 	if len(cms.Items) != 1 || cms.Items[0].Data["status"] != "pending" || len(a.awaitingFn) != 1 {
 		t.Fatalf("approval not stored: %d configmaps, %d waiting, status %q", len(cms.Items), len(a.awaitingFn), a.status)
 	}
@@ -176,7 +176,7 @@ func TestDevLoopRefusesProdAndApplies(t *testing.T) {
 func TestCloneAndCatalogScreens(t *testing.T) {
 	a, cs := newShopApp(t, "pods", true)
 	cs.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "shop-pr-1",
-		Labels: map[string]string{"kubesage.io/clone-of": "shop"}}}, metav1.CreateOptions{})
+		Labels: map[string]string{"kubeweave.io/clone-of": "shop"}}}, metav1.CreateOptions{})
 	run(a, a.runCommand("clone"), 0)
 	mustContain(t, screen(a), "Namespace clones", "shop-pr-1")
 	idx := filepath.Join(t.TempDir(), "index.yaml")
@@ -217,7 +217,7 @@ func TestDownloadLogsToFolder(t *testing.T) {
 	if !strings.Contains(a.status, "✓ saved") || !strings.Contains(a.status, ".zip") {
 		t.Fatalf("status = %q", a.status)
 	}
-	files, _ := filepath.Glob(filepath.Join(a.cfg.DownloadsDir, "kubesage-logs_*.zip"))
+	files, _ := filepath.Glob(filepath.Join(a.cfg.DownloadsDir, "kubeweave-logs_*.zip"))
 	if len(files) != 1 {
 		t.Fatalf("files = %v", files)
 	}

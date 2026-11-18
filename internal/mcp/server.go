@@ -1,4 +1,4 @@
-// Package mcp serves kubesage's read-only cluster insights over the Model Context Protocol (stdio),
+// Package mcp serves kubeweave's read-only cluster insights over the Model Context Protocol (stdio),
 // so AI agents such as Claude Code can use them as tools. No tool changes the cluster.
 package mcp
 
@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // ProtocolVersion is the MCP revision this server implements.
@@ -64,7 +64,7 @@ type tool struct {
 }
 
 func schema(required []string, props map[string]prop) map[string]any {
-	p := map[string]any{"context": prop{"string", "kube-context to use (default: the one kubesage was started with)"}}
+	p := map[string]any{"context": prop{"string", "kube-context to use (default: the one kubeweave was started with)"}}
 	for k, v := range props {
 		p[k] = v
 	}
@@ -372,8 +372,8 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 			send(response{ID: req.ID, Result: map[string]any{
 				"protocolVersion": ProtocolVersion,
 				"capabilities":    map[string]any{"tools": map[string]any{"listChanged": false}},
-				"serverInfo":      map[string]any{"name": "kubesage", "version": s.Version},
-				"instructions":    "Read-only Kubernetes insights from kubesage. Start with incident_report or find_issues, then relationships, timeline and pod_logs for a specific object. No tool changes the cluster.",
+				"serverInfo":      map[string]any{"name": "kubeweave", "version": s.Version},
+				"instructions":    "Read-only Kubernetes insights from kubeweave. Start with incident_report or find_issues, then relationships, timeline and pod_logs for a specific object. No tool changes the cluster.",
 			}})
 		case "ping":
 			send(response{ID: req.ID, Result: map[string]any{}})

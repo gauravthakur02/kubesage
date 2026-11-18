@@ -1,4 +1,4 @@
-// Package share serves a read-only, auto-refreshing web view of what kubesage shows (:share).
+// Package share serves a read-only, auto-refreshing web view of what kubeweave shows (:share).
 package share
 
 import (
@@ -106,10 +106,10 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 }
 
 const pageHTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>kubesage · shared view</title>
+<title>kubeweave · shared view</title>
 <style>body{margin:0;background:#1a1b26;color:#c0caf5}header{font:13px system-ui,sans-serif;padding:6px 12px;color:#7aa2f7;border-bottom:1px solid #2f334d}
 pre{margin:0;padding:8px 12px;font:13px/1.25 ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow:auto}</style></head>
-<body><header>kubesage · read-only shared view · refreshes every second</header><pre id="s">connecting…</pre>
+<body><header>kubeweave · read-only shared view · refreshes every second</header><pre id="s">connecting…</pre>
 <script>const t=%q;async function f(){try{const r=await fetch('/screen?t='+encodeURIComponent(t),{cache:'no-store'});if(r.ok)document.getElementById('s').innerHTML=await r.text()}catch(e){}setTimeout(f,1000)}f()</script></body></html>`
 
 // ANSIToHTML converts SGR colour/bold sequences to <span> tags and escapes everything else.

@@ -11,9 +11,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/gauravthakur02/kubesage/internal/agent"
-	"github.com/gauravthakur02/kubesage/internal/ai"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/agent"
+	"github.com/gauravthakur02/kubeweave/internal/ai"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // ---------- messages ----------
@@ -128,7 +128,7 @@ func (a *App) processQueue() tea.Cmd {
 			a.recordResult(agent.Result{Command: c, Declined: true, Note: m})
 			continue
 		case c.Risk == agent.Write && a.readOnly():
-			a.recordResult(agent.Result{Command: c, Declined: true, Note: "kubesage is in read-only mode; changes are disabled"})
+			a.recordResult(agent.Result{Command: c, Declined: true, Note: "kubeweave is in read-only mode; changes are disabled"})
 			continue
 		case c.Risk == agent.Read && (a.cfg.AI.AutoRunReadOnly || a.ag.userStarted), a.ag.approveAll:
 			return a.execQueued(c)
@@ -198,7 +198,7 @@ func (a *App) handleCmdResult(msg cmdResultMsg) tea.Cmd {
 		a.textTitle = msg.result.Command.Display()
 		out := msg.result.Output
 		if msg.result.Err != nil {
-			out += "\n[kubesage] " + msg.result.Err.Error()
+			out += "\n[kubeweave] " + msg.result.Err.Error()
 		}
 		a.textLines = strings.Split(strings.TrimRight(out, "\n"), "\n")
 		a.renderText(true)
@@ -278,7 +278,7 @@ func (a *App) updateApprove(k tea.KeyMsg) tea.Cmd {
 				return a.processQueue()
 			}
 			if edited.Risk == agent.Write && a.readOnly() {
-				a.recordResult(agent.Result{Command: edited, Declined: true, Note: "kubesage is in read-only mode"})
+				a.recordResult(agent.Result{Command: edited, Declined: true, Note: "kubeweave is in read-only mode"})
 				return a.processQueue()
 			}
 			a.ag.queue[a.ag.idx] = edited

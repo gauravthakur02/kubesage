@@ -14,8 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/yaml"
 
-	"github.com/gauravthakur02/kubesage/internal/ai"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/ai"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // ---------- guard: local-only contexts ----------
@@ -128,7 +128,7 @@ func (a *App) openAIFix() tea.Cmd {
 		if i := strings.Index(reply, "Why:"); i >= 0 {
 			why = strings.TrimSpace(reply[i:])
 		}
-		f, err := os.CreateTemp("", "kubesage-aifix-*.yaml")
+		f, err := os.CreateTemp("", "kubeweave-aifix-*.yaml")
 		if err != nil {
 			return aiFixMsg{err: err}
 		}

@@ -39,7 +39,7 @@ func (c *Client) ResizePod(ctx context.Context, ns, pod, container, cpuReq, memR
 		return fmt.Errorf("nothing to change")
 	}
 	patch, _ := json.Marshal(map[string]any{"spec": map[string]any{"containers": []map[string]any{{"name": container, "resources": res}}}})
-	opts := metav1.PatchOptions{FieldManager: "kubesage"}
+	opts := metav1.PatchOptions{FieldManager: "kubeweave"}
 	if dryRun {
 		opts.DryRun = []string{metav1.DryRunAll}
 	}

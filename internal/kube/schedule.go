@@ -13,7 +13,7 @@ import (
 )
 
 // ScaledDownAnnotation remembers the replica count a workload had before a schedule scaled it to zero.
-const ScaledDownAnnotation = "kubesage.io/scaled-down-replicas"
+const ScaledDownAnnotation = "kubeweave.io/scaled-down-replicas"
 
 var weekdays = map[string]time.Weekday{"sun": time.Sunday, "mon": time.Monday, "tue": time.Tuesday, "wed": time.Wednesday,
 	"thu": time.Thursday, "fri": time.Friday, "sat": time.Saturday}
@@ -69,7 +69,7 @@ func ShouldBeDown(now time.Time, down, up string, days []string) (bool, error) {
 type ScheduledWorkload struct {
 	Kind, Namespace, Name string
 	Replicas              int32
-	Saved                 int32 // replicas before scale-down (0 = not scaled down by kubesage)
+	Saved                 int32 // replicas before scale-down (0 = not scaled down by kubeweave)
 }
 
 // ScheduleTargets lists Deployments and StatefulSets in ns matching the label selector.
@@ -104,7 +104,7 @@ func ptrInt32(p *int32, def int32) int32 {
 
 func (c *Client) patchWorkload(ctx context.Context, w ScheduledWorkload, patch map[string]any, dryRun bool) error {
 	b, _ := json.Marshal(patch)
-	opts := metav1.PatchOptions{FieldManager: "kubesage"}
+	opts := metav1.PatchOptions{FieldManager: "kubeweave"}
 	if dryRun {
 		opts.DryRun = []string{metav1.DryRunAll}
 	}
@@ -134,7 +134,7 @@ func (c *Client) ScaleToZero(ctx context.Context, ws []ScheduledWorkload, dryRun
 	return done, nil
 }
 
-// RestoreScale brings workloads scaled down by kubesage back to their saved replicas.
+// RestoreScale brings workloads scaled down by kubeweave back to their saved replicas.
 func (c *Client) RestoreScale(ctx context.Context, ws []ScheduledWorkload, dryRun bool) ([]string, error) {
 	var done []string
 	for _, w := range ws {

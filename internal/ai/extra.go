@@ -79,9 +79,9 @@ Do not invent events that are not in the timeline.
 %s`, object, timeline)
 }
 
-// SearchPrompt turns a question into a kubesage filter.
+// SearchPrompt turns a question into a kubeweave filter.
 func SearchPrompt(question, resources string) string {
-	return fmt.Sprintf(`Turn this request into a JSON object for kubesage and reply with ONLY one fenced json block:
+	return fmt.Sprintf(`Turn this request into a JSON object for kubeweave and reply with ONLY one fenced json block:
 {"resource": "<one of: %s>", "namespace": "<namespace, all, or empty for current>",
  "filter": "<text filter matched against row cells, may be empty>", "label_selector": "<k8s label selector or empty>",
  "min_restarts": <number or 0>, "status": "<status text to match, e.g. CrashLoopBackOff, or empty>",

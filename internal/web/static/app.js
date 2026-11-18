@@ -1,7 +1,7 @@
-// kubesage web UI. Plain JavaScript, no build step. Data comes from the kubesage JSON API (/api/*).
+// kubeweave web UI. Plain JavaScript, no build step. Data comes from the kubeweave JSON API (/api/*).
 "use strict";
 
-const TOKEN = document.querySelector('meta[name="kubesage-token"]')?.content || ""; // normally empty: an HttpOnly cookie authenticates
+const TOKEN = document.querySelector('meta[name="kubeweave-token"]')?.content || ""; // normally empty: an HttpOnly cookie authenticates
 const $ = (s) => document.querySelector(s);
 
 // h builds DOM nodes; text is always set with textContent, never parsed as HTML.
@@ -27,7 +27,7 @@ const svg = (tag, attrs, ...kids) => {
   return el;
 };
 
-const HEADERS = { "X-Kubesage": "1", "Content-Type": "application/json", ...(TOKEN ? { "X-Kubesage-Token": TOKEN } : {}) };
+const HEADERS = { "X-Kubeweave": "1", "Content-Type": "application/json", ...(TOKEN ? { "X-Kubeweave-Token": TOKEN } : {}) };
 
 async function api(path, params, opts) {
   const q = new URLSearchParams(params || {});
@@ -74,7 +74,7 @@ const resInfo = (name) => S.resources.find((r) => r.name === name) || { name, ki
 const favorites = () => (S.meta.favorites && S.meta.favorites.length ? S.meta.favorites : ["pods", "deployments", "services", "events", "nodes"]);
 const rowKey = (r) => (r.ns || "") + "/" + r.name;
 const isDanger = () => S.meta.contexts.find((c) => c.name === S.ctx)?.danger;
-const roMsg = "Read-only: start kubesage serve with --allow-changes";
+const roMsg = "Read-only: start kubeweave serve with --allow-changes";
 
 // ---------- URL (deep links) ----------
 
@@ -96,7 +96,7 @@ async function boot() {
   try {
     S.meta = await api("meta");
   } catch (e) {
-    $("#title").textContent = "Cannot reach kubesage: " + e.message;
+    $("#title").textContent = "Cannot reach kubeweave: " + e.message;
     return;
   }
   const link = readHash();
@@ -338,7 +338,7 @@ function showSLOs() {
     const ss = await api("slos", { ctx: S.ctx });
     const pct = (v) => (v * 100).toFixed(3) + "%";
     return { columns: ["SLO", "OBJECTIVE", "WINDOW", "AVAILABILITY", "BUDGET LEFT", "BURN (1h)", "STATUS"], total: ss.length,
-      note: ss.length ? "error budgets from Prometheus" : "no SLOs for this cluster · add slos: to the kubesage config",
+      note: ss.length ? "error budgets from Prometheus" : "no SLOs for this cluster · add slos: to the kubeweave config",
       rows: ss.map((x) => {
         const st = x.Error ? ["err", "✗ " + x.Error] : x.Budget < 0 ? ["err", "budget spent"] : x.Burn1 > 14.4 ? ["err", "burning fast"] : x.Burn1 > 1 || x.Budget < 0.25 ? ["warn", "at risk"] : ["ok", "within budget"];
         return { ns: "", name: x.Name, health: st[0], cells: [x.Name, pct(x.Objective), x.Window, pct(x.Availability), (x.Budget * 100).toFixed(0) + "%", x.Burn1.toFixed(1) + "x", st[1]] };
@@ -633,7 +633,7 @@ function stopLogs() { if (S.logSrc) { S.logSrc.close(); S.logSrc = null; } }
 
 function chart(points, key, label, fmt) {
   const W = 560, H = 140, P = 40;
-  if (points.length < 2) return h("p", { class: "muted", text: `${label}: not enough samples yet (kubesage samples while this page is open; configure Prometheus for history).` });
+  if (points.length < 2) return h("p", { class: "muted", text: `${label}: not enough samples yet (kubeweave samples while this page is open; configure Prometheus for history).` });
   const vals = points.map((p) => p[key]), mx = Math.max(...vals, 1), t0 = points[0].t, t1 = points[points.length - 1].t || t0 + 1;
   const x = (t) => P + ((t - t0) / Math.max(1, t1 - t0)) * (W - P - 6), y = (v) => H - 18 - (v / mx) * (H - 30);
   const line = points.map((p, i) => `${i ? "L" : "M"}${x(p.t)},${y(p[key])}`).join(" ");
@@ -783,7 +783,7 @@ function palette() {
     { label: "What changed?", hint: "rollouts, config, scaling, Helm, GitOps in the last 2h", run: showChanges },
     { label: "SLOs", hint: "error budgets", run: showSLOs }, { label: "Snapshots", hint: "save and compare a namespace", run: showSnapshots },
     S.meta.ai ? { label: "Ask the AI", hint: "chat about this namespace", run: openChat } : null,
-    { label: "Terminal UI", hint: "the full kubesage in this tab", run: () => { location.href = $("#termLink").href; } },
+    { label: "Terminal UI", hint: "the full kubeweave in this tab", run: () => { location.href = $("#termLink").href; } },
     { label: "Toggle light / dark", hint: "", run: toggleTheme },
   ].filter(Boolean);
   const input = h("input", { type: "text", placeholder: "Type a resource, cluster or namespace…", autocomplete: "off", role: "combobox", "aria-expanded": "true", "aria-controls": "plist", "aria-label": "Go to" });
@@ -819,7 +819,7 @@ function toggleTheme() {
   const root = document.documentElement;
   const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
   root.dataset.theme = dark ? "light" : "dark";
-  try { localStorage.setItem("kubesage-theme", root.dataset.theme); } catch (_) {}
+  try { localStorage.setItem("kubeweave-theme", root.dataset.theme); } catch (_) {}
 }
 
 function refreshView() {
@@ -834,7 +834,7 @@ function setNS(ns) {
 // ---------- wiring ----------
 
 function wireChrome() {
-  try { const t = localStorage.getItem("kubesage-theme"); if (t) document.documentElement.dataset.theme = t; } catch (_) {}
+  try { const t = localStorage.getItem("kubeweave-theme"); if (t) document.documentElement.dataset.theme = t; } catch (_) {}
   $("#ctx").onchange = (e) => { S.ctx = e.target.value; closePanel(); S.picked.clear(); loadContext(true); };
   $("#ns").onchange = (e) => setNS(e.target.value);
   let deb;

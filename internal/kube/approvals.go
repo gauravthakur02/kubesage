@@ -15,14 +15,14 @@ import (
 )
 
 // Approval is a request for a second person to approve a change. It is stored as a ConfigMap in the
-// approvals namespace, so whoever can read that namespace sees it from their own kubesage.
+// approvals namespace, so whoever can read that namespace sees it from their own kubeweave.
 type Approval struct {
 	ID, Context, Namespace, Target, Action string
 	Requester, Approver, Reason, Status    string // Status: pending, approved, rejected, expired
 	Created, Decided                       time.Time
 }
 
-const approvalLabel = "kubesage.io/approval"
+const approvalLabel = "kubeweave.io/approval"
 
 // WhoAmI is the user name the API server sees (SelfSubjectReview), falling back to the kubeconfig user.
 func (c *Client) WhoAmI(ctx context.Context) string {
@@ -53,16 +53,16 @@ func approvalFrom(cm *corev1.ConfigMap, expire time.Duration) Approval {
 func (c *Client) RequestApproval(ctx context.Context, approvalsNS string, a Approval) (Approval, error) {
 	b := make([]byte, 4)
 	_, _ = rand.Read(b)
-	a.ID = "kubesage-approval-" + hex.EncodeToString(b)
+	a.ID = "kubeweave-approval-" + hex.EncodeToString(b)
 	a.Status = "pending"
 	if a.Requester == "" {
 		a.Requester = c.WhoAmI(ctx)
 	}
 	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: a.ID, Namespace: approvalsNS,
-		Labels: map[string]string{approvalLabel: "true", "app.kubernetes.io/managed-by": "kubesage"}},
+		Labels: map[string]string{approvalLabel: "true", "app.kubernetes.io/managed-by": "kubeweave"}},
 		Data: map[string]string{"context": a.Context, "namespace": a.Namespace, "target": a.Target, "action": a.Action,
 			"requester": a.Requester, "reason": a.Reason, "status": "pending", "created": time.Now().UTC().Format(time.RFC3339)}}
-	created, err := c.Clientset.CoreV1().ConfigMaps(approvalsNS).Create(ctx, cm, metav1.CreateOptions{FieldManager: "kubesage"})
+	created, err := c.Clientset.CoreV1().ConfigMaps(approvalsNS).Create(ctx, cm, metav1.CreateOptions{FieldManager: "kubeweave"})
 	if apierrors.IsNotFound(err) {
 		return a, fmt.Errorf("namespace %s does not exist: create it (kubectl create namespace %s) and let your team read/write ConfigMaps there", approvalsNS, approvalsNS)
 	}
@@ -107,7 +107,7 @@ func (c *Client) DecideApproval(ctx context.Context, approvalsNS, id string, app
 	}
 	cm.Data["status"], cm.Data["approver"], cm.Data["decided"] = a.Status, me, a.Decided.Format(time.RFC3339)
 	// Update carries the resourceVersion, so two people deciding at once cannot both win.
-	if _, err := c.Clientset.CoreV1().ConfigMaps(approvalsNS).Update(ctx, cm, metav1.UpdateOptions{FieldManager: "kubesage"}); err != nil {
+	if _, err := c.Clientset.CoreV1().ConfigMaps(approvalsNS).Update(ctx, cm, metav1.UpdateOptions{FieldManager: "kubeweave"}); err != nil {
 		return a, err
 	}
 	return a, nil
@@ -120,6 +120,6 @@ func (c *Client) CloseApproval(ctx context.Context, approvalsNS, id, result stri
 		return err
 	}
 	cm.Data["status"], cm.Data["result"] = "done", result
-	_, err = c.Clientset.CoreV1().ConfigMaps(approvalsNS).Update(ctx, cm, metav1.UpdateOptions{FieldManager: "kubesage"})
+	_, err = c.Clientset.CoreV1().ConfigMaps(approvalsNS).Update(ctx, cm, metav1.UpdateOptions{FieldManager: "kubeweave"})
 	return err
 }

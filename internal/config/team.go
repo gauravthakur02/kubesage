@@ -20,10 +20,10 @@ func TeamDir(repo string) string {
 		dir = os.TempDir()
 	}
 	name := regexp.MustCompile(`[^A-Za-z0-9._-]+`).ReplaceAllString(strings.TrimSuffix(repo, ".git"), "_")
-	return filepath.Join(dir, "kubesage", "team", name)
+	return filepath.Join(dir, "kubeweave", "team", name)
 }
 
-// SyncTeam clones or fast-forwards the team repository and merges its kubesage.yaml into c.
+// SyncTeam clones or fast-forwards the team repository and merges its kubeweave.yaml into c.
 // On a network failure the last clone is used, and the error says so.
 func (c *Config) SyncTeam(ctx context.Context) (string, error) {
 	t := c.Team
@@ -51,7 +51,7 @@ func (c *Config) SyncTeam(ctx context.Context) (string, error) {
 	}
 	path := t.Path
 	if path == "" {
-		path = "kubesage.yaml"
+		path = "kubeweave.yaml"
 	}
 	b, err := os.ReadFile(filepath.Join(dir, filepath.Clean("/" + path)[1:]))
 	if err != nil {

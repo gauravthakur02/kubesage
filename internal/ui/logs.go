@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 // logSpec describes the current log stream so it can be restarted (time window, timestamps).
@@ -68,7 +68,7 @@ func startMergedLogStream(c *kube.Client, spec logSpec) (chan string, context.Ca
 			rc, err := c.Logs(ctx, spec.ns, pod, opts)
 			if err != nil {
 				select {
-				case ch <- tag + "[kubesage] error: " + err.Error():
+				case ch <- tag + "[kubeweave] error: " + err.Error():
 				case <-ctx.Done():
 				}
 				return

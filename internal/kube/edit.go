@@ -76,7 +76,7 @@ func (c *Client) UpdateFromYAML(ctx context.Context, r Resource, ns, name, edite
 	if !strings.EqualFold(obj.GetKind(), r.Kind) && obj.GetKind() != "" {
 		return res, fmt.Errorf("kind changed from %s to %s", r.Kind, obj.GetKind())
 	}
-	opts := metav1.UpdateOptions{FieldManager: "kubesage"}
+	opts := metav1.UpdateOptions{FieldManager: "kubeweave"}
 	if dryRun {
 		opts.DryRun = []string{metav1.DryRunAll}
 	}

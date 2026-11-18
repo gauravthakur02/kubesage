@@ -204,10 +204,10 @@ func Classify(args []string) (Risk, string) {
 	case "":
 		return Blocked, "no kubectl subcommand"
 	case "port-forward", "proxy", "attach", "edit", "debug", "cp", "plugin", "completion", "alpha", "config", "kustomize":
-		return Blocked, "`kubectl " + verb + "` is interactive, long-running or local-config only; use kubesage's own UI for it"
+		return Blocked, "`kubectl " + verb + "` is interactive, long-running or local-config only; use kubeweave's own UI for it"
 	case "exec":
 		if hasFlag(args, "-it", "-ti", "-i", "--stdin", "-t", "--tty") {
-			return Blocked, "interactive exec is not allowed; use kubesage's shell (s)"
+			return Blocked, "interactive exec is not allowed; use kubeweave's shell (s)"
 		}
 		return Write, "runs a process inside a container"
 	case "run":

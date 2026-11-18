@@ -10,7 +10,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "site-src")
-REPO = "https://github.com/gauravthakur02/kubesage"
+REPO = "https://github.com/gauravthakur02/kubeweave"
 
 
 def slug(title):
@@ -54,7 +54,7 @@ def main():
                 name = "use-%s.md" % slug(st)
                 pages[name] = "# %s\n%s" % (st, sb)
                 group.append((st, name))
-            nav.append(("Using kubesage", group))
+            nav.append(("Using kubeweave", group))
             continue
         name = "%s.md" % slug(title)
         pages[name] = "# %s\n%s" % (title, body.replace("\n### ", "\n## "))
@@ -63,7 +63,7 @@ def main():
         with open(os.path.join(OUT, name), "w", encoding="utf-8") as f:
             f.write(body.strip() + "\n")
     lines = [
-        "site_name: kubesage",
+        "site_name: kubeweave",
         "site_description: A Kubernetes IDE for your terminal, with an AI copilot",
         "repo_url: " + REPO,
         "docs_dir: site-src",

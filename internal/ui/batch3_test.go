@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/config"
 )
 
 func TestRunbooksMatchAndInject(t *testing.T) {

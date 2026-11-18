@@ -23,7 +23,7 @@ type Owner struct {
 }
 
 // Labels and annotations that name an owner, in order of preference.
-var ownerKeys = []string{"owner", "team", "kubesage.io/owner", "app.kubernetes.io/owner", "app.kubernetes.io/team", "app.kubernetes.io/part-of"}
+var ownerKeys = []string{"owner", "team", "kubeweave.io/owner", "app.kubernetes.io/owner", "app.kubernetes.io/team", "app.kubernetes.io/part-of"}
 
 // Resolve finds the owner of an object in namespace ns with the given labels and annotations.
 func Resolve(rules []Rule, ns string, labels, annotations map[string]string) (Owner, bool) {

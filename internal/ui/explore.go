@@ -14,7 +14,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
 const (
@@ -328,7 +328,7 @@ func (a *App) exportReport(path string) tea.Cmd {
 	c := a.client
 	ns, name := row.Namespace, row.Name
 	if path == "" {
-		path = fmt.Sprintf("kubesage-report-%s-%s-%s.md", strings.ToLower(kind), name, time.Now().Format("20060102-1504"))
+		path = fmt.Sprintf("kubeweave-report-%s-%s-%s.md", strings.ToLower(kind), name, time.Now().Format("20060102-1504"))
 	}
 	lastAI := ""
 	for i := len(a.chat) - 1; i >= 0; i-- {
@@ -343,7 +343,7 @@ func (a *App) exportReport(path string) tea.Cmd {
 		defer cancel()
 		var b strings.Builder
 		fmt.Fprintf(&b, "# Incident report: %s %s/%s\n\n", strings.ToLower(kind), ns, name)
-		fmt.Fprintf(&b, "- Cluster: `%s`\n- Generated: %s by kubesage\n\n", c.Context, time.Now().Format(time.RFC1123))
+		fmt.Fprintf(&b, "- Cluster: `%s`\n- Generated: %s by kubeweave\n\n", c.Context, time.Now().Format(time.RFC1123))
 		if root, front, err := c.Relations(ctx, kind, ns, name); err == nil {
 			b.WriteString("## Relationships\n\n```\n")
 			if front != nil {

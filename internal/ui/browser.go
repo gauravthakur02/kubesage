@@ -33,5 +33,5 @@ func openBrowser(url string) error {
 	return nil
 }
 
-// OpenBrowser opens url in the default web browser (used by kubesage serve).
+// OpenBrowser opens url in the default web browser (used by kubeweave serve).
 func OpenBrowser(url string) error { return openBrowser(url) }

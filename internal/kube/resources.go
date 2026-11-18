@@ -51,7 +51,7 @@ type Resource struct {
 	GVR        schema.GroupVersionResource
 	Group      string // navigator section: Workloads, Network, Config & Storage, Access control (RBAC), Cluster, Custom resources
 	keepOrder  bool   // rows are already in a meaningful order (UI-provided lists)
-	// Slow tables query the cluster heavily (kubesage's own reports); the UI refreshes them less often.
+	// Slow tables query the cluster heavily (kubeweave's own reports); the UI refreshes them less often.
 	Slow bool
 	list func(ctx context.Context, c *Client, ns string) (Table, error)
 }

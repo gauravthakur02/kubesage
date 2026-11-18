@@ -9,9 +9,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/gauravthakur02/kubesage/internal/kube"
-	"github.com/gauravthakur02/kubesage/internal/report"
-	"github.com/gauravthakur02/kubesage/internal/share"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/report"
+	"github.com/gauravthakur02/kubeweave/internal/share"
 )
 
 // shareCommand starts or stops the read-only web view of this screen.
@@ -51,10 +51,10 @@ func (a *App) shareCommand(arg string) tea.Cmd {
 	a.sharing = s
 	a.audit("share screen (read-only) at "+strings.Split(s.URL, "?")[0], a.client.Context, a.client.Namespace, "", nil)
 	a.setStatus("● sharing read-only: "+s.URL+" · pauses while a secret is revealed · :share stop", false)
-	return tea.SetWindowTitle("kubesage ● sharing")
+	return tea.SetWindowTitle("kubeweave ● sharing")
 }
 
-// openDailyReport shows the summary `kubesage report` posts (:daily-report, :daily-report post).
+// openDailyReport shows the summary `kubeweave report` posts (:daily-report, :daily-report post).
 func (a *App) openDailyReport(arg string) tea.Cmd {
 	c := a.client
 	post := strings.TrimSpace(arg) == "post"

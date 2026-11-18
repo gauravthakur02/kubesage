@@ -7,15 +7,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/gauravthakur02/kubesage/internal/config"
-	"github.com/gauravthakur02/kubesage/internal/kube"
+	"github.com/gauravthakur02/kubeweave/internal/config"
+	"github.com/gauravthakur02/kubeweave/internal/kube"
 )
 
-// Read-only: KUBESAGE_LIVE_CONTEXT=ctx KUBESAGE_LIVE_NS=ns go test ./internal/ui -run LivePanes -v
+// Read-only: KUBEWEAVE_LIVE_CONTEXT=ctx KUBEWEAVE_LIVE_NS=ns go test ./internal/ui -run LivePanes -v
 func TestLivePanes(t *testing.T) {
-	kctx, ns := os.Getenv("KUBESAGE_LIVE_CONTEXT"), os.Getenv("KUBESAGE_LIVE_NS")
+	kctx, ns := os.Getenv("KUBEWEAVE_LIVE_CONTEXT"), os.Getenv("KUBEWEAVE_LIVE_NS")
 	if kctx == "" || ns == "" {
-		t.Skip("set KUBESAGE_LIVE_CONTEXT and KUBESAGE_LIVE_NS")
+		t.Skip("set KUBEWEAVE_LIVE_CONTEXT and KUBEWEAVE_LIVE_NS")
 	}
 	c, err := kube.New("", kctx, ns)
 	if err != nil {
@@ -31,7 +31,7 @@ func TestLivePanes(t *testing.T) {
 		t.Logf("pane %d %-12s %3d rows", p.id, p.res.Name, len(p.table.Rows))
 	}
 	assertFits(t, a)
-	if os.Getenv("KUBESAGE_LIVE_SHOW") != "" {
+	if os.Getenv("KUBEWEAVE_LIVE_SHOW") != "" {
 		t.Log("\n" + ansi.Strip(a.View()))
 	}
 }

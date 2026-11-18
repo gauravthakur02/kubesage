@@ -49,7 +49,7 @@ func KubeContexts(kubeconfig string) ([]ContextInfo, error) {
 	return out, nil
 }
 
-// backupKubeconfig copies every kubeconfig file that exists to <file>.kubesage-bak-<time>.
+// backupKubeconfig copies every kubeconfig file that exists to <file>.kubeweave-bak-<time>.
 func backupKubeconfig(po *clientcmd.PathOptions) (string, error) {
 	stamp := time.Now().Format("20060102-150405")
 	var made []string
@@ -58,7 +58,7 @@ func backupKubeconfig(po *clientcmd.PathOptions) (string, error) {
 		if err != nil {
 			continue
 		}
-		dst := f + ".kubesage-bak-" + stamp
+		dst := f + ".kubeweave-bak-" + stamp
 		if err := os.WriteFile(dst, b, 0o600); err != nil {
 			return "", err
 		}
