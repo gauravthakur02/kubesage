@@ -79,7 +79,7 @@ Usage:
   kubeweave schedule run [--dry-run]   apply scale-to-zero schedules now (run from cron every 10 min)
   kubeweave schedule status         show what each schedule wants right now
   kubeweave approve list | <id> [--reject]   two-person rule: list or decide pending changes
-  kubeweave audit verify            check the audit log's hash chain (exit 1 if tampered)
+  kubeweave audit verify            check the audit log's hash chain (exit 1 if tampered; KUBEWEAVE_AUDIT_KEY signs it)
   kubeweave audit export [--since 24h]       push the audit log to Grafana Loki (audit_loki_url)
   kubeweave serve [--addr 127.0.0.1:7777] [--lan] [--allow-changes]
                                    the full UI in a web browser (read-only unless --allow-changes)
@@ -845,13 +845,21 @@ func runAudit(cfg *config.Config, args []string) {
 			fmt.Printf("no audit log yet at %s (nothing has been changed through kubeweave)\n", path)
 			return
 		}
-		n, legacy, err := audit.Verify(path)
+		r, err := audit.Verify(path)
 		exitIf(err)
-		fmt.Printf("✓ %s: %d chained entries intact", path, n)
-		if legacy > 0 {
-			fmt.Printf(" (%d older entries without a hash)", legacy)
+		fmt.Printf("✓ %s: %d chained entries intact", path, r.Checked)
+		if r.Signed > 0 {
+			fmt.Printf(", %d signed with %s", r.Signed, audit.KeyEnv)
+		}
+		if r.Legacy > 0 {
+			fmt.Printf(" (%d older entries without a hash)", r.Legacy)
 		}
 		fmt.Println()
+		if r.KeySet && r.Checked > 0 && r.Signed == 0 {
+			// a log rewritten by someone without the key has no signed entries at all
+			fmt.Fprintf(os.Stderr, "warning: %s is set but no entry is signed with it; if it was set when the log was written, the log was rewritten\n", audit.KeyEnv)
+			os.Exit(1)
+		}
 	case "export":
 		since := 24 * time.Hour
 		for i := 1; i < len(args)-1; i++ {

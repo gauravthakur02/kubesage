@@ -2,7 +2,9 @@ package kube
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"sigs.k8s.io/yaml"
@@ -59,22 +61,29 @@ func setEnvValues(v any, path string, f func(path, val string) string) {
 	}
 }
 
-// MaskEnvYAML masks sensitive env values in a manifest. With like set (the live manifest), only values equal to the
-// live ones are masked, so a change someone typed or proposed stays visible.
-func MaskEnvYAML(manifest, like string) (string, error) {
-	var m map[string]any
-	if err := yaml.Unmarshal([]byte(manifest), &m); err != nil {
-		return "", err
+const lastApplied = "kubectl.kubernetes.io/last-applied-configuration"
+
+// appliedDoc parses the last-applied annotation (a JSON copy of the manifest, env values included).
+func appliedDoc(m map[string]any) (map[string]any, string, bool) {
+	md, _ := m["metadata"].(map[string]any)
+	ann, _ := md["annotations"].(map[string]any)
+	raw, ok := ann[lastApplied].(string)
+	if !ok {
+		return nil, "", false
 	}
-	var live map[string]string
-	if like != "" {
-		var lm map[string]any
-		if err := yaml.Unmarshal([]byte(like), &lm); err != nil {
-			return "", err
-		}
-		live = map[string]string{}
-		envValues(lm, "", live)
+	var doc map[string]any
+	if json.Unmarshal([]byte(raw), &doc) != nil {
+		return nil, raw, false
 	}
+	return doc, raw, true
+}
+
+func setApplied(m map[string]any, v string) {
+	m["metadata"].(map[string]any)["annotations"].(map[string]any)[lastApplied] = v
+}
+
+// maskTree masks sensitive env values in a parsed manifest; with live set, only values equal to the live ones.
+func maskTree(m map[string]any, live map[string]string) {
 	setEnvValues(m, "", func(path, val string) string {
 		if live != nil {
 			if old, ok := live[path]; !ok || old != val {
@@ -83,6 +92,34 @@ func MaskEnvYAML(manifest, like string) (string, error) {
 		}
 		return MaskedEnv
 	})
+}
+
+// MaskEnvYAML masks sensitive env values in a manifest. With like set (the live manifest), only values equal to the
+// live ones are masked, so a change someone typed or proposed stays visible.
+func MaskEnvYAML(manifest, like string) (string, error) {
+	var m map[string]any
+	if err := yaml.Unmarshal([]byte(manifest), &m); err != nil {
+		return "", err
+	}
+	var live, liveApplied map[string]string
+	if like != "" {
+		var lm map[string]any
+		if err := yaml.Unmarshal([]byte(like), &lm); err != nil {
+			return "", err
+		}
+		live = map[string]string{}
+		envValues(lm, "", live)
+		liveApplied = map[string]string{}
+		if doc, _, ok := appliedDoc(lm); ok {
+			envValues(doc, "", liveApplied)
+		}
+	}
+	maskTree(m, live)
+	if doc, _, ok := appliedDoc(m); ok { // kubectl apply keeps a JSON copy of the manifest, passwords included
+		maskTree(doc, liveApplied)
+		b, _ := json.Marshal(doc)
+		setApplied(m, string(b))
+	}
 	b, err := yaml.Marshal(m)
 	return string(b), err
 }
@@ -96,19 +133,32 @@ func UnmaskEnvYAML(edited, live string) (string, error) {
 	if err := yaml.Unmarshal([]byte(live), &lm); err != nil {
 		return "", err
 	}
-	orig := map[string]string{}
-	envValues(lm, "", orig)
 	var missing string
-	setEnvValues(m, "", func(path, val string) string {
-		if val != MaskedEnv {
+	restore := func(tree, liveTree map[string]any) {
+		orig := map[string]string{}
+		envValues(liveTree, "", orig)
+		setEnvValues(tree, "", func(path, val string) string {
+			if val != MaskedEnv {
+				return val
+			}
+			if old, ok := orig[path]; ok {
+				return old
+			}
+			missing = path
 			return val
+		})
+	}
+	restore(m, lm)
+	if doc, _, ok := appliedDoc(m); ok {
+		liveDoc, liveRaw, liveOK := appliedDoc(lm)
+		restore(doc, liveDoc)
+		if liveOK && reflect.DeepEqual(doc, liveDoc) {
+			setApplied(m, liveRaw) // unchanged: keep the exact original string
+		} else {
+			b, _ := json.Marshal(doc)
+			setApplied(m, string(b))
 		}
-		if old, ok := orig[path]; ok {
-			return old
-		}
-		missing = path
-		return val
-	})
+	}
 	if missing != "" {
 		return "", fmt.Errorf("%s is still %q but has no value in the cluster to keep: type a value", missing, MaskedEnv)
 	}

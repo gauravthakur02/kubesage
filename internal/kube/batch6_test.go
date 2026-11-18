@@ -157,19 +157,24 @@ func TestCrashLoopErrorWindow(t *testing.T) {
 			Status: corev1.PodStatus{Phase: corev1.PodRunning, ContainerStatuses: []corev1.ContainerStatus{cs}}}
 	}
 	errWindow := pod(corev1.ContainerStatus{Name: "app", RestartCount: 3, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "Error", ExitCode: 1}}})
-	between := pod(corev1.ContainerStatus{Name: "app", RestartCount: 4, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+	between := pod(corev1.ContainerStatus{Name: "app", RestartCount: 4, State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "PodInitializing"}},
 		LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "Error", ExitCode: 2}}})
+	// crashed twice, now running but not ready (failing readiness probe): not a crash loop
+	settled := pod(corev1.ContainerStatus{Name: "app", RestartCount: 2, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+		LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "Error", ExitCode: 1}}})
 	healthy := pod(corev1.ContainerStatus{Name: "app", RestartCount: 4, Ready: true, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
 		LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "Error", ExitCode: 2}}})
-	for name, p := range map[string]*corev1.Pod{"terminated Error": errWindow, "running again, not ready": between} {
+	for name, p := range map[string]*corev1.Pod{"terminated Error": errWindow, "restarting again": between} {
 		is := PodIssues(p)
 		if len(is) == 0 || is[0].Severity != HealthErr {
 			t.Errorf("%s: %+v, want an error", name, is)
 		}
 	}
-	for _, is := range PodIssues(healthy) {
-		if is.Severity == HealthErr {
-			t.Errorf("recovered pod is an error: %+v", is)
+	for _, p := range []*corev1.Pod{healthy, settled} {
+		for _, is := range PodIssues(p) {
+			if is.Severity == HealthErr {
+				t.Errorf("running pod is an error: %+v", is)
+			}
 		}
 	}
 }

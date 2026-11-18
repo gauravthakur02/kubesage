@@ -1,11 +1,13 @@
 // Package audit is kubeweave's change log: JSON lines, each entry chained to the previous one by a SHA-256
-// hash so that edited or deleted lines are detected (`kubeweave audit verify`).
+// hash so that edited or deleted lines are detected (`kubeweave audit verify`). With KUBEWEAVE_AUDIT_KEY set, the
+// chain is an HMAC: someone who can write the file but does not have the key cannot rebuild it.
 package audit
 
 import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -30,15 +32,32 @@ type Entry struct {
 	Reason  string    `json:"reason,omitempty"`
 	Result  string    `json:"result"`
 	Prev    string    `json:"prev,omitempty"` // hash of the previous entry
-	Hash    string    `json:"hash,omitempty"` // sha256(prev + this entry without hash)
+	Hash    string    `json:"hash,omitempty"` // sha256(prev + this entry without hash), or HMAC-SHA256 when Keyed
+	Keyed   bool      `json:"keyed,omitempty"`
 }
 
 var mu sync.Mutex
 
-func (e Entry) digest() string {
+// KeyEnv names the environment variable holding the audit key.
+const KeyEnv = "KUBEWEAVE_AUDIT_KEY"
+
+func key() []byte {
+	if k := os.Getenv(KeyEnv); k != "" {
+		return []byte(k)
+	}
+	return nil
+}
+
+func (e Entry) digest(k []byte) string {
 	e.Hash = ""
 	b, _ := json.Marshal(e)
-	sum := sha256.Sum256(append([]byte(e.Prev), b...))
+	msg := append([]byte(e.Prev), b...)
+	if e.Keyed {
+		m := hmac.New(sha256.New, k)
+		m.Write(msg)
+		return hex.EncodeToString(m.Sum(nil))
+	}
+	sum := sha256.Sum256(msg)
 	return hex.EncodeToString(sum[:])
 }
 
@@ -74,7 +93,9 @@ func Append(path string, e Entry) error {
 	}
 	defer f.Close()
 	e.Prev = lastHash(f)
-	e.Hash = e.digest()
+	k := key()
+	e.Keyed = k != nil
+	e.Hash = e.digest(k)
 	b, _ := json.Marshal(e)
 	_, err = f.Write(append(b, '\n'))
 	return err
@@ -99,28 +120,50 @@ func Read(path string) ([]Entry, error) {
 	return out, sc.Err()
 }
 
+// Result is what Verify checked.
+type Result struct {
+	Checked, Legacy, Signed int // chained entries, older entries without a hash, entries signed with the key
+	KeySet                  bool
+}
+
 // Verify checks the hash chain. Entries written before chaining existed (no hash) are counted as legacy.
-func Verify(path string) (checked, legacy int, err error) {
+func Verify(path string) (Result, error) {
+	var r Result
 	entries, err := Read(path)
 	if err != nil {
-		return 0, 0, err
+		return r, err
 	}
+	k := key()
+	r.KeySet = k != nil
 	prev := ""
 	for i, e := range entries {
+		at := fmt.Sprintf("entry %d (%s %s)", i+1, e.Time.Format(time.RFC3339), e.Action)
 		if e.Hash == "" {
-			legacy++
+			r.Legacy++
 			continue
 		}
 		if e.Prev != prev { // the first chained entry has no predecessor, so a removed head is caught too
-			return checked, legacy, fmt.Errorf("entry %d (%s %s): chain broken, an entry before it was changed or removed", i+1, e.Time.Format(time.RFC3339), e.Action)
+			return r, fmt.Errorf("%s: chain broken, an entry before it was changed or removed", at)
 		}
-		if e.digest() != e.Hash {
-			return checked, legacy, fmt.Errorf("entry %d (%s %s): content was modified", i+1, e.Time.Format(time.RFC3339), e.Action)
+		switch {
+		case e.Keyed && k == nil:
+			return r, fmt.Errorf("%s is signed: set %s to verify the log", at, KeyEnv)
+		case !e.Keyed && r.Signed > 0:
+			return r, fmt.Errorf("%s is not signed although earlier entries are: the log was rewritten", at)
+		}
+		if !hmac.Equal([]byte(e.digest(k)), []byte(e.Hash)) {
+			if e.Keyed {
+				return r, fmt.Errorf("%s: content was modified, or %s is not the key it was signed with", at, KeyEnv)
+			}
+			return r, fmt.Errorf("%s: content was modified", at)
+		}
+		if e.Keyed {
+			r.Signed++
 		}
 		prev = e.Hash
-		checked++
+		r.Checked++
 	}
-	return checked, legacy, nil
+	return r, nil
 }
 
 // ExportLoki pushes entries newer than since to a Grafana Loki push endpoint (…/loki/api/v1/push).

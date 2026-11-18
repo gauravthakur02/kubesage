@@ -76,12 +76,22 @@ There is no telemetry.
   Share the link only with people you would give your kubeconfig to.
 - Release binaries are not code-signed (macOS Gatekeeper and Windows SmartScreen warn on browser downloads); install
   with Homebrew, the install script or `go install`, and compare checksums.
-- The audit log's hash chain is not keyed: it detects edits, removed entries and a removed head, but someone who can
-  write the file can rewrite the whole chain. Push it to Loki (`kubeweave audit export`, `audit_loki_url`) or other write-once storage for evidence.
+- Without `KUBEWEAVE_AUDIT_KEY`, the audit log's hash chain is plain SHA-256: it detects edits, removed entries and a removed
+  head, but someone who can write the file can rewrite the whole chain. Set the key to sign entries (HMAC-SHA256), and push
+  the log to Loki (`kubeweave audit export`, `audit_loki_url`) or other write-once storage for evidence. A rewritten log with
+  no signed entries at all is reported only as a warning when the key is set, so keep a copy elsewhere.
 - AI answers can be wrong or manipulated by text in logs and objects (prompt injection). kubeweave never runs a change
   the AI proposes without your approval, but read the command before you approve it.
 
 ## Security review log
+
+**2026-11 (v0.7.2)**, a retest of v0.7.1. All earlier findings confirmed fixed; follow-ups:
+
+| Severity | Finding | Fix |
+|---|---|---|
+| Medium | The browser's edit view masked env passwords in the spec but not inside the `kubectl.kubernetes.io/last-applied-configuration` annotation (a JSON copy of the manifest). | Values in the annotation are masked too and restored exactly on save. |
+| Medium | A container that crashed earlier but is running now (failing only its readiness probe) was reported as crash-looping. | The crash-loop rule skips running containers. |
+| Low | The audit chain could be rebuilt by anyone who can write the file (no key). | Optional `KUBEWEAVE_AUDIT_KEY` signs entries with HMAC-SHA256; `audit verify` checks it. |
 
 **2026-11 (v0.7.1)**, an independent install-and-test report (fresh install, kind cluster, CLI, web UI, AI agent).
 Fixed:

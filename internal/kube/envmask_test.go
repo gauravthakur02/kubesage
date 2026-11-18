@@ -59,3 +59,17 @@ func TestComparableHashesEnv(t *testing.T) {
 		t.Fatalf("comparable = %s", out)
 	}
 }
+
+func TestMaskLastAppliedAnnotation(t *testing.T) {
+	applied := `{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"web"},"spec":{"template":{"spec":{"containers":[{"name":"app","env":[{"name":"DB_PASSWORD","value":"hunter2"}]}]}}}}`
+	live := strings.Replace(liveDep, "metadata: {name: web, namespace: shop}",
+		"metadata:\n  name: web\n  namespace: shop\n  annotations:\n    kubectl.kubernetes.io/last-applied-configuration: '"+applied+"'", 1)
+	shown, err := MaskEnvYAML(live, "")
+	if err != nil || strings.Contains(shown, "hunter2") {
+		t.Fatalf("password left in the edit view: %v\n%s", err, shown)
+	}
+	full, err := UnmaskEnvYAML(strings.Replace(shown, "web:1", "web:2", 1), live)
+	if err != nil || !strings.Contains(full, applied) || !strings.Contains(full, "web:2") {
+		t.Fatalf("annotation not restored exactly: %v\n%s", err, full)
+	}
+}

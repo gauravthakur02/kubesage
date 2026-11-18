@@ -62,7 +62,7 @@ func PodIssues(p *corev1.Pod) []Issue {
 				"The container exits right after starting: read its previous logs, check command, args, config and required env vars.")
 			crashing = true
 		} else if lt := cs.LastTerminationState.Terminated; lt != nil && lt.ExitCode != 0 && lt.Reason != "OOMKilled" && restarts &&
-			cs.RestartCount >= 2 && !cs.Ready && (cs.State.Waiting == nil || waitingHints[cs.State.Waiting.Reason] == "") {
+			cs.RestartCount >= 2 && !cs.Ready && cs.State.Running == nil && (cs.State.Waiting == nil || waitingHints[cs.State.Waiting.Reason] == "") {
 			add(HealthErr, "CrashLooping", fmt.Sprintf("container %q keeps exiting with code %d (%s), restarts: %d", cs.Name, lt.ExitCode, nonEmpty(lt.Reason, "Error"), cs.RestartCount),
 				"The container exits repeatedly: read its previous logs, check command, args, config and liveness probes.")
 			crashing = true

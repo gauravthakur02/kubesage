@@ -613,6 +613,8 @@ team: {repo: https://github.com/acme/platform-kubeweave.git, ref: main, path: ku
 
 **Tamper-evident audit log.** Every entry carries a SHA-256 hash of itself and the previous entry. `kubeweave audit verify` reports a
 changed or deleted line; `kubeweave audit export --since 24h` pushes entries to Grafana Loki (`audit_loki_url`, token in `$KUBEWEAVE_LOKI_TOKEN`).
+Set `KUBEWEAVE_AUDIT_KEY` (from a secret store, the same value wherever kubeweave runs) to sign new entries with HMAC-SHA256:
+then someone who can write the file but does not have the key cannot rebuild the chain, and `audit verify` needs the key.
 
 ## Logs, traces, node pools and operators
 
