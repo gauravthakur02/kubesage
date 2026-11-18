@@ -6,6 +6,7 @@ Writes site-src/*.md and mkdocs.yml, then `mkdocs build` produces site/.
 """
 import os
 import re
+import shutil
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -39,6 +40,8 @@ def main():
     # Links to repository files must point at GitHub, not the docs site.
     readme = re.sub(r"\]\((?!https?://|#)([^)]+)\)", lambda m: "](%s/blob/main/%s)" % (REPO, m.group(1)), readme)
     os.makedirs(OUT, exist_ok=True)
+    # Images referenced by the README (the logo is an HTML <img src="assets/...">, which mkdocs does not copy).
+    shutil.copytree(os.path.join(ROOT, "assets"), os.path.join(OUT, "assets"), dirs_exist_ok=True)
     nav = []
     sections = split(readme, 2)
     intro = sections[0][1]
@@ -69,6 +72,8 @@ def main():
         "docs_dir: site-src",
         "theme:",
         "  name: material",
+        "  logo: assets/icon.svg",
+        "  favicon: assets/icon.svg",
         "  palette:",
         "    - scheme: slate",
         "      primary: indigo",
