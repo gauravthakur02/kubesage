@@ -116,3 +116,25 @@ func TestRedactOutput(t *testing.T) {
 		t.Fatal("FormatResults does not redact")
 	}
 }
+
+func TestIdentityFlagsStripped(t *testing.T) {
+	for _, line := range []string{
+		"kubectl get pods --as-uid=1000", "kubectl get pods --username=alice --password=s3cret", "kubectl get pods --username alice --password s3cret",
+		"kubectl get pods --client-certificate=/tmp/c --client-key /tmp/k", "kubectl get pods --insecure-skip-tls-verify -n shop",
+		"kubectl --as admin get pods", "kubectl get pods --certificate-authority=/x --tls-server-name=evil",
+	} {
+		c := Parse(line)
+		d := c.Display()
+		for _, bad := range []string{"--as", "--username", "--password", "s3cret", "--client-", "--insecure", "--certificate", "--tls-server", "admin", "alice"} {
+			if strings.Contains(d, bad) {
+				t.Errorf("%q kept %q: %s", line, bad, d)
+			}
+		}
+		if !strings.Contains(d, "get pods") {
+			t.Errorf("%q lost the command: %s", line, d)
+		}
+	}
+	if d := Parse("kubectl get pods --insecure-skip-tls-verify -n shop").Display(); !strings.Contains(d, "-n shop") {
+		t.Errorf("boolean flag swallowed the next argument: %s", d)
+	}
+}

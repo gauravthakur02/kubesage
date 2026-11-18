@@ -749,7 +749,8 @@ bot:
   teams_token_env: TEAMS_WEBHOOK_TOKEN     # the base64 token Teams shows when you create the outgoing webhook
 ```
 ```bash
-SLACK_SIGNING_SECRET=… kubeweave bot --addr :8090   # point the slash command's Request URL at https://<host>/slack
+SLACK_SIGNING_SECRET=… kubeweave bot   # listens on 127.0.0.1:8090; put an HTTPS reverse proxy in front for Slack/Teams
+# or listen on every interface (only behind a firewall or proxy): kubeweave bot --addr :8090
 ```
 
 **Owners.** kubeweave works out who owns a workload: from your rules first (by namespace or label), then from the `owner`, `team` or
@@ -1009,7 +1010,7 @@ measures how long the workload takes to be fully ready again (up to 5 minutes), 
 confirm. It is refused on production-like contexts, in read-only mode and outside change windows, and recorded in the audit log.
 
 **Daily report (`kubeweave report`).** A short summary of each cluster: health, top issues and certificates expiring within 14 days.
-Without flags it prints to the terminal; `--post` sends it to a Slack or Microsoft Teams incoming webhook. Keep the URL out of the config:
+It covers all namespaces unless you pass `-n NAMESPACE`. Without flags it prints to the terminal; `--post` sends it to a Slack or Microsoft Teams incoming webhook. Keep the URL out of the config:
 ```yaml
 reports:
   webhook_env: KUBEWEAVE_WEBHOOK   # export KUBEWEAVE_WEBHOOK=https://hooks.slack.com/services/…
@@ -1043,6 +1044,8 @@ End-to-end tests run exec, port-forward, apply, scale schedules, a chaos test an
 kind create cluster --name kubeweave-e2e
 go test -tags e2e -v ./e2e/
 ```
+If the kind node cannot pull images (proxies, rate limits), pull them on your machine and load them:
+`docker pull nginx:1.27-alpine && kind load docker-image nginx:1.27-alpine --name kubeweave-e2e`.
 
 ## Documentation site and demo
 

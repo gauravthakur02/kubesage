@@ -111,7 +111,7 @@ func Verify(path string) (checked, legacy int, err error) {
 			legacy++
 			continue
 		}
-		if e.Prev != prev && prev != "" {
+		if e.Prev != prev { // the first chained entry has no predecessor, so a removed head is caught too
 			return checked, legacy, fmt.Errorf("entry %d (%s %s): chain broken, an entry before it was changed or removed", i+1, e.Time.Format(time.RFC3339), e.Action)
 		}
 		if e.digest() != e.Hash {

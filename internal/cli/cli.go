@@ -212,3 +212,17 @@ func Known(name string) bool {
 	}
 	return false
 }
+
+// CommandHelp is the short help of one subcommand (kubeweave <command> --help).
+func CommandHelp(name string) string {
+	for _, c := range Commands {
+		if c.Name == name {
+			h := fmt.Sprintf("kubeweave %s: %s\n", c.Name, c.Help)
+			if len(c.Args) > 0 {
+				h += "\nArguments and options: " + strings.Join(c.Args, ", ") + "\n"
+			}
+			return h + "\nGlobal flags (--context, -n, -A, --readonly, --config, …) can come before or after the command; `kubeweave help` lists them.\n"
+		}
+	}
+	return "unknown command " + name + "\n"
+}

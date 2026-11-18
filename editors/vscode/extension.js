@@ -7,8 +7,12 @@ function settings() {
   return { bin: c.get('path') || 'kubeweave', readOnly: c.get('readOnly'), extra: c.get('extraArgs') || [] };
 }
 
+// Single quotes: the shell expands nothing inside them ($(…), backticks, $VAR stay literal). POSIX shells end the
+// quote to add a quote ('\''); PowerShell, VS Code's default terminal on Windows, doubles it ('').
 function quote(a) {
-  return /^[A-Za-z0-9_./:=@%+,-]+$/.test(a) ? a : JSON.stringify(a);
+  if (/^[A-Za-z0-9_./:=@%+,-]+$/.test(a)) return a;
+  if (process.platform === 'win32') return "'" + a.replace(/'/g, "''") + "'";
+  return "'" + a.replace(/'/g, "'\\''") + "'";
 }
 
 function run(args, name) {

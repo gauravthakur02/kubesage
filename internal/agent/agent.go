@@ -117,12 +117,20 @@ func Parse(line string) Command {
 // stripTargetingFlags removes --context/--kubeconfig/--cluster/--server/--token/--as
 // so the AI can only act on the context the user is looking at, as the user.
 func stripTargetingFlags(args []string) []string {
+	// Every kubectl flag that picks the cluster, the identity or the credentials: the AI always works as the
+	// current kube-context, never as someone else.
 	banned := map[string]bool{"--context": true, "--kubeconfig": true, "--cluster": true, "--server": true, "-s": true,
-		"--token": true, "--as": true, "--as-group": true, "--user": true}
+		"--token": true, "--as": true, "--as-group": true, "--as-uid": true, "--user": true, "--username": true,
+		"--password": true, "--client-certificate": true, "--client-key": true, "--certificate-authority": true,
+		"--tls-server-name": true, "--auth-provider": true, "--auth-provider-arg": true, "--exec-command": true}
+	bannedBool := map[string]bool{"--insecure-skip-tls-verify": true}
 	var out []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		name, _, hasEq := strings.Cut(a, "=")
+		if bannedBool[name] {
+			continue
+		}
 		if banned[name] {
 			if !hasEq {
 				i++ // skip value

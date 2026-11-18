@@ -40,8 +40,8 @@ func (c *Client) Fleet(ctx context.Context) (FleetStat, error) {
 	}
 	if pods, err := c.listPodsAcross(ctx, c.Namespace); err == nil {
 		s.Pods = len(pods)
-		for i := range pods {
-			if pods[i].Status.Phase == corev1.PodRunning || pods[i].Status.Phase == corev1.PodSucceeded {
+		for i := range pods { // "running" means really working: all containers ready (or a finished job)
+			if pods[i].Status.Phase == corev1.PodSucceeded || (pods[i].Status.Phase == corev1.PodRunning && podReady(&pods[i])) {
 				s.Running++
 			}
 		}

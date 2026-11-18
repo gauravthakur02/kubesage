@@ -150,3 +150,45 @@ func TestSafeFileNames(t *testing.T) {
 		}
 	}
 }
+
+func TestCrashLoopErrorWindow(t *testing.T) {
+	pod := func(cs corev1.ContainerStatus) *corev1.Pod {
+		return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "x"}, Spec: corev1.PodSpec{RestartPolicy: corev1.RestartPolicyAlways},
+			Status: corev1.PodStatus{Phase: corev1.PodRunning, ContainerStatuses: []corev1.ContainerStatus{cs}}}
+	}
+	errWindow := pod(corev1.ContainerStatus{Name: "app", RestartCount: 3, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "Error", ExitCode: 1}}})
+	between := pod(corev1.ContainerStatus{Name: "app", RestartCount: 4, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+		LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "Error", ExitCode: 2}}})
+	healthy := pod(corev1.ContainerStatus{Name: "app", RestartCount: 4, Ready: true, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+		LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "Error", ExitCode: 2}}})
+	for name, p := range map[string]*corev1.Pod{"terminated Error": errWindow, "running again, not ready": between} {
+		is := PodIssues(p)
+		if len(is) == 0 || is[0].Severity != HealthErr {
+			t.Errorf("%s: %+v, want an error", name, is)
+		}
+	}
+	for _, is := range PodIssues(healthy) {
+		if is.Severity == HealthErr {
+			t.Errorf("recovered pod is an error: %+v", is)
+		}
+	}
+}
+
+func TestScanDropsWarningsFromBeforeReady(t *testing.T) {
+	now := time.Now()
+	readyPod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: "shop"}, Status: corev1.PodStatus{Phase: corev1.PodRunning,
+		Conditions:        []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.NewTime(now.Add(-5 * time.Minute))}},
+		ContainerStatuses: []corev1.ContainerStatus{{Name: "app", Ready: true, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}}}}
+	ev := func(name string, at time.Time) *corev1.Event {
+		return &corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "shop"}, Type: corev1.EventTypeWarning, Reason: "Unhealthy",
+			Message: "Readiness probe failed", LastTimestamp: metav1.NewTime(at), InvolvedObject: corev1.ObjectReference{Kind: "Pod", Namespace: "shop", Name: "web"}}
+	}
+	c := NewForTesting(fake.NewSimpleClientset(readyPod, ev("old", now.Add(-10*time.Minute))), "dev", "shop", map[string]string{"dev": "dev"})
+	if is, _ := c.Scan(context.Background()); len(is) != 0 {
+		t.Fatalf("startup warning before Ready reported: %+v", is)
+	}
+	c = NewForTesting(fake.NewSimpleClientset(readyPod, ev("new", now.Add(-time.Minute))), "dev", "shop", map[string]string{"dev": "dev"})
+	if is, _ := c.Scan(context.Background()); len(is) != 1 {
+		t.Fatalf("warning after Ready dropped: %+v", is)
+	}
+}

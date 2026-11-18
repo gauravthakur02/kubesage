@@ -38,6 +38,7 @@ func Comparable(obj *unstructured.Unstructured) string {
 			m["data"] = hashed
 		}
 	}
+	hashEnvValues(m) // snapshots and diffs never hold plaintext passwords from env vars
 	if spec, ok := m["spec"].(map[string]any); ok {
 		if tpl, ok := spec["template"].(map[string]any); ok {
 			if md, ok := tpl["metadata"].(map[string]any); ok {

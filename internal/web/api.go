@@ -472,7 +472,7 @@ func (a *App) text(kind string) http.HandlerFunc {
 		defer cancel()
 		var out string
 		if kind == "yaml" {
-			out, err = c.YAML(ctx, res, ns, name, false) // secret values stay masked in the browser
+			out, err = c.RedactedYAML(ctx, res, ns, name) // secret and sensitive env values stay masked in the browser
 		} else {
 			out, err = c.Describe(ctx, res, ns, name)
 		}

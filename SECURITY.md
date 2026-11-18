@@ -76,10 +76,29 @@ There is no telemetry.
   Share the link only with people you would give your kubeconfig to.
 - Release binaries are not code-signed (macOS Gatekeeper and Windows SmartScreen warn on browser downloads); install
   with Homebrew, the install script or `go install`, and compare checksums.
+- The audit log's hash chain is not keyed: it detects edits, removed entries and a removed head, but someone who can
+  write the file can rewrite the whole chain. Push it to Loki (`kubeweave audit export`, `audit_loki_url`) or other write-once storage for evidence.
 - AI answers can be wrong or manipulated by text in logs and objects (prompt injection). kubeweave never runs a change
   the AI proposes without your approval, but read the command before you approve it.
 
 ## Security review log
+
+**2026-11 (v0.7.1)**, an independent install-and-test report (fresh install, kind cluster, CLI, web UI, AI agent).
+Fixed:
+
+| Severity | Finding | Fix |
+|---|---|---|
+| High | Global flags before the subcommand (`kubeweave --context x scan`) were ignored and the interactive UI opened instead, so CI jobs hung. | The subcommand is found after global flags; `kubeweave <command> -h` prints that command's help. |
+| High | Auto-run AI `kubectl` commands could keep identity flags (`--as`, `--token`, `--server`, `--kubeconfig`, `--insecure-skip-tls-verify`…), acting as someone else without approval. | All targeting and identity flags are removed before kubeweave adds its own context. |
+| Medium | Sensitive env values (`DB_PASSWORD: …`) were in plain text in snapshots, cluster diffs and the browser's YAML, compare and edit views. | Snapshots and diffs store a short hash; the browser shows them masked and saving keeps the cluster's value. |
+| Medium | Deleting the oldest entries of the audit log passed `audit verify`. | The chain must start empty, so a removed head is detected. The unkeyed hash is listed above as a limitation. |
+| Medium | A crash-looping container counted as a warning while it showed `Error` between restarts, so `scan` passed in CI. | A non-zero exit in a restarting, not-ready container is an error. |
+| Medium | Readiness-probe warnings from a pod's startup were reported after the pod became Ready. | Pod warnings from before the pod's current Ready time are skipped. |
+| Low | `kubeweave audit` and `snapshot list` needed a kubeconfig. | Both work without one. |
+| Low | `kubeweave report` used the kubeconfig's default namespace. | It covers all namespaces unless `-n` is given. |
+| Low | `update --check` told a source build it was the latest version. | It says it is a development build and names the latest release. |
+| Low | The VS Code extension quoted arguments with double quotes (`$(…)` still expanded in POSIX shells). | Single quotes, with each shell's escaping. |
+| Low | `kubeweave bot` listened on every interface by default. | It listens on `127.0.0.1:8090` unless `--addr` says otherwise. |
 
 **2026-11 (v0.6.0 public beta)**, a review of the web server, sign-in, AI agent, plugins, bot, MCP server, file
 handling and installers. Fixed:

@@ -84,7 +84,7 @@ Usage:
   kubeweave serve [--addr 127.0.0.1:7777] [--lan] [--allow-changes]
                                    the full UI in a web browser (read-only unless --allow-changes)
   kubeweave snapshot save [name] | list | diff <name>   save a namespace (-n) and compare it later
-  kubeweave bot [--addr :8090]      read-only Slack slash command (/slack) and Teams webhook (/teams)
+  kubeweave bot [--addr ADDR]       read-only Slack slash command (/slack) and Teams webhook (/teams)
   kubeweave update [--check]        download, verify and install the latest release
   kubeweave completion bash|zsh|fish|powershell   shell completion script
   kubeweave man                     print the man page (kubeweave man > kubeweave.1)
@@ -112,11 +112,7 @@ func main() {
 		fs.PrintDefaults()
 	}
 
-	args := os.Args[1:]
-	sub := ""
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		sub, args = args[0], args[1:]
-	}
+	sub, args := findSubcommand(fs, os.Args[1:])
 	if sub == "config" {
 		// Accept flags before or after the action: `config init --config x` and `config --config x init`.
 		cfs := flag.NewFlagSet("config", flag.ExitOnError)
@@ -138,11 +134,18 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Run `kubeweave help` for the commands this version has.")
 		os.Exit(1)
 	}
+	_, words := splitGlobalFlags(fs, args) // the subcommand's own words, without global flags
+	for _, a := range words {
+		if (a == "-h" || a == "--help" || a == "-help") && sub != "" && sub != "help" && sub != "ai" && sub != "config" {
+			fmt.Print(cli.CommandHelp(sub))
+			return
+		}
+	}
 	switch sub {
 	case "completion":
 		shell := ""
-		if len(args) > 0 {
-			shell = args[0]
+		if len(words) > 0 {
+			shell = words[0]
 		}
 		script, err := cli.Completion(shell)
 		exitIf(err)
@@ -152,10 +155,10 @@ func main() {
 		fmt.Print(cli.Man(version, time.Now()))
 		return
 	case "update":
-		runUpdate(args)
+		runUpdate(words)
 		return
 	case "__complete": // used by the completion scripts
-		runComplete(args)
+		runComplete(words)
 		return
 	}
 	if sub == "version" {
@@ -205,12 +208,20 @@ func main() {
 		runAI(cfg, subArgs)
 		return
 	}
+	if sub == "audit" { // a local file: no cluster or kubeconfig needed
+		runAudit(cfg, subArgs)
+		return
+	}
 	namespace := *ns
 	if *allNS || namespace == "all" {
 		namespace = "*all*"
 	}
 	contexts := strings.Split(*kctx, ",")
 	client, err := kube.New(*kubeconfig, strings.TrimSpace(contexts[0]), strings.ReplaceAll(namespace, "*all*", ""))
+	if err != nil && sub == "snapshot" && (len(subArgs) == 0 || subArgs[0] == "list") {
+		listAllSnapshots(*cfgPath) // listing saved files works without a kubeconfig
+		return
+	}
 	exitIf(err)
 	if namespace == "*all*" {
 		client.Namespace = kube.AllNamespaces
@@ -256,7 +267,7 @@ func main() {
 	case "audit":
 		runAudit(cfg, subArgs)
 	case "report":
-		runReport(cfg, *kubeconfig, client, subArgs)
+		runReport(cfg, *kubeconfig, client, namespace, subArgs)
 	case "schedule":
 		runSchedule(cfg, *kubeconfig, subArgs)
 	case "ask":
@@ -652,7 +663,17 @@ func runPolicyScan(cfg *config.Config, c *kube.Client) int {
 	return code
 }
 
-func runReport(cfg *config.Config, kubeconfig string, client *kube.Client, args []string) {
+// runReport covers every namespace unless -n names one (a cluster report from cron should not depend on the
+// kubeconfig's default namespace).
+func runReport(cfg *config.Config, kubeconfig string, client *kube.Client, namespace string, args []string) {
+	scope := func(c *kube.Client) {
+		if namespace == "" || namespace == "*all*" {
+			c.Namespace = kube.AllNamespaces
+		} else {
+			c.Namespace = namespace
+		}
+	}
+	scope(client)
 	post := false
 	for _, a := range args {
 		if a == "--post" || a == "-post" {
@@ -667,6 +688,7 @@ func runReport(cfg *config.Config, kubeconfig string, client *kube.Client, args 
 				if re, err := regexp.Compile(p); err == nil && re.MatchString(name) {
 					c, err := kube.New(kubeconfig, name, "")
 					exitIf(err)
+					scope(c)
 					clients = append(clients, c)
 					break
 				}
@@ -714,6 +736,13 @@ func runUpdate(args []string) {
 	}
 	r, err := update.Latest(context.Background())
 	exitIf(err)
+	if !update.IsRelease(version) { // a source or dev build: never claim it is "the latest"
+		fmt.Printf("kubeweave %s is a development build; the latest release is %s: %s\n", version, r.Version, r.URL)
+		if !checkOnly {
+			exitIf(fmt.Errorf("not replacing a development build; install a release (see the README) or rebuild from source"))
+		}
+		return
+	}
 	if !update.Newer(version, r.Version) {
 		fmt.Printf("✓ kubeweave %s is the latest version\n", version)
 		return
@@ -812,6 +841,10 @@ func runAudit(cfg *config.Config, args []string) {
 	}
 	switch action {
 	case "verify":
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			fmt.Printf("no audit log yet at %s (nothing has been changed through kubeweave)\n", path)
+			return
+		}
 		n, legacy, err := audit.Verify(path)
 		exitIf(err)
 		fmt.Printf("✓ %s: %d chained entries intact", path, n)
@@ -981,7 +1014,7 @@ func cfgPathOrDefault(p string) string {
 }
 
 func runBot(cfg *config.Config, kubeconfig string, def *kube.Client, args []string) {
-	addr := ":8090"
+	addr := "127.0.0.1:8090" // local only; pass --addr :8090 behind a proxy that forwards Slack/Teams
 	for i := 0; i < len(args)-1; i++ {
 		if args[i] == "--addr" || args[i] == "-addr" {
 			addr = args[i+1]
@@ -1077,5 +1110,53 @@ func runSnapshot(cfg *config.Config, cfgPath string, c *kube.Client, args []stri
 		}
 	default:
 		exitIf(fmt.Errorf("use: kubeweave snapshot save [name] | list | diff <name>"))
+	}
+}
+
+// findSubcommand finds the subcommand even when global flags come first (kubectl style:
+// `kubeweave --context dev scan -n shop`). Global flags and their values are skipped; the first other word is the
+// subcommand and is removed from the returned arguments.
+func findSubcommand(fs *flag.FlagSet, args []string) (string, []string) {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			return "", args
+		}
+		if !strings.HasPrefix(a, "-") || a == "-" {
+			rest := append(append([]string{}, args[:i]...), args[i+1:]...)
+			return a, rest
+		}
+		name, _, hasValue := strings.Cut(strings.TrimLeft(a, "-"), "=")
+		f := fs.Lookup(name)
+		if f == nil {
+			continue // unknown flag: leave it for the flag parser to report
+		}
+		if bf, ok := f.Value.(interface{ IsBoolFlag() bool }); ok && bf.IsBoolFlag() {
+			continue
+		}
+		if !hasValue {
+			i++ // skip the flag's value
+		}
+	}
+	return "", args
+}
+
+// listAllSnapshots lists every saved snapshot, grouped by context and namespace (no cluster needed).
+func listAllSnapshots(cfgPath string) {
+	base := filepath.Join(filepath.Dir(cfgPathOrDefault(cfgPath)), "snapshots")
+	ctxs, err := os.ReadDir(base)
+	if os.IsNotExist(err) {
+		fmt.Println("no snapshots yet (kubeweave snapshot save -n <namespace>)")
+		return
+	}
+	exitIf(err)
+	for _, c := range ctxs {
+		nss, _ := os.ReadDir(filepath.Join(base, c.Name()))
+		for _, n := range nss {
+			files, _ := os.ReadDir(filepath.Join(base, c.Name(), n.Name()))
+			for _, f := range files {
+				fmt.Printf("%s/%s  %s\n", c.Name(), n.Name(), strings.TrimSuffix(f.Name(), ".json"))
+			}
+		}
 	}
 }

@@ -34,6 +34,11 @@ func TestChainVerifyAndTamper(t *testing.T) {
 	if _, _, err := Verify(p); err == nil || !strings.Contains(err.Error(), "chain broken") {
 		t.Fatalf("deletion not detected: %v", err)
 	}
+	// removing the oldest chained entries (the head of the chain) is detected too
+	os.WriteFile(p, []byte(strings.Join(lines[2:], "\n")+"\n"), 0o600)
+	if _, _, err := Verify(p); err == nil || !strings.Contains(err.Error(), "chain broken") {
+		t.Fatalf("prefix deletion not detected: %v", err)
+	}
 }
 
 func TestExportLoki(t *testing.T) {

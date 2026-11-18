@@ -53,6 +53,20 @@ func PodIssues(p *corev1.Pod) []Issue {
 				add(HealthErr, w.Reason, msg, hint)
 			}
 		}
+		// Between restarts a crashing container shows terminated/Error before the kubelet says CrashLoopBackOff;
+		// both are the same outage, so both are errors (CI must not pass during the Error window).
+		crashing := false
+		restarts := p.Spec.RestartPolicy != corev1.RestartPolicyNever
+		if t := cs.State.Terminated; t != nil && t.ExitCode != 0 && restarts && t.Reason != "OOMKilled" {
+			add(HealthErr, "ContainerExited", fmt.Sprintf("container %q exited with code %d (%s), restarts: %d", cs.Name, t.ExitCode, nonEmpty(t.Reason, "Error"), cs.RestartCount),
+				"The container exits right after starting: read its previous logs, check command, args, config and required env vars.")
+			crashing = true
+		} else if lt := cs.LastTerminationState.Terminated; lt != nil && lt.ExitCode != 0 && lt.Reason != "OOMKilled" && restarts &&
+			cs.RestartCount >= 2 && !cs.Ready && (cs.State.Waiting == nil || waitingHints[cs.State.Waiting.Reason] == "") {
+			add(HealthErr, "CrashLooping", fmt.Sprintf("container %q keeps exiting with code %d (%s), restarts: %d", cs.Name, lt.ExitCode, nonEmpty(lt.Reason, "Error"), cs.RestartCount),
+				"The container exits repeatedly: read its previous logs, check command, args, config and liveness probes.")
+			crashing = true
+		}
 		if t := cs.LastTerminationState.Terminated; t != nil && t.Reason == "OOMKilled" {
 			// A container that was OOMKilled once but is healthy again is a warning, not an outage.
 			sev := HealthErr
@@ -61,7 +75,7 @@ func PodIssues(p *corev1.Pod) []Issue {
 			}
 			add(sev, "OOMKilled", fmt.Sprintf("container %q was OOMKilled (restarts: %d, last at %s)", cs.Name, cs.RestartCount, Age(t.FinishedAt)),
 				"Memory limit is too low or the app leaks memory. Raise resources.limits.memory or profile the app.")
-		} else if cs.RestartCount >= 5 && (cs.State.Waiting == nil || waitingHints[cs.State.Waiting.Reason] == "") {
+		} else if !crashing && cs.RestartCount >= 5 && (cs.State.Waiting == nil || waitingHints[cs.State.Waiting.Reason] == "") {
 			add(HealthWarn, "HighRestarts", fmt.Sprintf("container %q restarted %d times", cs.Name, cs.RestartCount),
 				"Inspect previous logs and liveness probe settings.")
 		}
@@ -131,8 +145,12 @@ func (c *Client) Scan(ctx context.Context) ([]Issue, error) {
 	if err != nil {
 		return nil, err
 	}
+	readySince := map[string]time.Time{} // pods that became Ready after their warnings (startup probe failures etc.)
 	for i := range pods {
 		out = append(out, PodIssues(&pods[i])...)
+		if t, ok := readyAt(&pods[i]); ok {
+			readySince[pods[i].Namespace+"/"+pods[i].Name] = t
+		}
 	}
 	if deps, err := c.listDeploymentsAcross(ctx, ns); err == nil {
 		for i := range deps {
@@ -197,6 +215,11 @@ func (c *Client) Scan(ctx context.Context) ([]Issue, error) {
 			e := &evs[i]
 			if time.Since(eventTime(e)) > 30*time.Minute {
 				continue
+			}
+			if e.InvolvedObject.Kind == "Pod" { // a warning from before the pod turned Ready is history, not a problem
+				if t, ok := readySince[e.InvolvedObject.Namespace+"/"+e.InvolvedObject.Name]; ok && !eventTime(e).After(t) {
+					continue
+				}
 			}
 			r, ok := Lookup(e.InvolvedObject.Kind)
 			if !ok || seen[r.Name+"/"+e.InvolvedObject.Namespace+"/"+e.InvolvedObject.Name] {
@@ -388,4 +411,17 @@ func (c *Client) Pulse(ctx context.Context) (Pulse, error) {
 		}
 	}
 	return p, nil
+}
+
+// readyAt reports when a pod that is Ready now last became Ready.
+func readyAt(p *corev1.Pod) (time.Time, bool) {
+	if p.Status.Phase != corev1.PodRunning {
+		return time.Time{}, false
+	}
+	for _, c := range p.Status.Conditions {
+		if c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue {
+			return c.LastTransitionTime.Time, true
+		}
+	}
+	return time.Time{}, false
 }

@@ -101,6 +101,16 @@ func (c *Client) YAML(ctx context.Context, r Resource, ns, name string, reveal b
 	return string(out), err
 }
 
+// RedactedYAML is YAML with secret values and sensitive env values masked (for the browser).
+func (c *Client) RedactedYAML(ctx context.Context, r Resource, ns, name string) (string, error) {
+	obj, err := c.Get(ctx, r, ns, name)
+	if err != nil {
+		return "", err
+	}
+	out, err := yaml.Marshal(Clean(obj, true, false))
+	return string(out), err
+}
+
 // kubectlArgs prefixes args with the kubeconfig/context flags of this client.
 func (c *Client) KubectlArgs(args ...string) []string {
 	base := []string{"--context", c.Context}

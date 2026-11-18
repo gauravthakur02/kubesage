@@ -80,6 +80,9 @@ func (a *App) editYAML(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := reqCtx(r, 20*time.Second)
 	defer cancel()
 	y, err := c.EditableYAML(ctx, res, ns, name)
+	if err == nil {
+		y, err = kube.MaskEnvYAML(y, "") // sensitive env values are masked; saving keeps them
+	}
 	if err != nil {
 		fail(w, 502, err)
 		return
@@ -108,8 +111,15 @@ func (a *App) dryRun(w http.ResponseWriter, r *http.Request) {
 		fail(w, 502, err)
 		return
 	}
-	out := map[string]any{"diff": diffOf(cur, req.YAML)}
-	result, err := c.UpdateFromYAML(ctx, res, req.NS, req.Name, req.YAML, true)
+	full, err := kube.UnmaskEnvYAML(req.YAML, cur)
+	if err != nil {
+		fail(w, 422, err)
+		return
+	}
+	shownCur, _ := kube.MaskEnvYAML(cur, "")
+	shownNew, _ := kube.MaskEnvYAML(full, cur)
+	out := map[string]any{"diff": diffOf(shownCur, shownNew)}
+	result, err := c.UpdateFromYAML(ctx, res, req.NS, req.Name, full, true)
 	out["warnings"] = result.Warnings
 	if err != nil {
 		out["error"] = err.Error()
@@ -139,7 +149,17 @@ func (a *App) applyYAML(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := reqCtx(r, 30*time.Second)
 	defer cancel()
-	_, err := c.UpdateFromYAML(ctx, res, req.NS, req.Name, req.YAML, false)
+	cur, err := c.EditableYAML(ctx, res, req.NS, req.Name)
+	if err != nil {
+		fail(w, 502, err)
+		return
+	}
+	full, err := kube.UnmaskEnvYAML(req.YAML, cur)
+	if err != nil {
+		fail(w, 422, err)
+		return
+	}
+	_, err = c.UpdateFromYAML(ctx, res, req.NS, req.Name, full, false)
 	a.audit(r, c.Context, req.NS, "edit.apply", res.Name+"/"+req.Name, err)
 	if err != nil {
 		fail(w, 502, err)
@@ -174,12 +194,12 @@ func (a *App) compare(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := reqCtx(r, 30*time.Second)
 	defer cancel()
-	y1, err := c1.YAML(ctx, res, q.Get("ns"), q.Get("name"), false)
+	y1, err := c1.RedactedYAML(ctx, res, q.Get("ns"), q.Get("name"))
 	if err != nil {
 		fail(w, 502, err)
 		return
 	}
-	y2, err := c2.YAML(ctx, res, q.Get("ns2"), q.Get("name2"), false)
+	y2, err := c2.RedactedYAML(ctx, res, q.Get("ns2"), q.Get("name2"))
 	if err != nil {
 		fail(w, 502, err)
 		return
@@ -324,7 +344,9 @@ func (a *App) aiFix(w http.ResponseWriter, r *http.Request) {
 		fail(w, 422, err)
 		return
 	}
-	out := map[string]any{"patch": patch, "why": why, "yaml": edited, "diff": diffOf(original, edited)}
+	shownOrig, _ := kube.MaskEnvYAML(original, "")
+	shownEdited, _ := kube.MaskEnvYAML(edited, original)
+	out := map[string]any{"patch": patch, "why": why, "yaml": shownEdited, "diff": diffOf(shownOrig, shownEdited)}
 	result, err := c.UpdateFromYAML(ctx, res, req.NS, req.Name, edited, true)
 	out["warnings"] = result.Warnings
 	if err != nil {
