@@ -9,8 +9,8 @@
 class Kubeweave < Formula
   desc "Kubernetes IDE for your terminal with an AI copilot"
   homepage "https://github.com/gauravthakur02/kubeweave"
-  url "https://github.com/gauravthakur02/kubeweave/archive/refs/tags/v0.6.0.tar.gz"
-  sha256 "1013ca877d6108b9be46220c9fc1616d6def536c367fc7c3ef270ad8b4b02f19"
+  url "https://github.com/gauravthakur02/kubeweave/archive/refs/tags/v0.7.0.tar.gz"
+  sha256 "965890067e35af23ad20a55fbe2e289ff57cbccf6e11f119638e6f54f3f3df6a"
   license "MIT"
   head "https://github.com/gauravthakur02/kubeweave.git", branch: "main"
 
