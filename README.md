@@ -1,17 +1,31 @@
-<p align="center">
-  <img src="assets/logo-animated.svg" alt="kubeweave: Kubernetes IDE for your terminal with an AI copilot" width="640">
-</p>
-
 # kubeweave
 
-> **Public beta.** kubeweave is young and moves fast. The core (browsing, logs, shells, port-forwards, Helm, health
-> checks, AI analysis) is used daily; features marked *experimental* below have been tested against fake clusters and
-> services but not yet widely in the field. Try new things with `--readonly` or on a non-production cluster first, and
-> please [report problems](https://github.com/gauravthakur02/kubeweave/issues). Security issues:
-> [SECURITY.md](SECURITY.md).
+**A Kubernetes IDE for your terminal and browser, with an issue detector that needs no AI and an optional AI copilot.**
 
-A Kubernetes IDE for the terminal, in the spirit of k9s and Lens, with an AI copilot that
-reads your cluster's manifests, events and logs and tells you what is wrong and how to fix it.
+<p align="center">
+  <img src="assets/demo.gif" alt="kubeweave in a terminal: a pod list with a crashing pod, its logs, the Pulse health screen with detected issues, and a deployment's relationships" width="900">
+</p>
+<p align="center"><sub>About 20 seconds, real UI, read-only mode, against a local kind cluster. No AI in this clip.</sub></p>
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubeweave/main/install.sh | sh
+```
+<sub>macOS and Linux; the script checks the download against the release's checksums. Windows, Homebrew, `go install` and
+packages: see [Install](#install). Then run `kubeweave --readonly` to look around without being able to change anything.</sub>
+
+> **Beta: please read before you rely on it.** kubeweave is a young project (first release November 2026) built and
+> maintained by one person. What that means in practice:
+> - **Tested:** unit and race tests on Linux, macOS and Windows, an end-to-end suite against a real kind cluster on every
+>   push to main, and an independent install-and-test review plus a retest, whose findings are fixed ([SECURITY.md](SECURITY.md#security-review-log)).
+>   Browsing, logs, shells, port-forwards, Helm, health checks and the issue detector have had the most use.
+> - **Not yet proven:** wide use on large production clusters. Features marked *experimental* below have only been tested
+>   against test clusters and fake services. Commands, flags and config keys can still change between minor versions.
+> - **AI answers can be wrong.** The AI never changes anything without your approval; read each command before you approve it.
+> - **Release binaries are not code-signed**, so use the install script, Homebrew or `go install` (no Gatekeeper warning).
+>
+> Start with `--readonly` or a non-production cluster, and please [report problems](https://github.com/gauravthakur02/kubeweave/issues).
+
+What you get:
 
 - A single static binary. Runs in bash, zsh, PowerShell and Windows Terminal (macOS, Linux, Windows).
 - Colour themes using truecolor, which falls back to 256 or 16 colours automatically.
@@ -963,7 +977,7 @@ internal/ui             Bubble Tea app: split panes, themes, table, text/log vie
 
 | File | Use |
 |---|---|
-| `assets/logo-animated.svg` | wordmark with a slowly turning wheel, a breathing leaf and twinkling sparkles (shown at the top of this README) |
+| `assets/logo-animated.svg` | wordmark with a slowly turning wheel, a breathing leaf and twinkling sparkles |
 | `assets/icon-animated.svg` | animated square icon |
 | `assets/logo.svg`, `assets/icon.svg` | static versions for slides, favicons and places that do not play animation |
 
@@ -1053,7 +1067,7 @@ If the kind node cannot pull images (proxies, rate limits), pull them on your ma
 
 The [documentation site](https://gauravthakur02.github.io/kubeweave/) is built from this README by `docs/build.py` (one page per
 section) and published by the `docs` workflow. Preview it locally with `pip install mkdocs-material && python docs/build.py && mkdocs serve`.
-`docs/demo.tape` records the demo GIF with [VHS](https://github.com/charmbracelet/vhs) against a throwaway kind cluster.
+`docs/demo.tape` records the demo GIF (`assets/demo.gif`) with [VHS](https://github.com/charmbracelet/vhs) against a throwaway kind cluster.
 
 ## Releases
 
@@ -1085,7 +1099,7 @@ Signing runs on the Linux release runner, so no Mac is needed in CI.
 
 ## Roadmap ideas
 
-A terminal-recorded demo, publishing the VS Code extension to the Marketplace, and more plugins in the catalogue.
+Publishing the VS Code extension to the Marketplace, and more plugins in the catalogue.
 
 ## License
 
