@@ -65,8 +65,13 @@ def main():
     # "[Install](#install)" in the README points at a section; on the site each "## " section is its own page.
     page_of = {slug(t): "%s.md" % slug(t) for t, _ in sections[1:] if t != "Use"}
     page_of["use"] = "use.md"
-    fix = lambda body: re.sub(r"\]\(#([a-z0-9-]+)\)", lambda m: "](%s)" % page_of.get(m.group(1), "#" + m.group(1)), body)
-    pages = {name: fix(body) for name, body in pages.items()}
+    def fix(name, body):
+        body = re.sub(r"\]\(#([a-z0-9-]+)\)", lambda m: "](%s)" % page_of.get(m.group(1), "#" + m.group(1)), body)
+        # HTML links: the site serves each page as a folder (install.md -> install/, index.md -> the site root)
+        up = "" if name == "index.md" else "../"
+        return re.sub(r'href="#([a-z0-9-]+)"', lambda m: 'href="%s"' % (
+            up + page_of[m.group(1)][:-3] + "/" if m.group(1) in page_of else "#" + m.group(1)), body)
+    pages = {name: fix(name, body) for name, body in pages.items()}
     for name, body in pages.items():
         with open(os.path.join(OUT, name), "w", encoding="utf-8") as f:
             f.write(body.strip() + "\n")

@@ -5,7 +5,8 @@
 <p align="center">
   <img src="assets/demo.gif" alt="kubeweave in a terminal: a pod list with a crashing pod, its logs, the Pulse health screen with detected issues, and a deployment's relationships" width="900">
 </p>
-<p align="center"><sub>About 20 seconds, real UI, read-only mode, against a local kind cluster. No AI in this clip.</sub></p>
+<p align="center"><sub>About 20 seconds, real UI, read-only mode, against a local kind cluster. No AI in this clip.
+Prefer a browser? <code>kubeweave serve</code> opens the same clusters in a web UI: <a href="#in-the-browser-and-in-vs-code">see it in action</a>.</sub></p>
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gauravthakur02/kubeweave/main/install.sh | sh
@@ -665,6 +666,11 @@ your config). `enter` shows the exact command it will run and installs it on con
 
 **Web UI (`kubeweave serve`).** A browser app for the same clusters, built for mouse *and* keyboard:
 
+<p align="center">
+  <img src="assets/demo-web.gif" alt="The kubeweave web UI: a pod list, a crashing pod's logs in the side panel, a deployment's relationships graph, the Ctrl+K palette and the health check" width="900">
+</p>
+<p align="center"><sub>About 18 seconds, read-only, against a local kind cluster: logs of a crashing pod, a deployment's relationships, then Ctrl+K to the health check.</sub></p>
+
 - **Navigate:** a sidebar with every resource type (built-in and CRDs), cluster and namespace pickers, and a live table (refreshes every
   5 seconds) with health dots, CPU sparklines for pods, sort on any column, and a filter. Filtering, sorting and paging happen on the
   server, so namespaces with thousands of objects stay fast ("Load 500 more").
@@ -1067,7 +1073,8 @@ If the kind node cannot pull images (proxies, rate limits), pull them on your ma
 
 The [documentation site](https://gauravthakur02.github.io/kubeweave/) is built from this README by `docs/build.py` (one page per
 section) and published by the `docs` workflow. Preview it locally with `pip install mkdocs-material && python docs/build.py && mkdocs serve`.
-`docs/demo.tape` records the demo GIF (`assets/demo.gif`) with [VHS](https://github.com/charmbracelet/vhs) against a throwaway kind cluster.
+`docs/demo.tape` records the terminal demo GIF (`assets/demo.gif`) with [VHS](https://github.com/charmbracelet/vhs), and `docs/demo-web.js` the web UI one
+(`assets/demo-web.gif`) with Playwright and ffmpeg, both against a throwaway kind cluster.
 
 ## Releases
 
